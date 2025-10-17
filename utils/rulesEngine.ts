@@ -5,6 +5,9 @@ export const runFiscalValidation = (item: Record<string, any>): Inconsistency[] 
   const findings: Inconsistency[] = [];
   const cfop = item.produto_cfop?.toString() || '';
   const ncm = item.produto_ncm?.toString() || '';
+  const cstIcms = item.produto_cst_icms?.toString();
+  const cstPis = item.produto_cst_pis?.toString();
+  const cstCofins = item.produto_cst_cofins?.toString();
   const qCom = parseFloat(item.produto_qtd || 0);
   const vUnCom = parseFloat(item.produto_valor_unit || 0);
   const vProd = parseFloat(item.produto_valor_total || 0);
@@ -56,6 +59,22 @@ export const runFiscalValidation = (item: Record<string, any>): Inconsistency[] 
           }
       }
   }
+  
+  const isReturnCfop = cfop.startsWith('12') || cfop.startsWith('22') || cfop.startsWith('52') || cfop.startsWith('62');
+
+  // Rule 7: PIS/COFINS CST validation for returns
+  const tributadoNormalmentePisCofins = (cst: string | undefined) => cst && ['01', '02'].includes(cst);
+
+  if (isReturnCfop && (tributadoNormalmentePisCofins(cstPis) || tributadoNormalmentePisCofins(cstCofins))) {
+      findings.push(INCONSISTENCIES.PIS_COFINS_CST_INVALIDO_PARA_DEVOLUCAO);
+  }
+
+  // Rule 8: ICMS CST validation for returns
+  const tributadoNormalmenteIcms = (cst: string | undefined) => cst && ['00', '20'].includes(cst);
+  if(isReturnCfop && tributadoNormalmenteIcms(cstIcms)) {
+      findings.push(INCONSISTENCIES.ICMS_CST_INVALIDO_PARA_CFOP);
+  }
+
 
   return findings;
 };

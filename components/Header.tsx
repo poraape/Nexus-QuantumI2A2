@@ -1,15 +1,18 @@
 import React from 'react';
-import { DownloadIcon, LoadingSpinnerIcon, DocumentTextIcon } from './icons';
+import { DownloadIcon, LoadingSpinnerIcon, DocumentTextIcon, FileInfoIcon } from './icons';
 import type { ExportType } from '../App';
 import LogoIcon from './LogoIcon'; // Importa o novo ícone
 
 interface HeaderProps {
     showExports: boolean;
+    showSpedExport: boolean;
+    isReportView: boolean;
     isExporting: ExportType | null;
     onExport: (type: ExportType) => void;
+    onToggleLogs: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ showExports, isExporting, onExport }) => {
+const Header: React.FC<HeaderProps> = ({ showExports, showSpedExport, isReportView, isExporting, onExport, onToggleLogs }) => {
   const exportOptions: { type: ExportType, label: string, icon: React.ReactNode }[] = [
       { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
       { type: 'html', label: 'HTML', icon: <span className="font-bold text-sm">H</span> },
@@ -32,22 +35,46 @@ const Header: React.FC<HeaderProps> = ({ showExports, isExporting, onExport }) =
                     </p>
                 </div>
             </div>
-            {showExports && (
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-400 hidden sm:block">Exportar Relatório:</span>
-                    {exportOptions.map(({ type, label, icon }) => (
-                         <button
-                            key={type}
-                            onClick={() => onExport(type)}
-                            disabled={!!isExporting}
-                            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait w-9 h-9 flex items-center justify-center"
-                            title={`Exportar para ${label}`}
-                        >
-                            {isExporting === type ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : icon}
-                        </button>
-                    ))}
-                </div>
-            )}
+
+            <div className="flex items-center gap-2">
+                 {showExports && isReportView && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-400 hidden sm:block">Exportar Relatório:</span>
+                        {exportOptions.map(({ type, label, icon }) => (
+                            <button
+                                key={type}
+                                onClick={() => onExport(type)}
+                                disabled={!!isExporting}
+                                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait w-9 h-9 flex items-center justify-center"
+                                title={`Exportar para ${label}`}
+                            >
+                                {isExporting === type ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : icon}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                
+                {showSpedExport && (
+                    <button
+                        onClick={() => onExport('sped')}
+                        disabled={!!isExporting}
+                        className="px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait h-9 flex items-center justify-center gap-2 text-sm"
+                        title="Exportar SPED/EFD"
+                    >
+                        {isExporting === 'sped' ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : <DownloadIcon className="w-4 h-4"/>}
+                        <span className="hidden sm:inline">SPED</span>
+                    </button>
+                )}
+
+
+                 <button
+                    onClick={onToggleLogs}
+                    className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors w-9 h-9 flex items-center justify-center"
+                    title="Ver Logs de Execução"
+                >
+                    <FileInfoIcon className="w-5 h-5"/>
+                </button>
+            </div>
         </div>
       </div>
     </header>

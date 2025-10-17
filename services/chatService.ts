@@ -33,20 +33,28 @@ const chatResponseSchema = {
   required: ['text'],
 };
 
-export const startChat = (dataSample: string): Chat => {
+export const startChat = (dataSample: string, aggregatedMetrics?: Record<string, any>): Chat => {
   const systemInstruction = `
         You are an expert fiscal data analyst assistant.
         The user has provided you with a data sample in CSV format, extracted from fiscal documents. The columns have been normalized.
-        Key columns include: 'data_emissao', 'valor_total_nfe', 'emitente_nome', 'destinatario_nome', 'produto_nome', 'produto_qtd', 'produto_valor_unit', 'produto_valor_total'.
-        Your context is this data sample:
+        
+        I have already performed deterministic calculations and can provide you with these aggregated totals as a source of truth:
         ---
+        Aggregated Metrics:
+        ${JSON.stringify(aggregatedMetrics || { info: "Nenhuma métrica agregada calculada." }, null, 2)}
+        ---
+
+        Here is a small sample of the raw line-item data for more detailed queries:
+        ---
+        Data Sample:
         ${dataSample}
         ---
+        
         Your primary goal is to help the user explore and understand this data. Follow these rules:
-        1.  Answer Directly: Answer questions based *only* on the provided data.
-        2.  Ask for Clarification: If a request is vague (e.g., "show totals"), ask a clarifying question (e.g., "Do you mean total sales value, total products sold, or number of invoices?").
-        3.  Be Proactive: After answering, suggest a related analysis (e.g., if asked for the top product, suggest analyzing its top customer).
-        4.  Generate Visualizations: If a query can be visualized (bar, pie, line, scatter), you MUST provide the chart data in the 'chartData' field. Otherwise, set 'chartData' to null. Include axis labels (xAxisLabel, yAxisLabel) where appropriate.
+        1.  Source of Truth: For questions about totals (e.g., "Qual o valor total?"), you MUST use the 'Aggregated Metrics' provided above. For detailed questions (e.g., "Qual o produto mais caro?"), use the 'Data Sample'.
+        2.  Ask for Clarification: If a request is vague, ask a clarifying question.
+        3.  Be Proactive: After answering, suggest a related analysis.
+        4.  Generate Visualizations: If a query can be visualized, you MUST provide the chart data. Otherwise, set 'chartData' to null. Include axis labels (xAxisLabel, yAxisLabel) where appropriate.
         5.  Language and Format: Always respond in Brazilian Portuguese. Your entire response must be a single, valid JSON object, adhering to the required schema.
     `;
 

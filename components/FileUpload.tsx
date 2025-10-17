@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { UploadIcon, FileIcon } from './icons';
+import { logger } from '../services/logger';
 
 interface FileUploadProps {
   onFileUpload: (files: FileList) => void;
@@ -24,21 +25,33 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
   };
 
   const processFiles = (files: FileList) => {
+      logger.log('FileUpload', 'INFO', `${files.length} arquivo(s) recebido(s) para processamento.`);
       setError(null);
       const acceptedFiles: File[] = [];
+      const rejectedFiles: {name: string, reason: string}[] = [];
+
       for (const file of Array.from(files)) {
           if (file.size > FILE_SIZE_LIMIT_BYTES) {
-              setError(`O arquivo ${file.name} excede o limite de ${FILE_SIZE_LIMIT_MB} MB.`);
-              // continue processing other files
+              rejectedFiles.push({name: file.name, reason: `Tamanho excede ${FILE_SIZE_LIMIT_MB} MB`});
           } else {
               acceptedFiles.push(file);
           }
       }
+
+      if(rejectedFiles.length > 0) {
+        const errorMessage = `Arquivo(s) rejeitado(s): ${rejectedFiles.map(f => f.name).join(', ')}. Verifique os limites.`;
+        setError(errorMessage);
+        logger.log('FileUpload', 'WARN', errorMessage, { rejectedFiles });
+      }
+
       if (acceptedFiles.length > 0) {
+        logger.log('FileUpload', 'INFO', `${acceptedFiles.length} arquivo(s) aceito(s) e enviados para o pipeline.`);
         const dataTransfer = new DataTransfer();
         acceptedFiles.forEach(file => dataTransfer.items.add(file));
         onFileUpload(dataTransfer.files);
         setUploadedFiles(acceptedFiles);
+      } else if (files.length > 0) {
+        logger.log('FileUpload', 'ERROR', 'Nenhum arquivo foi aceito para o pipeline.');
       }
   };
 
@@ -66,7 +79,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
     if (!disabled && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       processFiles(e.dataTransfer.files);
     }
-  }, [disabled, onFileUpload]);
+  }, [disabled]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!disabled && e.target.files && e.target.files.length > 0) {
@@ -174,7 +187,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
               Clique ou arraste seus arquivos
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              Suportados: XML, CSV, XLSX, PDF, Imagens (PNG, JPG), ZIP
+              Suportados: XML, CSV, XLSX, PDF, Imagens (PNG, JPG), ZIP (limite de {FILE_SIZE_LIMIT_MB}MB)
             </p>
           </div>
         </label>

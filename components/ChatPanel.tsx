@@ -1,18 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { ChatMessage } from '../types';
+import type { ExportType } from '../App';
 import Chart from './Chart';
-import { SendIcon, UserIcon, AiIcon, LoadingSpinnerIcon, StopIcon } from './icons';
+import { SendIcon, UserIcon, AiIcon, LoadingSpinnerIcon, StopIcon, DownloadIcon, DocumentTextIcon } from './icons';
+import { exportConversationToDocx, exportConversationToHtml, exportConversationToPdf } from '../utils/exportConversationUtils';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
   isStreaming: boolean;
   onStopStreaming: () => void;
+  reportTitle: string;
+  setError: (message: string | null) => void;
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStreaming, onStopStreaming }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStreaming, onStopStreaming, reportTitle, setError }) => {
   const [input, setInput] = useState('');
+  const [isExporting, setIsExporting] = useState<ExportType | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -21,6 +28,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Close export menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +47,39 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
       setInput('');
     }
   };
+  
+  const handleExport = async (type: ExportType) => {
+    setIsExporting(type);
+    setShowExportMenu(false);
+    try {
+        const filename = `Conversa_Analise_Fiscal_${reportTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
+        const title = `Conversa sobre: ${reportTitle}`;
+
+        switch(type) {
+            case 'docx':
+                await exportConversationToDocx(messages, title, filename);
+                break;
+            case 'html':
+                await exportConversationToHtml(messages, title, filename);
+                break;
+            case 'pdf':
+                await exportConversationToPdf(messages, title, filename);
+                break;
+        }
+
+    } catch(err) {
+        console.error(`Failed to export conversation as ${type}:`, err);
+        setError(`Falha ao exportar a conversa como ${type.toUpperCase()}.`);
+    } finally {
+        setIsExporting(null);
+    }
+  };
+
+  const exportOptions: { type: ExportType, label: string, icon: React.ReactNode }[] = [
+      { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
+      { type: 'html', label: 'HTML', icon: <span className="font-bold text-sm">H</span> },
+      { type: 'pdf', label: 'PDF', icon: <span className="font-bold text-sm">P</span> },
+  ];
   
   const renderMessageContent = (message: ChatMessage) => {
     const html = message.text
@@ -41,8 +92,34 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col h-full max-h-[calc(100vh-12rem)] animate-fade-in">
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-200">3. Chat Interativo</h2>
+        <div className="relative" ref={exportMenuRef}>
+            <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={!!isExporting}
+                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 flex items-center gap-2 text-sm"
+                title="Exportar Conversa"
+            >
+                <DownloadIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Exportar Conversa</span>
+            </button>
+            {showExportMenu && (
+                <div className="absolute top-full right-0 mt-2 w-40 bg-gray-700 rounded-md shadow-lg z-10 animate-fade-in-down-sm">
+                    {exportOptions.map(({ type, label, icon }) => (
+                         <button
+                            key={type}
+                            onClick={() => handleExport(type)}
+                            disabled={!!isExporting}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-left text-sm text-gray-200 hover:bg-gray-600 disabled:opacity-50"
+                        >
+                            {isExporting === type ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : icon}
+                            <span>{label}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
       </div>
       <div className="flex-grow p-4 overflow-y-auto space-y-6">
         {messages.map((message) => (

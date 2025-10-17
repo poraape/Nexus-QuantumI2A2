@@ -66,15 +66,40 @@ export interface Inconsistency {
   code: string;
   message: string;
   explanation: string; // XAI part
+  normativeBase?: string; // Legal reference
+  severity: 'ERRO' | 'ALERTA' | 'INFO';
+}
+
+export interface ClassificationResult {
+    operationType: 'Compra' | 'Venda' | 'Devolução' | 'Serviço' | 'Transferência' | 'Outros';
+    businessSector: string; // e.g., 'Indústria', 'Comércio', 'Tecnologia'
+    confidence: number;
 }
 
 export interface AuditedDocument {
   doc: ImportedDoc;
   status: AuditStatus;
+  score?: number; // Weighted score of inconsistencies
   inconsistencies: Inconsistency[];
+  classification?: ClassificationResult;
+}
+
+export interface AccountingEntry {
+  docName: string;
+  account: string;
+  type: 'D' | 'C'; // Débito or Crédito
+  value: number;
+}
+
+export interface SpedFile {
+    filename: string;
+    content: string;
 }
 
 export interface AuditReport {
   summary: AnalysisResult;
   documents: AuditedDocument[];
+  aggregatedMetrics?: Record<string, number | string>;
+  accountingEntries?: AccountingEntry[];
+  spedFile?: SpedFile;
 }

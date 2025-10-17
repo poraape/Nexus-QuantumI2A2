@@ -1,5 +1,8 @@
 import type { ImportedDoc } from '../types';
 import { runOCRFromImage } from '../agents/ocrExtractor';
+import { extractDataFromText } from '../agents/nlpAgent';
+import { logger } from '../services/logger';
+
 // FIX: Import `JSZipObject` type to correctly type items from the zip archive.
 import JSZip, { type JSZipObject } from 'jszip';
 import Papa from 'papaparse';
@@ -14,6 +17,38 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://aistudiocdn.com/pdfjs-dist@^4.
 const getFileExtension = (filename: string): string => {
     return filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
 };
+
+const sanitizeFilename = (filename: string): string => {
+    return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+const FILE_SIGNATURES: Record<string, string[]> = {
+    'pdf': ['25504446'], // %PDF
+    'png': ['89504e47'], // .PNG
+    'jpg': ['ffd8ff'],   // Various JPEG signatures
+    'zip': ['504b0304', '504b0506', '504b0708'], // PK..
+    'xml': ['3c3f786d6c'], // <?xml
+    'xlsx': ['504b0304'], // Also a zip file
+};
+
+const checkMagicNumbers = async (file: File): Promise<boolean> => {
+    const extension = getFileExtension(file.name);
+    const signatures = FILE_SIGNATURES[extension];
+    if (!signatures) return true; // No signature to check
+
+    try {
+        const slice = file.slice(0, 4);
+        const buffer = await slice.arrayBuffer();
+        const view = new DataView(buffer);
+        const fileHeader = Array.from({ length: view.byteLength }, (_, i) => view.getUint8(i).toString(16).padStart(2, '0')).join('');
+        
+        return signatures.some(sig => fileHeader.startsWith(sig));
+    } catch (e) {
+        logger.log('ImportPipeline', 'ERROR', `Falha ao ler o cabeçalho do arquivo ${file.name}`, { error: e });
+        return false;
+    }
+};
+
 
 const getInfNFe = (nfeData: any): any => {
     if (!nfeData) return null;
@@ -35,33 +70,49 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
     const dest = infNFe.dest || {};
     const total = infNFe.total?.ICMSTot || {};
 
-    // Helper to find CST inside the ICMS block, which can have various structures like ICMS00, ICMS10 etc.
-    const findIcmsCst = (imposto: any): string | undefined => {
-        const icms = imposto?.ICMS;
-        if (!icms) return undefined;
-        // The ICMS object contains a key like ICMS00, ICMS10, etc. We get the first key.
-        const icmsTypeKey = Object.keys(icms)[0];
-        if (icmsTypeKey && icms[icmsTypeKey] && icms[icmsTypeKey].CST) {
-            return icms[icmsTypeKey].CST.toString();
+    const findTaxInfo = (imposto: any, tributo: 'ICMS' | 'PIS' | 'COFINS'): { cst?: string; value?: number } => {
+        const impostoBlock = imposto?.[tributo];
+        if (!impostoBlock) return {};
+        
+        const typeKey = Object.keys(impostoBlock)[0];
+        if (typeKey && impostoBlock[typeKey]) {
+            const taxDetails = impostoBlock[typeKey];
+            const valueKey = `v${tributo}`;
+            return {
+                cst: taxDetails.CST?.toString(),
+                value: taxDetails[valueKey]
+            };
         }
-        return undefined;
+        return {};
     };
 
-    return items.map((item: any) => ({
-        data_emissao: ide.dhEmi,
-        valor_total_nfe: total.vNF,
-        emitente_nome: emit.xNome,
-        emitente_uf: emit.enderEmit?.UF,
-        destinatario_nome: dest.xNome,
-        destinatario_uf: dest.enderDest?.UF,
-        produto_nome: item.prod?.xProd,
-        produto_ncm: item.prod?.NCM,
-        produto_cfop: item.prod?.CFOP,
-        produto_cst_icms: findIcmsCst(item.imposto),
-        produto_qtd: item.prod?.qCom,
-        produto_valor_unit: item.prod?.vUnCom,
-        produto_valor_total: item.prod?.vProd,
-    }));
+
+    return items.map((item: any) => {
+        const icmsInfo = findTaxInfo(item.imposto, 'ICMS');
+        const pisInfo = findTaxInfo(item.imposto, 'PIS');
+        const cofinsInfo = findTaxInfo(item.imposto, 'COFINS');
+
+        return {
+            data_emissao: ide.dhEmi,
+            valor_total_nfe: total.vNF,
+            emitente_nome: emit.xNome,
+            emitente_uf: emit.enderEmit?.UF,
+            destinatario_nome: dest.xNome,
+            destinatario_uf: dest.enderDest?.UF,
+            produto_nome: item.prod?.xProd,
+            produto_ncm: item.prod?.NCM,
+            produto_cfop: item.prod?.CFOP,
+            produto_cst_icms: icmsInfo.cst,
+            produto_valor_icms: icmsInfo.value,
+            produto_cst_pis: pisInfo.cst,
+            produto_valor_pis: pisInfo.value,
+            produto_cst_cofins: cofinsInfo.cst,
+            produto_valor_cofins: cofinsInfo.value,
+            produto_qtd: item.prod?.qCom,
+            produto_valor_unit: item.prod?.vUnCom,
+            produto_valor_total: item.prod?.vProd,
+        }
+    });
 };
 
 
@@ -71,7 +122,11 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
     try {
         const { XMLParser } = await import('fast-xml-parser');
         const text = await file.text();
-        const parser = new XMLParser();
+        const parser = new XMLParser({
+            ignoreAttributes: false,
+            parseAttributeValue: true,
+            parseNodeValue: true,
+        });
         const jsonObj = parser.parse(text);
         const data = normalizeNFeData(jsonObj);
 
@@ -118,9 +173,13 @@ const handleImage = async (file: File): Promise<ImportedDoc> => {
         const buffer = await file.arrayBuffer();
         const text = await runOCRFromImage(buffer);
         if (!text.trim()) {
-            return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: 'Nenhum texto detectado na imagem.', raw: file };
+            return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: 'Nenhum texto detectado na imagem (OCR).', raw: file };
         }
-        return { kind: 'IMAGE', name: file.name, size: file.size, status: 'parsed', text, raw: file };
+         const data = extractDataFromText(text);
+        if (data.length === 0) {
+            logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto da imagem ${file.name}`);
+        }
+        return { kind: 'IMAGE', name: file.name, size: file.size, status: 'parsed', text, data, raw: file };
     } catch (error: any) {
         return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: error.message, raw: file };
     }
@@ -136,32 +195,54 @@ const handlePDF = async (file: File): Promise<ImportedDoc> => {
             const textContent = await page.getTextContent();
             fullText += textContent.items.map((item: any) => item.str).join(' ');
         }
-        if (fullText.trim()) {
-            return { kind: 'PDF', name: file.name, size: file.size, status: 'parsed', text: fullText, raw: file };
+        
+        let doc: ImportedDoc = { kind: 'PDF', name: file.name, size: file.size, status: 'parsed', text: fullText, raw: file };
+
+        if (fullText.trim().length > 10) { // Check if text was extracted
+             const data = extractDataFromText(fullText);
+             if (data.length === 0) {
+                logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto do PDF ${file.name}`);
+             }
+             doc.data = data;
         } else {
+            logger.log('ocrExtractor', 'INFO', `PDF ${file.name} sem texto, tentando OCR.`);
             const ocrText = await runOCRFromImage(buffer);
             if (!ocrText.trim()) {
-                throw new Error("Documento PDF parece estar vazio ou não contém texto legível.");
+                throw new Error("Documento PDF parece estar vazio ou não contém texto legível (falha no OCR).");
             }
-            return { kind: 'PDF', name: file.name, size: file.size, status: 'parsed', text: ocrText, raw: file };
+            doc.text = ocrText;
+            doc.data = extractDataFromText(ocrText);
         }
+        return doc;
+
     } catch (error: any) {
         return { kind: 'PDF', name: file.name, size: file.size, status: 'error', error: `Falha no processamento do PDF: ${error.message}`, raw: file };
     }
 };
 
-const handleUnsupported = (file: File): ImportedDoc => ({
-    kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'unsupported', raw: file
+const handleUnsupported = (file: File, reason: string): ImportedDoc => ({
+    kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'unsupported', raw: file, error: reason,
 });
 
 // --- Main Pipeline ---
 
-const isSupported = (name: string): boolean => {
+const isSupportedExtension = (name: string): boolean => {
     const supportedExtensions = ['.xml', '.csv', '.xlsx', '.xls', '.pdf', '.jpg', '.jpeg', '.png', '.zip'];
     return supportedExtensions.some(ext => name.toLowerCase().endsWith(ext));
 };
 
-const processSingleFile = (file: File): Promise<ImportedDoc> => {
+const processSingleFile = async (file: File): Promise<ImportedDoc> => {
+    const sanitizedName = sanitizeFilename(file.name);
+    if(sanitizedName !== file.name) {
+        logger.log('ImportPipeline', 'WARN', `Nome de arquivo sanitizado: de '${file.name}' para '${sanitizedName}'`);
+        // Create a new file with the sanitized name
+        file = new File([file], sanitizedName, { type: file.type });
+    }
+
+    if (!await checkMagicNumbers(file)) {
+        return handleUnsupported(file, 'Assinatura do arquivo (magic number) não corresponde à extensão.');
+    }
+
     const extension = getFileExtension(file.name);
     switch (extension) {
         case 'xml': return handleXML(file);
@@ -169,7 +250,7 @@ const processSingleFile = (file: File): Promise<ImportedDoc> => {
         case 'xlsx': case 'xls': return handleXLSX(file);
         case 'pdf': return handlePDF(file);
         case 'png': case 'jpg': case 'jpeg': return handleImage(file);
-        default: return Promise.resolve(handleUnsupported(file));
+        default: return Promise.resolve(handleUnsupported(file, 'Extensão de arquivo não suportada.'));
     }
 };
 
@@ -184,18 +265,18 @@ export const importFiles = async (
 
     for (const file of files) {
         const promise = (async () => {
-            let result;
+            let result: ImportedDoc | ImportedDoc[];
             const extension = getFileExtension(file.name);
+
             if (extension === 'zip') {
                 try {
+                    logger.log('ImportPipeline', 'INFO', `Descompactando arquivo zip: ${file.name}`);
                     const jszip = new JSZip();
                     const zip = await jszip.loadAsync(file);
-                    // FIX: Explicitly type `zipFile` to ensure properties are accessible.
                     const filesInZip = Object.values(zip.files).filter(
-                        (zipFile: JSZipObject) => !zipFile.dir && isSupported(zipFile.name) && !zipFile.name.startsWith('__MACOSX/') && !zipFile.name.endsWith('.DS_Store')
+                        (zipFile: JSZipObject) => !zipFile.dir && isSupportedExtension(zipFile.name) && !zipFile.name.startsWith('__MACOSX/') && !zipFile.name.endsWith('.DS_Store')
                     );
                     
-                    // FIX: Explicitly type `zipEntry` to ensure properties are accessible.
                     const innerDocs = await Promise.all(filesInZip.map(async (zipEntry: JSZipObject) => {
                         const blob = await zipEntry.async('blob');
                         const innerFile = new File([blob], zipEntry.name, { type: blob.type });
@@ -204,13 +285,29 @@ export const importFiles = async (
                         return doc;
                     }));
                     result = innerDocs;
+                    logger.log('ImportPipeline', 'INFO', `Processados ${innerDocs.length} arquivos de dentro de ${file.name}`);
 
                 } catch (e: any) {
-                    result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: `Falha ao descompactar o arquivo: ${e.message}` };
+                    const errorMsg = `Falha ao descompactar o arquivo: ${e.message}`;
+                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name});
+                    result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: errorMsg };
                 }
-            } else {
+            } else if (isSupportedExtension(file.name)) {
                 result = await processSingleFile(file);
+            } else {
+                 result = handleUnsupported(file, 'Extensão de arquivo não suportada.');
             }
+
+            // Log final status of processing
+            const logResult = (doc: ImportedDoc) => {
+                if (doc.status === 'error' || doc.status === 'unsupported') {
+                    logger.log('ImportPipeline', 'ERROR', `Falha ao processar ${doc.name}: ${doc.error}`, { status: doc.status });
+                } else {
+                     logger.log('ImportPipeline', 'INFO', `Arquivo ${doc.name} processado com sucesso.`);
+                }
+            };
+            Array.isArray(result) ? result.forEach(logResult) : logResult(result);
+
             progressCounter++;
             onProgress(progressCounter, files.length);
             return result;

@@ -1,6 +1,12 @@
 import type { ImportedDoc, AuditReport, AuditedDocument, AuditStatus, Inconsistency } from '../types';
 import { runFiscalValidation } from '../utils/rulesEngine';
 
+const SEVERITY_WEIGHTS: Record<Inconsistency['severity'], number> = {
+    'ERRO': 10,
+    'ALERTA': 2,
+    'INFO': 0,
+};
+
 /**
  * Runs a deterministic fiscal audit on a list of imported documents.
  * It uses a rules engine to find real inconsistencies.
@@ -16,10 +22,12 @@ export const runAudit = async (docs: ImportedDoc[]): Promise<Omit<AuditReport, '
       return {
         doc,
         status: 'ERRO',
+        score: 99, // High score for import failures
         inconsistencies: [{
           code: 'IMPORT-FAIL',
           message: doc.error || 'Falha na importação ou formato não suportado.',
           explanation: `O arquivo "${doc.name}" não pôde ser lido corretamente. Verifique se o arquivo não está corrompido e se o formato é um dos suportados.`,
+          severity: 'ERRO',
         }],
       };
     }
@@ -37,14 +45,21 @@ export const runAudit = async (docs: ImportedDoc[]): Promise<Omit<AuditReport, '
     
     let status: AuditStatus = 'OK';
     if (uniqueInconsistencies.length > 0) {
-        // A simple logic: if any inconsistency message contains "inválido" or "divergente", it's an error. Otherwise, it's a warning.
-        const hasError = uniqueInconsistencies.some(inc => inc.message.toLowerCase().includes('inválido') || inc.message.toLowerCase().includes('divergente') || inc.message.toLowerCase().includes('compra'));
-        status = hasError ? 'ERRO' : 'ALERTA';
+        if (uniqueInconsistencies.some(inc => inc.severity === 'ERRO')) {
+            status = 'ERRO';
+        } else if (uniqueInconsistencies.some(inc => inc.severity === 'ALERTA')) {
+            status = 'ALERTA';
+        }
     }
+
+    const score = uniqueInconsistencies.reduce((acc, inc) => {
+        return acc + (SEVERITY_WEIGHTS[inc.severity] || 0);
+    }, 0);
 
     return {
       doc,
       status,
+      score,
       inconsistencies: uniqueInconsistencies,
     };
   });
