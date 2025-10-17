@@ -62,8 +62,15 @@ export const useAgentOrchestrator = () => {
             });
             updateAgentState('ocr', 'completed');
             
-            if (importedDocs.every(d => d.status === 'unsupported' || d.status === 'error')) {
-                throw new Error("Nenhum arquivo válido foi processado. Verifique os formatos.");
+            const isSingleZip = files.length === 1 && (files[0].name.toLowerCase().endsWith('.zip') || files[0].type.includes('zip'));
+            const hasValidDocs = importedDocs.some(d => d.status !== 'unsupported' && d.status !== 'error');
+
+            if (!hasValidDocs) {
+                let errorMessage = "Nenhum arquivo válido foi processado. Verifique os formatos.";
+                if (isSingleZip) {
+                    errorMessage = "O arquivo ZIP está vazio ou não contém arquivos com formato suportado.";
+                }
+                throw new Error(errorMessage);
             }
             
             // 2. Agente Auditor
@@ -142,6 +149,8 @@ export const useAgentOrchestrator = () => {
                 fullResponseText += chunk;
             }
 
+            // If the stream was not aborted, process the full response.
+            // The AbortError is handled in the catch block.
             if (!signal.aborted) {
                 // Robust JSON parsing: The model can sometimes stream a valid JSON followed by extra text.
                 // This logic extracts the core JSON object before parsing to prevent errors.
@@ -161,22 +170,23 @@ export const useAgentOrchestrator = () => {
                             : msg
                     )
                 );
-            } else {
+            }
+        } catch (err) {
+            // FIX: Correctly handle stream abortion and other errors with type guards.
+            // This ensures the UI is updated appropriately when the user stops the stream.
+            if (err instanceof Error && err.name === 'AbortError') {
                 setMessages((prev) =>
                     prev.map((msg) =>
                         msg.id === aiMessageId ? { ...msg, text: '[Geração de resposta interrompida]' } : msg
                     )
                 );
+            } else {
+                console.error('Chat stream failed:', err);
+                const errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
+                setMessages((prev) =>
+                    prev.map((msg) => (msg.id === aiMessageId ? { ...msg, text: errorText } : msg))
+                );
             }
-        } catch (err) {
-            // FIX: Use a type guard to safely access properties on the caught error object.
-            // This prevents runtime errors if the caught object is not an `Error` instance.
-            if (err instanceof Error && err.name === 'AbortError') return;
-            console.error('Chat stream failed:', err);
-            const errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
-            setMessages((prev) =>
-                prev.map((msg) => (msg.id === aiMessageId ? { ...msg, text: errorText } : msg))
-            );
         } finally {
             setIsStreaming(false);
             streamController.current = null;
