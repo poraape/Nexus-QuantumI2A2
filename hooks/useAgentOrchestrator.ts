@@ -4,7 +4,7 @@ import { runAudit } from '../agents/auditorAgent';
 import { runClassification } from '../agents/classifierAgent';
 import { runAccountingAnalysis } from '../agents/accountantAgent';
 import { startChat, sendMessageStream } from '../services/chatService';
-import type { AnalysisResult, NfeData, ChatMessage, ImportedDoc } from '../types';
+import type { NfeData, ChatMessage, ImportedDoc, AuditReport } from '../types';
 import type { Chat } from '@google/genai';
 import Papa from 'papaparse';
 
@@ -51,8 +51,7 @@ const aggregateImportedData = (docs: ImportedDoc[]): NfeData => {
 export const useAgentOrchestrator = () => {
     const [status, setStatus] = useState<PipelineStatus>('idle');
     const [progress, setProgress] = useState<AgentProgress>({ step: '', current: 0, total: 0 });
-    const [nfeData, setNfeData] = useState<NfeData | null>(null);
-    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+    const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -63,8 +62,7 @@ export const useAgentOrchestrator = () => {
     const runPipeline = useCallback(async (files: FileList) => {
         setStatus('ocr');
         setError(null);
-        setAnalysisResult(null);
-        setNfeData(null);
+        setAuditReport(null);
         setMessages([]);
         chatRef.current = null;
         
@@ -75,36 +73,47 @@ export const useAgentOrchestrator = () => {
                 setProgress({ step: 'Agente OCR: Processando arquivos...', current, total });
             });
             
-            const processedData = aggregateImportedData(importedDocs);
-            
-            if (processedData.fileCount === 0) {
+            if (importedDocs.every(d => d.status === 'unsupported' || d.status === 'error')) {
                 throw new Error("Nenhum arquivo válido foi processado. Verifique os formatos de arquivo.");
             }
-            setNfeData(processedData);
-
+            
             // 2. Agente Auditor
             setStatus('auditing');
-            setProgress({ step: 'Agente Auditor: Validando regras fiscais...', current: 0, total: 0 });
-            const auditedData = await runAudit(processedData);
+            setProgress({ step: 'Agente Auditor: Validando regras fiscais...', current: importedDocs.length, total: importedDocs.length });
+            const initialReport = await runAudit(importedDocs);
 
-            // 3. Agente Classificador
+            // 3. Agente Classificador (Placeholder)
             setStatus('classifying');
             setProgress({ step: 'Agente Classificador: Organizando operações...', current: 0, total: 0 });
-            const classifiedData = await runClassification(auditedData);
+            // This agent would enrich the report, for now it's a pass-through
+            await runClassification();
 
             // 4. Agente Contador (Análise IA)
             setStatus('accounting');
             setProgress({ step: 'Agente Contador: Gerando análise com IA...', current: 0, total: 0 });
-            const analysis = await runAccountingAnalysis(classifiedData.dataSample);
-            setAnalysisResult(analysis);
+            
+            // Build data sample only from valid documents for higher quality analysis
+            const validDocsData = initialReport.documents
+                .filter(d => d.status !== 'ERRO' && d.doc.data)
+                .flatMap(d => d.doc.data!);
+                
+            const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
+
+            if (dataSampleForAI.trim().length === 0) {
+                 throw new Error("Não há dados válidos suficientes para gerar uma análise.");
+            }
+
+            const analysisSummary = await runAccountingAnalysis(dataSampleForAI);
+            const finalReport = { ...initialReport, summary: analysisSummary };
+            setAuditReport(finalReport);
 
             // 5. Preparar para Chat
-            chatRef.current = startChat(classifiedData.dataSample);
+            chatRef.current = startChat(dataSampleForAI);
             setMessages([
                 {
                     id: 'initial-ai-message',
                     sender: 'ai',
-                    text: 'Sua análise inicial está pronta. Agora você pode me fazer perguntas sobre os detalhes dos dados.',
+                    text: 'Sua análise fiscal está pronta. Explore os detalhes abaixo ou me faça uma pergunta sobre os dados.',
                 },
             ]);
             
@@ -143,7 +152,17 @@ export const useAgentOrchestrator = () => {
             }
 
             if (!signal.aborted) {
-                const finalAiResponse = JSON.parse(fullResponseText);
+                // Robust JSON parsing: The model can sometimes stream a valid JSON followed by extra text.
+                // This logic extracts the core JSON object before parsing to prevent errors.
+                let jsonString = fullResponseText.trim();
+                const jsonStart = jsonString.indexOf('{');
+                const jsonEnd = jsonString.lastIndexOf('}');
+
+                if (jsonStart !== -1 && jsonEnd > jsonStart) {
+                    jsonString = jsonString.substring(jsonStart, jsonEnd + 1);
+                }
+                
+                const finalAiResponse = JSON.parse(jsonString);
                 setMessages((prev) =>
                     prev.map((msg) =>
                         msg.id === aiMessageId
@@ -181,8 +200,7 @@ export const useAgentOrchestrator = () => {
     return {
         status,
         progress,
-        nfeData,
-        analysisResult,
+        auditReport,
         messages,
         isStreaming,
         error,

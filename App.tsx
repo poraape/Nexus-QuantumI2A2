@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import FileUpload from './components/FileUpload';
-import AnalysisDisplay from './components/AnalysisDisplay';
+import ReportViewer from './components/ReportViewer';
 import ChatPanel from './components/ChatPanel';
 import Header from './components/Header';
 import Toast from './components/Toast';
@@ -16,8 +16,7 @@ const App: React.FC = () => {
     const {
         status,
         progress,
-        nfeData,
-        analysisResult,
+        auditReport,
         messages,
         isStreaming,
         error,
@@ -30,15 +29,15 @@ const App: React.FC = () => {
     const exportableContentRef = useRef<HTMLElement>(null);
 
     const handleExport = async (type: ExportType) => {
-        if (!exportableContentRef.current || !analysisResult) return;
+        if (!exportableContentRef.current || !auditReport) return;
         setIsExporting(type);
         try {
-            const filename = analysisResult.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const filename = auditReport.summary.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             switch (type) {
                 case 'md': await exportToMarkdown(exportableContentRef.current, filename); break;
-                case 'html': await exportToHtml(exportableContentRef.current, filename, analysisResult.title); break;
-                case 'pdf': await exportToPdf(exportableContentRef.current, filename, analysisResult.title); break;
-                case 'docx': await exportToDocx(exportableContentRef.current, filename, analysisResult.title); break;
+                case 'html': await exportToHtml(exportableContentRef.current, filename, auditReport.summary.title); break;
+                case 'pdf': await exportToPdf(exportableContentRef.current, filename, auditReport.summary.title); break;
+                case 'docx': await exportToDocx(exportableContentRef.current, filename, auditReport.summary.title); break;
             }
         } catch (exportError) {
             console.error(`Failed to export as ${type}:`, exportError);
@@ -53,7 +52,7 @@ const App: React.FC = () => {
     return (
         <div className="bg-gray-900 text-white min-h-screen font-sans">
             <Header
-                showExports={!!analysisResult}
+                showExports={!!auditReport}
                 onExport={handleExport}
                 isExporting={isExporting}
             />
@@ -62,7 +61,7 @@ const App: React.FC = () => {
                     <div className="flex flex-col gap-6 lg:gap-8">
                         <FileUpload onFileUpload={runPipeline} disabled={isLoading} />
                         {isLoading && <ProgressTracker status={status} progress={progress} />}
-                        {status === 'ready' && analysisResult && <AnalysisDisplay result={analysisResult} fileInfo={nfeData} />}
+                        {status === 'ready' && auditReport && <ReportViewer report={auditReport} />}
                     </div>
                     <div className="lg:sticky lg:top-24">
                         {status === 'ready' && (

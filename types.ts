@@ -57,3 +57,24 @@ export type ImportedDoc = {
     internal_path: string;
   };
 };
+
+// --- New Types for Detailed Audit Report ---
+
+export type AuditStatus = 'OK' | 'ALERTA' | 'ERRO';
+
+export interface Inconsistency {
+  code: string;
+  message: string;
+  explanation: string; // XAI part
+}
+
+export interface AuditedDocument {
+  doc: ImportedDoc;
+  status: AuditStatus;
+  inconsistencies: Inconsistency[];
+}
+
+export interface AuditReport {
+  summary: AnalysisResult;
+  documents: AuditedDocument[];
+}

@@ -9,22 +9,67 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
     const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: "@_",
-        allowBooleanAttributes: true
+        allowBooleanAttributes: true,
+        ignoreNameSpace: true, // Handles XML with namespaces
     });
     try {
         const jsonObj = parser.parse(text);
-        // Basic normalization for NFe XML structure
-        const nfeProc = jsonObj.nfeProc || jsonObj.NFe;
-        const data = nfeProc?.NFe?.infNFe?.det || [];
-        const normalizedData = Array.isArray(data) ? data : [data];
+        
+        // ROBUSTNESS FIX: Find the <infNFe> block regardless of the root element structure.
+        let infNFe;
+        if (jsonObj.nfeProc?.NFe?.infNFe) {
+            infNFe = jsonObj.nfeProc.NFe.infNFe;
+        } else if (jsonObj.NFe?.infNFe) {
+            infNFe = jsonObj.NFe.infNFe;
+        } else if (jsonObj.infNFe) {
+            infNFe = jsonObj.infNFe;
+        }
+
+        if (!infNFe) {
+            return { kind: "NFE_XML", name: file.name, size: file.size, status: "error", error: "Estrutura NFe inválida: a tag <infNFe> não foi encontrada.", raw: file };
+        }
+
+        const details = infNFe.det || [];
+        const normalizedDetails = Array.isArray(details) ? details : [details];
+
+        if (normalizedDetails.length === 0 || normalizedDetails[0] === undefined) {
+             return { kind: "NFE_XML", name: file.name, size: file.size, status: "error", error: "Não foi possível encontrar itens de nota (<det>) no XML.", raw: file };
+        }
+
+        // ENHANCEMENT: Extract common NFe info to enrich the data for each product.
+        const ide = infNFe.ide || {};
+        const emit = infNFe.emit || {};
+        const dest = infNFe.dest || {};
+        const total = infNFe.total?.ICMSTot || {};
+
+        const data = normalizedDetails.map((item: any) => {
+            const prod = item.prod || {};
+            return {
+                data_emissao: ide.dhEmi,
+                valor_total_nfe: total.vNF,
+                emitente_nome: emit.xNome,
+                destinatario_nome: dest.xNome,
+                produto_codigo: prod.cProd,
+                produto_nome: prod.xProd,
+                produto_ncm: prod.NCM,
+                produto_cfop: prod.CFOP,
+                produto_qtd: prod.qCom,
+                produto_valor_unit: prod.vUnCom,
+                produto_valor_total: prod.vProd,
+            };
+        });
 
         return {
-            kind: "NFE_XML", name: file.name, size: file.size, status: "parsed",
-            data: normalizedData.map((item: any) => item.prod),
+            kind: "NFE_XML",
+            name: file.name,
+            size: file.size,
+            status: "parsed",
+            data: data,
             raw: file,
         };
     } catch (error) {
-        return { kind: "NFE_XML", name: file.name, size: file.size, status: "error", error: "XML inválido", raw: file };
+        console.error("XML Parsing Error:", error);
+        return { kind: "NFE_XML", name: file.name, size: file.size, status: "error", error: "XML inválido ou mal formatado.", raw: file };
     }
 };
 
