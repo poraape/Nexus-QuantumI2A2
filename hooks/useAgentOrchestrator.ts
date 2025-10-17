@@ -4,95 +4,80 @@ import { runAudit } from '../agents/auditorAgent';
 import { runClassification } from '../agents/classifierAgent';
 import { runAccountingAnalysis } from '../agents/accountantAgent';
 import { startChat, sendMessageStream } from '../services/chatService';
-import type { NfeData, ChatMessage, ImportedDoc, AuditReport } from '../types';
+import type { ChatMessage, ImportedDoc, AuditReport } from '../types';
 import type { Chat } from '@google/genai';
 import Papa from 'papaparse';
 
-export type PipelineStatus = 'idle' | 'ocr' | 'auditing' | 'classifying' | 'accounting' | 'ready' | 'error';
+export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'accountant';
+export type AgentStatus = 'pending' | 'running' | 'completed' | 'error';
 export interface AgentProgress {
   step: string;
   current: number;
   total: number;
 }
+export type AgentState = { status: AgentStatus; progress: AgentProgress; };
+export type AgentStates = Record<AgentName, AgentState>;
 
-const aggregateImportedData = (docs: ImportedDoc[]): NfeData => {
-    let allCsvData: Record<string, any>[] = [];
-    const fileDetails: { name: string; size: number }[] = [];
-    let totalSize = 0;
-    let fileCount = 0;
-
-    for (const doc of docs) {
-        if (doc.status === 'parsed' && doc.data) {
-            allCsvData = allCsvData.concat(doc.data);
-            fileDetails.push({ name: doc.name, size: doc.size });
-            totalSize += doc.size;
-            fileCount++;
-        } else if (doc.status === 'ocr_needed' && doc.text) {
-             // Basic text to CSV conversion for sample
-             const lines = doc.text.split('\n').filter(line => line.trim() !== '');
-             allCsvData.push({ 'extracted_text': lines.join('; ') });
-             fileDetails.push({ name: doc.name, size: doc.size });
-             totalSize += doc.size;
-             fileCount++;
-        }
-    }
-    
-    const dataSample = Papa.unparse(allCsvData.slice(0, 200));
-
-    return {
-        fileCount,
-        totalSize,
-        fileDetails,
-        dataSample,
-    };
+const initialAgentStates: AgentStates = {
+    ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
+    auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+    classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+    accountant: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
 };
 
-
 export const useAgentOrchestrator = () => {
-    const [status, setStatus] = useState<PipelineStatus>('idle');
-    const [progress, setProgress] = useState<AgentProgress>({ step: '', current: 0, total: 0 });
+    const [agentStates, setAgentStates] = useState<AgentStates>(initialAgentStates);
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [pipelineError, setPipelineError] = useState<boolean>(false);
 
     const chatRef = useRef<Chat | null>(null);
     const streamController = useRef<AbortController | null>(null);
 
     const runPipeline = useCallback(async (files: FileList) => {
-        setStatus('ocr');
+        setAgentStates(initialAgentStates);
         setError(null);
+        setPipelineError(false);
         setAuditReport(null);
         setMessages([]);
         chatRef.current = null;
         
         try {
-            // 1. Agente OCR / Pipeline de Importação
-            setProgress({ step: 'Agente OCR: Processando arquivos...', current: 0, total: files.length });
+            const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
+                setAgentStates(prev => ({
+                    ...prev,
+                    [agent]: {
+                        status,
+                        progress: { ...prev[agent].progress, ...progress }
+                    }
+                }));
+            };
+
+            // 1. Agente OCR
+            updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
             const importedDocs = await importFiles(Array.from(files), (current, total) => {
-                setProgress({ step: 'Agente OCR: Processando arquivos...', current, total });
+                updateAgentState('ocr', 'running', { step: 'Processando arquivos...', current, total });
             });
+            updateAgentState('ocr', 'completed');
             
             if (importedDocs.every(d => d.status === 'unsupported' || d.status === 'error')) {
-                throw new Error("Nenhum arquivo válido foi processado. Verifique os formatos de arquivo.");
+                throw new Error("Nenhum arquivo válido foi processado. Verifique os formatos.");
             }
             
             // 2. Agente Auditor
-            setStatus('auditing');
-            setProgress({ step: 'Agente Auditor: Validando regras fiscais...', current: importedDocs.length, total: importedDocs.length });
+            updateAgentState('auditor', 'running', { step: `Validando ${importedDocs.length} documentos...` });
             const initialReport = await runAudit(importedDocs);
+            updateAgentState('auditor', 'completed');
 
-            // 3. Agente Classificador (Placeholder)
-            setStatus('classifying');
-            setProgress({ step: 'Agente Classificador: Organizando operações...', current: 0, total: 0 });
-            // This agent would enrich the report, for now it's a pass-through
+            // 3. Agente Classificador
+            updateAgentState('classifier', 'running', { step: 'Organizando operações...' });
             await runClassification();
+            updateAgentState('classifier', 'completed');
 
-            // 4. Agente Contador (Análise IA)
-            setStatus('accounting');
-            setProgress({ step: 'Agente Contador: Gerando análise com IA...', current: 0, total: 0 });
-            
-            // Build data sample only from valid documents for higher quality analysis
+            // 4. Agente Contador
+            updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
             const validDocsData = initialReport.documents
                 .filter(d => d.status !== 'ERRO' && d.doc.data)
                 .flatMap(d => d.doc.data!);
@@ -106,6 +91,7 @@ export const useAgentOrchestrator = () => {
             const analysisSummary = await runAccountingAnalysis(dataSampleForAI);
             const finalReport = { ...initialReport, summary: analysisSummary };
             setAuditReport(finalReport);
+            updateAgentState('accountant', 'completed');
 
             // 5. Preparar para Chat
             chatRef.current = startChat(dataSampleForAI);
@@ -116,14 +102,19 @@ export const useAgentOrchestrator = () => {
                     text: 'Sua análise fiscal está pronta. Explore os detalhes abaixo ou me faça uma pergunta sobre os dados.',
                 },
             ]);
-            
-            setStatus('ready');
-            setProgress({ step: 'Pronto', current: 0, total: 0 });
 
         } catch (err: any) {
             console.error('Pipeline failed:', err);
             setError(err.message || 'Ocorreu um erro desconhecido.');
-            setStatus('error');
+            setPipelineError(true);
+            setAgentStates(prev => {
+                const newStates = { ...prev };
+                const runningAgent = Object.keys(newStates).find(key => newStates[key as AgentName].status === 'running') as AgentName;
+                if(runningAgent) {
+                    newStates[runningAgent].status = 'error';
+                }
+                return newStates;
+            });
         }
     }, []);
 
@@ -177,8 +168,10 @@ export const useAgentOrchestrator = () => {
                     )
                 );
             }
-        } catch (err: any) {
-            if (err.name === 'AbortError') return;
+        } catch (err) {
+            // FIX: Use a type guard to safely access properties on the caught error object.
+            // This prevents runtime errors if the caught object is not an `Error` instance.
+            if (err instanceof Error && err.name === 'AbortError') return;
             console.error('Chat stream failed:', err);
             const errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
             setMessages((prev) =>
@@ -196,14 +189,19 @@ export const useAgentOrchestrator = () => {
         }
         setIsStreaming(false);
     }, []);
+
+    const isPipelineRunning = Object.values(agentStates).some(s => s.status === 'running');
+    const isPipelineComplete = agentStates.accountant.status === 'completed';
     
     return {
-        status,
-        progress,
+        agentStates,
         auditReport,
         messages,
         isStreaming,
         error,
+        isPipelineRunning,
+        isPipelineComplete,
+        pipelineError,
         runPipeline,
         handleSendMessage,
         handleStopStreaming,

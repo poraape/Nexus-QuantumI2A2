@@ -113,33 +113,78 @@ const handleXLSX = async (file: File): Promise<ImportedDoc> => {
 };
 
 const handlePDF = async (file: File): Promise<ImportedDoc> => {
-    const pdfjsLib = await import('pdfjs-dist/build/pdf');
-    // In AI Studio, worker is loaded via importmap. For local dev, you'd set workerSrc.
-    // pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    // FIX: Import from the correct module path for pdf.js, which is '.mjs'
+    const pdfjsLib = await import('pdfjs-dist/build/pdf.mjs');
     
     const buffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument(buffer);
     try {
         const pdf = await loadingTask.promise;
         let textContent = '';
+        let hasTextLayer = false;
+        
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const text = await page.getTextContent();
+            if (text.items.length > 0) {
+                hasTextLayer = true;
+            }
             textContent += text.items.map((s: any) => s.str).join(' ');
         }
-        
-        // If text is very short, it's likely a scanned PDF needing OCR
-        if (textContent.trim().length < 100) {
-             return handleImage(file); // Re-route to OCR
+
+        // If there's a significant text layer, consider it a text-based PDF.
+        if (hasTextLayer && textContent.trim().length > 50) {
+            return {
+                kind: "PDF",
+                name: file.name,
+                size: file.size,
+                status: "parsed", // Text is successfully extracted, no OCR needed.
+                text: textContent,
+                raw: file
+            };
         }
 
-        return {
-            kind: "PDF", name: file.name, size: file.size, status: "ocr_needed",
-            text: textContent,
-            raw: file
-        };
+        // If no text layer or very little text, it's a scanned PDF. Proceed to OCR.
+        const page = await pdf.getPage(1); // Process the first page for OCR.
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        if (!context) {
+            throw new Error("Não foi possível obter o contexto do canvas para renderizar o PDF.");
+        }
+
+        await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+        // Convert canvas to an image blob, then to an ArrayBuffer for the OCR agent.
+        return new Promise((resolve) => {
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    resolve({ kind: "PDF", name: file.name, size: file.size, status: "error", error: "Falha ao converter PDF para imagem.", raw: file });
+                    return;
+                }
+                const imageBuffer = await blob.arrayBuffer();
+                try {
+                    const ocrText = await runOCRFromImage(imageBuffer);
+                    resolve({
+                        kind: "PDF",
+                        name: file.name,
+                        size: file.size,
+                        status: "ocr_needed",
+                        text: ocrText,
+                        raw: file,
+                    });
+                } catch (ocrError: any) {
+                     resolve({ kind: "PDF", name: file.name, size: file.size, status: "error", error: ocrError.message || "Falha no OCR do PDF.", raw: file });
+                }
+            }, 'image/png');
+        });
+
     } catch (error) {
-        return { kind: "PDF", name: file.name, size: file.size, status: "error", error: "Falha ao processar PDF", raw: file };
+        console.error("PDF Processing Error:", error);
+        return { kind: "PDF", name: file.name, size: file.size, status: "error", error: "Falha ao processar o arquivo PDF. Pode estar corrompido.", raw: file };
     }
 };
 
@@ -152,8 +197,8 @@ const handleImage = async (file: File): Promise<ImportedDoc> => {
             text: text,
             raw: file
         };
-    } catch (error) {
-        return { kind: "IMAGE", name: file.name, size: file.size, status: "error", error: "Falha no OCR", raw: file };
+    } catch (error: any) {
+        return { kind: "IMAGE", name: file.name, size: file.size, status: "error", error: error.message || "Falha no OCR", raw: file };
     }
 };
 

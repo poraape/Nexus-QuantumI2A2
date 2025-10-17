@@ -14,12 +14,14 @@ const App: React.FC = () => {
     const [isExporting, setIsExporting] = useState<ExportType | null>(null);
 
     const {
-        status,
-        progress,
+        agentStates,
         auditReport,
         messages,
         isStreaming,
         error,
+        isPipelineRunning,
+        isPipelineComplete,
+        pipelineError,
         runPipeline,
         handleSendMessage,
         handleStopStreaming,
@@ -47,24 +49,22 @@ const App: React.FC = () => {
         }
     };
     
-    const isLoading = ['ocr', 'auditing', 'classifying', 'accounting'].includes(status);
-    
     return (
         <div className="bg-gray-900 text-white min-h-screen font-sans">
             <Header
-                showExports={!!auditReport}
+                showExports={!!auditReport && isPipelineComplete}
                 onExport={handleExport}
                 isExporting={isExporting}
             />
             <main ref={exportableContentRef} className="container mx-auto p-4 md:p-6 lg:p-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
                     <div className="flex flex-col gap-6 lg:gap-8">
-                        <FileUpload onFileUpload={runPipeline} disabled={isLoading} />
-                        {isLoading && <ProgressTracker status={status} progress={progress} />}
-                        {status === 'ready' && auditReport && <ReportViewer report={auditReport} />}
+                        <FileUpload onFileUpload={runPipeline} disabled={isPipelineRunning} />
+                        {isPipelineRunning && <ProgressTracker agentStates={agentStates} />}
+                        {isPipelineComplete && !pipelineError && auditReport && <ReportViewer report={auditReport} />}
                     </div>
                     <div className="lg:sticky lg:top-24">
-                        {status === 'ready' && (
+                        {isPipelineComplete && !pipelineError && (
                             <ChatPanel messages={messages} onSendMessage={handleSendMessage} isStreaming={isStreaming} onStopStreaming={handleStopStreaming} />
                         )}
                     </div>
