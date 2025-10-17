@@ -41,5 +41,21 @@ export const runFiscalValidation = (item: Record<string, any>): Inconsistency[] 
       findings.push(INCONSISTENCIES.VALOR_PROD_ZERO);
   }
 
+  const emitUf = item.emitente_uf?.toString().trim().toUpperCase();
+  const destUf = item.destinatario_uf?.toString().trim().toUpperCase();
+
+  // Rule 5 & 6: Geo-Fiscal validation (CFOP vs UF)
+  if (emitUf && destUf && cfop) {
+      if (cfop.startsWith('6')) { // Interstate operation
+          if (emitUf === destUf) {
+              findings.push(INCONSISTENCIES.CFOP_INTERESTADUAL_UF_INCOMPATIVEL);
+          }
+      } else if (cfop.startsWith('5')) { // Intrastate operation
+          if (emitUf !== destUf) {
+              findings.push(INCONSISTENCIES.CFOP_ESTADUAL_UF_INCOMPATIVEL);
+          }
+      }
+  }
+
   return findings;
 };

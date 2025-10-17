@@ -15,8 +15,15 @@ const getFileExtension = (filename: string): string => {
     return filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
 };
 
+const getInfNFe = (nfeData: any): any => {
+    if (!nfeData) return null;
+    return nfeData?.nfeProc?.NFe?.infNFe 
+        || nfeData?.NFe?.infNFe 
+        || nfeData?.infNFe;
+}
+
 const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
-    const infNFe = nfeData?.nfeProc?.NFe?.infNFe || nfeData?.NFe?.infNFe;
+    const infNFe = getInfNFe(nfeData);
     if (!infNFe) return [];
 
     const det = infNFe.det;
@@ -28,14 +35,29 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
     const dest = infNFe.dest || {};
     const total = infNFe.total?.ICMSTot || {};
 
+    // Helper to find CST inside the ICMS block, which can have various structures like ICMS00, ICMS10 etc.
+    const findIcmsCst = (imposto: any): string | undefined => {
+        const icms = imposto?.ICMS;
+        if (!icms) return undefined;
+        // The ICMS object contains a key like ICMS00, ICMS10, etc. We get the first key.
+        const icmsTypeKey = Object.keys(icms)[0];
+        if (icmsTypeKey && icms[icmsTypeKey] && icms[icmsTypeKey].CST) {
+            return icms[icmsTypeKey].CST.toString();
+        }
+        return undefined;
+    };
+
     return items.map((item: any) => ({
         data_emissao: ide.dhEmi,
         valor_total_nfe: total.vNF,
         emitente_nome: emit.xNome,
+        emitente_uf: emit.enderEmit?.UF,
         destinatario_nome: dest.xNome,
+        destinatario_uf: dest.enderDest?.UF,
         produto_nome: item.prod?.xProd,
         produto_ncm: item.prod?.NCM,
         produto_cfop: item.prod?.CFOP,
+        produto_cst_icms: findIcmsCst(item.imposto),
         produto_qtd: item.prod?.qCom,
         produto_valor_unit: item.prod?.vUnCom,
         produto_valor_total: item.prod?.vProd,

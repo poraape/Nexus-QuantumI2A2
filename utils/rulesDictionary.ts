@@ -25,5 +25,15 @@ export const INCONSISTENCIES: Record<string, Inconsistency> = {
         code: 'VAL-WARN-01',
         message: 'Produto com valor total zerado.',
         explanation: 'O valor total do produto é zero. Isso pode ser uma bonificação, doação ou amostra, que exige um CFOP específico (e.g., 5910/6910) e pode ter tratamento tributário diferenciado.'
+    },
+    CFOP_INTERESTADUAL_UF_INCOMPATIVEL: {
+        code: 'CFOP-GEO-01',
+        message: 'CFOP interestadual (6xxx) usado em operação com mesma UF de origem e destino.',
+        explanation: 'Um CFOP iniciado com 6 indica uma operação interestadual (entre estados diferentes). No entanto, a UF do emitente e do destinatário são as mesmas. Isso pode indicar um erro de digitação no CFOP ou nos endereços.'
+    },
+    CFOP_ESTADUAL_UF_INCOMPATIVEL: {
+        code: 'CFOP-GEO-02',
+        message: 'CFOP estadual (5xxx) usado em operação com UFs de origem e destino diferentes.',
+        explanation: 'Um CFOP iniciado com 5 indica uma operação estadual (dentro do mesmo estado). No entanto, a UF do emitente e do destinatário são diferentes. O CFOP correto para esta operação provavelmente deveria começar com 6.'
     }
 };

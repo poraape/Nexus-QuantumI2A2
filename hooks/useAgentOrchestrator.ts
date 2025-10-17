@@ -171,7 +171,8 @@ export const useAgentOrchestrator = () => {
                     )
                 );
             }
-        } catch (err) {
+        // FIX: Add explicit `unknown` type to the caught error and enhance handling for different error types as suggested by the FIX comment.
+        } catch (err: unknown) {
             // FIX: Correctly handle stream abortion and other errors with type guards.
             // This ensures the UI is updated appropriately when the user stops the stream.
             if (err instanceof Error && err.name === 'AbortError') {
@@ -182,7 +183,11 @@ export const useAgentOrchestrator = () => {
                 );
             } else {
                 console.error('Chat stream failed:', err);
-                const errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
+                // Extract a more specific error message if available, otherwise use a generic one.
+                let errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
+                if (err instanceof Error) {
+                    errorText = err.message;
+                }
                 setMessages((prev) =>
                     prev.map((msg) => (msg.id === aiMessageId ? { ...msg, text: errorText } : msg))
                 );
