@@ -1,5 +1,5 @@
 {
-  "name": "nexus-quantumi2a2:-análise-fiscal-com-ia",
+  "name": "copy-of-nexus-quantumi2a2:-análise-fiscal-com-ia",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,7 +11,18 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@google/genai": "^1.25.0"
+    "@google/genai": "^1.25.0",
+    "xlsx": "^0.18.5",
+    "papaparse": "^5.4.1",
+    "fast-xml-parser": "^4.4.0",
+    "pdfjs-dist": "^5.4.296",
+    "tesseract.js": "^5.0.5",
+    "docx": "^8.5.0",
+    "pdfmake": "^0.2.20",
+    "dayjs": "^1.11.13",
+    "filesize": "^10.1.2",
+    "html2canvas": "^1.4.1",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

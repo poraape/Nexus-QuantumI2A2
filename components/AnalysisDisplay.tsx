@@ -1,44 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import type { AnalysisResult, NfeData } from '../types';
-import { exportToMarkdown, exportToHtml, exportToPdf } from '../utils/exportUtils';
-import { DownloadIcon, FileInfoIcon, MetricIcon, InsightIcon, LoadingSpinnerIcon } from './icons';
+import { FileInfoIcon, MetricIcon, InsightIcon } from './icons';
 
 interface AnalysisDisplayProps {
   result: AnalysisResult;
   fileInfo: NfeData | null;
 }
 
-type ExportType = 'md' | 'html' | 'pdf';
-
 const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, fileInfo }) => {
-  const [isExporting, setIsExporting] = useState<ExportType | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  const handleExport = async (type: ExportType) => {
-    if (!contentRef.current) return;
-    setIsExporting(type);
-    try {
-      const { title } = result;
-      const filename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      
-      switch (type) {
-        case 'md':
-          await exportToMarkdown(contentRef.current, filename);
-          break;
-        case 'html':
-          await exportToHtml(contentRef.current, filename, title);
-          break;
-        case 'pdf':
-          await exportToPdf(contentRef.current, filename);
-          break;
-      }
-    } catch (error) {
-      console.error(`Failed to export as ${type}:`, error);
-    } finally {
-      setIsExporting(null);
-    }
-  };
-  
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -52,22 +21,9 @@ const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, fileInfo }) =
     <div className="bg-gray-800 p-6 rounded-lg shadow-lg animate-fade-in">
       <div className="flex justify-between items-start mb-4">
         <h2 className="text-xl font-bold text-gray-200">2. Análise Executiva</h2>
-        <div className="flex space-x-2">
-            {(['md', 'html', 'pdf'] as ExportType[]).map(type => (
-                <button
-                    key={type}
-                    onClick={() => handleExport(type)}
-                    disabled={!!isExporting}
-                    className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait"
-                    title={`Exportar para ${type.toUpperCase()}`}
-                >
-                    {isExporting === type ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : <DownloadIcon className="w-4 h-4" />}
-                </button>
-            ))}
-        </div>
       </div>
       
-      <div ref={contentRef} className="text-gray-300 space-y-6">
+      <div className="text-gray-300 space-y-6">
         <h3 data-export-title className="text-lg font-semibold text-blue-400">{result.title}</h3>
         
         {fileInfo && (

@@ -1,35 +1,5 @@
 // types.ts
 
-// FIX: Export JSZipObject and related interfaces so they can be imported.
-export interface JSZipObject {
-  name: string;
-  dir: boolean;
-  async(type: 'string'): Promise<string>;
-}
-
-export interface JSZip {
-  files: { [key: string]: JSZipObject };
-}
-
-export interface JSZipConstructor {
-  new (): JSZip;
-  loadAsync(data: any): Promise<JSZip>;
-}
-
-declare global {
-  interface Window {
-    JSZip: JSZipConstructor;
-    Papa: {
-      parse(csvString: string, config: any): void;
-      unparse(data: any[]): string;
-    };
-    jspdf: {
-      jsPDF: new (options?: any) => any;
-    };
-    html2canvas: (element: HTMLElement, options?: any) => Promise<HTMLCanvasElement>;
-  }
-}
-
 export interface ChartDataPoint {
   label: string;
   value: number; // Y-axis for scatter
@@ -72,3 +42,18 @@ export interface NfeData {
   fileDetails: { name: string; size: number }[];
   dataSample: string; // CSV string of data sample
 }
+
+export type ImportedDoc = {
+  kind: "NFE_XML" | "CSV" | "XLSX" | "PDF" | "IMAGE" | "UNSUPPORTED";
+  name: string;
+  size: number;
+  status: "parsed" | "ocr_needed" | "unsupported" | "error";
+  data?: Record<string, any>[]; // Parsed data for CSV/XLSX/XML
+  text?: string; // Text content for PDF/OCR
+  raw?: File;
+  error?: string;
+  meta?: {
+    source_zip: string;
+    internal_path: string;
+  };
+};
