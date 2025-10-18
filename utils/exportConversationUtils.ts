@@ -69,10 +69,8 @@ export const exportConversationToPdf = async (messages: ChatMessage[], title: st
     const pdfMake = await import('pdfmake/build/pdfmake');
     const pdfFonts = await import('pdfmake/build/vfs_fonts');
     
-    // FIX: Handle CJS/ESM module interop for vfs_fonts. The dynamically imported
-    // module often nests the actual content under a `default` property. The error
-    // "Cannot read properties of undefined (reading 'vfs')" happens when `pdfFonts.pdfMake`
-    // is undefined. This fix robustly finds the correct object.
+    // Handle CJS/ESM module interop for vfs_fonts. The dynamically imported
+    // module often nests the actual content under a `default` property.
     const fonts = pdfFonts.default || pdfFonts;
     if (fonts.pdfMake && fonts.pdfMake.vfs) {
         pdfMake.vfs = fonts.pdfMake.vfs;

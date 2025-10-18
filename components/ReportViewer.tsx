@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import type { AuditReport, AuditedDocument, AuditStatus, ClassificationResult, AccountingEntry } from '../types';
+import type { AuditReport, AuditedDocument, AuditStatus, ClassificationResult, AccountingEntry, AIDrivenInsight, AIFindingSeverity } from '../types';
 import { 
     MetricIcon, 
     InsightIcon, 
     ShieldCheckIcon, 
     ShieldExclamationIcon, 
     ChevronDownIcon,
-    FileIcon
+    FileIcon,
+    AiIcon
 } from './icons';
 
 const statusStyles: { [key in AuditStatus]: { badge: string; icon: React.ReactNode; text: string; } } = {
@@ -38,6 +39,13 @@ const classificationStyles: { [key in ClassificationResult['operationType']]: st
     Serviço: 'bg-purple-500/30 text-purple-300',
     Transferência: 'bg-indigo-500/30 text-indigo-300',
     Outros: 'bg-gray-500/30 text-gray-300',
+};
+
+const severityStyles: Record<AIFindingSeverity, string> = {
+    INFO: 'border-l-sky-500',
+    BAIXA: 'border-l-yellow-500',
+    MÉDIA: 'border-l-orange-500',
+    ALTA: 'border-l-red-500',
 };
 
 
@@ -164,7 +172,7 @@ const AccountingEntriesViewer: React.FC<{ entries: AccountingEntry[] }> = ({ ent
 
 
 const ReportViewer: React.FC<{ report: AuditReport, onClassificationChange: (docName: string, newClassification: ClassificationResult['operationType']) => void }> = ({ report, onClassificationChange }) => {
-  const { summary, documents, accountingEntries } = report;
+  const { summary, documents, accountingEntries, aiDrivenInsights } = report;
 
   const docStats = documents.reduce((acc, item) => {
       acc[item.status] = (acc[item.status] || 0) + 1;
@@ -202,8 +210,46 @@ const ReportViewer: React.FC<{ report: AuditReport, onClassificationChange: (doc
                 ))}
             </ul>
             </div>
+             {summary.strategicRecommendations && summary.strategicRecommendations.length > 0 && (
+                <div className="bg-sky-900/50 border border-sky-700 p-4 rounded-lg">
+                    <h4 className="flex items-center text-md font-semibold text-sky-300 mb-3">
+                        <AiIcon className="w-5 h-5 mr-2"/>
+                        Recomendações Estratégicas (IA)
+                    </h4>
+                    <ul className="list-disc list-inside space-y-2 text-sm text-sky-200">
+                        {summary.strategicRecommendations.map((item, index) => (
+                        <li key={index}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </div>
       </div>
+
+      {/* AI Driven Insights Section */}
+      {aiDrivenInsights && aiDrivenInsights.length > 0 && (
+        <div>
+            <h2 className="text-xl font-bold text-gray-200 mb-4 border-t border-gray-700 pt-8">Insights Gerados por IA</h2>
+            <div className="space-y-3">
+            {aiDrivenInsights.map((insight, index) => (
+                <div key={index} className={`bg-gray-700/50 p-4 rounded-lg border-l-4 ${severityStyles[insight.severity]}`}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="font-semibold text-gray-200">{insight.category}</p>
+                            <p className="text-sm text-gray-400 mt-1">{insight.description}</p>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-md`}>{insight.severity}</span>
+                    </div>
+                    {insight.evidence && insight.evidence.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-2">
+                            <span className="font-semibold">Evidências:</span> {insight.evidence.join(', ')}
+                        </p>
+                    )}
+                </div>
+            ))}
+            </div>
+        </div>
+      )}
       
       {/* Detailed Document Analysis Section */}
       <div>

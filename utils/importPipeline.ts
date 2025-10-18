@@ -2,8 +2,8 @@ import type { ImportedDoc } from '../types';
 import { runOCRFromImage } from '../agents/ocrExtractor';
 import { extractDataFromText } from '../agents/nlpAgent';
 import { logger } from '../services/logger';
+import { parseSafeFloat } from './parsingUtils';
 
-// FIX: Import `JSZipObject` type to correctly type items from the zip archive.
 import JSZip, { type JSZipObject } from 'jszip';
 import Papa from 'papaparse';
 
@@ -69,6 +69,7 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
     const emit = infNFe.emit || {};
     const dest = infNFe.dest || {};
     const total = infNFe.total?.ICMSTot || {};
+    const nfeId = infNFe.Id;
 
     const findTaxInfo = (imposto: any, tributo: 'ICMS' | 'PIS' | 'COFINS'): { cst?: string; value?: number } => {
         const impostoBlock = imposto?.[tributo];
@@ -91,10 +92,18 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
         const icmsInfo = findTaxInfo(item.imposto, 'ICMS');
         const pisInfo = findTaxInfo(item.imposto, 'PIS');
         const cofinsInfo = findTaxInfo(item.imposto, 'COFINS');
+        
+        if (!item.prod?.vProd) {
+            logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} não possui valor (vProd).`);
+        }
+        if (!item.prod?.CFOP) {
+            logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} não possui CFOP.`);
+        }
 
         return {
+            nfe_id: nfeId,
             data_emissao: ide.dhEmi,
-            valor_total_nfe: total.vNF,
+            valor_total_nfe: parseSafeFloat(total.vNF),
             emitente_nome: emit.xNome,
             emitente_uf: emit.enderEmit?.UF,
             destinatario_nome: dest.xNome,
@@ -103,14 +112,14 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
             produto_ncm: item.prod?.NCM,
             produto_cfop: item.prod?.CFOP,
             produto_cst_icms: icmsInfo.cst,
-            produto_valor_icms: icmsInfo.value,
+            produto_valor_icms: parseSafeFloat(icmsInfo.value),
             produto_cst_pis: pisInfo.cst,
-            produto_valor_pis: pisInfo.value,
+            produto_valor_pis: parseSafeFloat(pisInfo.value),
             produto_cst_cofins: cofinsInfo.cst,
-            produto_valor_cofins: cofinsInfo.value,
-            produto_qtd: item.prod?.qCom,
-            produto_valor_unit: item.prod?.vUnCom,
-            produto_valor_total: item.prod?.vProd,
+            produto_valor_cofins: parseSafeFloat(cofinsInfo.value),
+            produto_qtd: parseSafeFloat(item.prod?.qCom),
+            produto_valor_unit: parseSafeFloat(item.prod?.vUnCom),
+            produto_valor_total: parseSafeFloat(item.prod?.vProd),
         }
     });
 };
@@ -124,8 +133,10 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
         const text = await file.text();
         const parser = new XMLParser({
             ignoreAttributes: false,
+            attributeNamePrefix: "", // Do not add prefix to attributes
             parseAttributeValue: true,
             parseNodeValue: true,
+            ignoreNameSpace: true,
         });
         const jsonObj = parser.parse(text);
         const data = normalizeNFeData(jsonObj);

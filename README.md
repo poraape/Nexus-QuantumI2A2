@@ -8,15 +8,18 @@ Esta aplicação demonstra uma arquitetura robusta para processamento de dados e
 
 ## ✨ Funcionalidades Principais
 
-*   **Pipeline Multiagente:** Uma cadeia de agentes especializados (OCR, Auditor, Classificador, Contador) processa os arquivos em etapas, garantindo modularidade e clareza no fluxo de trabalho.
+*   **Pipeline Multiagente Avançado:** Uma cadeia de agentes especializados (OCR, Auditor, Classificador, **Agente de Inteligência**, Contador) processa os arquivos em etapas, garantindo modularidade e profundidade na análise.
 *   **Upload Flexível de Arquivos:** Suporte para múltiplos formatos, incluindo `XML`, `CSV`, `XLSX`, `PDF`, imagens (`PNG`, `JPG`) e arquivos `.ZIP` contendo múltiplos documentos.
-*   **Análise Fiscal Abrangente:** Geração de um relatório detalhado com resumo executivo, métricas chave, insights acionáveis e uma análise documento a documento com score de risco.
-*   **Chat Interativo com IA:** Um assistente de IA, contextualizado com os dados do relatório, permite explorar os resultados através de perguntas em linguagem natural e gera visualizações de dados sob demanda.
+*   **Análise Fiscal Aprofundada por IA:** Geração de um relatório detalhado com:
+    *   **Resumo Executivo e Recomendações Estratégicas** gerados por IA.
+    *   **Detecção de Anomalias por IA** que vai além de regras fixas.
+    *   **Validação Cruzada (Cross-Validation)** entre documentos para encontrar discrepâncias sutis.
+*   **Busca Inteligente (Smart Search):** Interaja com seus dados através de perguntas em linguagem natural diretamente no dashboard.
+*   **Chat Interativo com IA:** Um assistente de IA, contextualizado com os dados do relatório, permite explorar os resultados e gera visualizações de dados sob demanda.
 *   **Dashboards Dinâmicos:** Painéis interativos com KPIs, gráficos e filtros para uma visão aprofundada dos dados fiscais.
-*   **Simulação Preditiva:** Ferramenta "what-if" que permite simular cenários fiscais alterando parâmetros como alíquotas e regimes tributários para prever impactos.
+*   **Simulação Preditiva:** Ferramenta "what-if" que permite simular cenários fiscais alterando parâmetros como alíquotas.
 *   **Apuração Contábil:** Geração automática de lançamentos contábeis (débito/crédito) para operações de compra e venda.
-*   **Exportação SPED/EFD:** Geração de um arquivo de texto no layout simplificado do SPED Fiscal (EFD ICMS IPI), pronto para validação.
-*   **Segurança e Logging:** Validações de segurança no upload e um sistema de logging estruturado para auditoria e troubleshooting.
+*   **Exportação SPED/EFD:** Geração de um arquivo de texto no layout simplificado do SPED Fiscal.
 *   **Exportação de Relatórios:** Exporte a análise completa ou as conversas do chat para formatos como `PDF`, `DOCX`, `HTML` e `Markdown`.
 
 ---
@@ -25,34 +28,35 @@ Esta aplicação demonstra uma arquitetura robusta para processamento de dados e
 
 O núcleo da aplicação é um pipeline orquestrado que simula o trabalho de uma equipe de especialistas fiscais. Cada "agente" é um módulo de software com uma responsabilidade específica.
 
-1.  **Agente OCR (`ocrExtractor.ts`):**
-    *   **Responsabilidade:** Extrair texto de documentos baseados em imagem (PDFs de imagem, PNG, JPG) usando Tesseract.js.
-    *   **Entrada:** Arquivo de imagem/PDF.
-    *   **Saída:** `ImportedDoc` com o conteúdo de texto extraído.
+1.  **Agente OCR & NLP (`importPipeline.ts`):**
+    *   **Responsabilidade:** Extrair texto e dados estruturados de diversos formatos de arquivo, usando Tesseract.js para imagens e parsers específicos para cada tipo.
+    *   **Entrada:** Arquivos brutos.
+    *   **Saída:** `ImportedDoc` com dados normalizados.
 
-2.  **Agente NLP (`nlpAgent.ts`):**
-    *   **Responsabilidade:** Realizar extração de entidades fiscais (CNPJ, valores, CFOP) a partir de texto não estruturado usando regras determinísticas (Regex).
-    *   **Entrada:** `ImportedDoc` com texto.
-    *   **Saída:** `ImportedDoc` com dados estruturados.
-
-3.  **Agente Auditor (`auditorAgent.ts`):**
-    *   **Responsabilidade:** Aplicar um conjunto de regras fiscais determinísticas (`rulesEngine.ts`) para identificar inconsistências em cada documento.
+2.  **Agente Auditor (`auditorAgent.ts`):**
+    *   **Responsabilidade:** Aplicar um conjunto de regras fiscais determinísticas (`rulesEngine.ts`) para identificar inconsistências óbvias em cada documento.
     *   **Entrada:** Documentos com dados estruturados.
-    *   **Saída:** `AuditedDocument` com status (`OK`, `ALERTA`, `ERRO`), score de risco e lista de inconsistências.
+    *   **Saída:** `AuditedDocument` com status (`OK`, `ALERTA`, `ERRO`) e lista de inconsistências.
 
-4.  **Agente Classificador (`classifierAgent.ts`):**
-    *   **Responsabilidade:** Classificar a natureza de cada operação (Compra, Venda, etc.) e o setor de negócio com base em heurísticas sobre códigos CFOP e NCM.
+3.  **Agente Classificador (`classifierAgent.ts`):**
+    *   **Responsabilidade:** Classificar a natureza de cada operação (Compra, Venda, etc.) com base em heurísticas sobre códigos CFOP e NCM.
     *   **Entrada:** `AuditedDocument`.
     *   **Saída:** `AuditedDocument` enriquecido com dados de classificação.
+    
+4.  **⚡ Agente de Inteligência (`intelligenceAgent.ts`):**
+    *   **Responsabilidade:** Utilizar a API Gemini para realizar análises complexas que regras determinísticas não conseguem capturar.
+        1.  **Detecção de Anomalias:** Identifica padrões incomuns nos dados (ex: volatilidade de preços, combinações estranhas de CFOP/NCM).
+        2.  **Validação Cruzada:** Compara todos os documentos entre si para encontrar discrepâncias em atributos fiscais e valores.
+    *   **Entrada:** Relatório de auditoria e classificação.
+    *   **Saída:** `aiDrivenInsights` e `crossValidationResults`.
 
 5.  **Agente Contador (`accountantAgent.ts`):**
     *   **Responsabilidade:**
-        1.  Executar agregações determinísticas (somas, contagens, impostos) sobre os dados auditados.
-        2.  Gerar os lançamentos contábeis de débito e crédito.
-        3.  Gerar o arquivo no formato SPED/EFD.
-        4.  Utilizar a API Gemini para gerar um resumo executivo, métricas chave e insights acionáveis com base nos dados agregados e em uma amostra dos dados.
-    *   **Entrada:** Relatório de auditoria completo.
-    *   **Saída:** O `AuditReport` final com a análise da IA, lançamentos contábeis e arquivo SPED.
+        1.  Executar agregações determinísticas (somas, contagens).
+        2.  Gerar os lançamentos contábeis e o arquivo SPED.
+        3.  Utilizar a API Gemini para gerar o resumo executivo, insights acionáveis e **recomendações estratégicas** com base em todos os dados coletados.
+    *   **Entrada:** Relatório completo, incluindo os insights do Agente de Inteligência.
+    *   **Saída:** O `AuditReport` final.
 
 ---
 

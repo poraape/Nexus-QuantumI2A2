@@ -10,20 +10,26 @@ import { useAgentOrchestrator } from './hooks/useAgentOrchestrator';
 import { exportToMarkdown, exportToHtml, exportToPdf, exportToDocx } from './utils/exportUtils';
 import LogsPanel from './components/LogsPanel';
 import Dashboard from './components/Dashboard';
+import type { AuditReport } from './types';
+import IncrementalInsights from './components/IncrementalInsights';
 
 export type ExportType = 'md' | 'html' | 'pdf' | 'docx' | 'sped';
 type PipelineStep = 'UPLOAD' | 'PROCESSING' | 'COMPLETE' | 'ERROR';
-type ActiveView = 'report' | 'dashboard';
+type ActiveView = 'report' | 'dashboard' | 'comparative';
 
 const App: React.FC = () => {
     const [isExporting, setIsExporting] = useState<ExportType | null>(null);
     const [pipelineStep, setPipelineStep] = useState<PipelineStep>('UPLOAD');
     const [showLogs, setShowLogs] = useState(false);
     const [activeView, setActiveView] = useState<ActiveView>('report');
+    const [analysisHistory, setAnalysisHistory] = useState<AuditReport[]>([]);
+    const [processedFiles, setProcessedFiles] = useState<File[]>([]);
+
 
     const {
         agentStates,
         auditReport,
+        setAuditReport, // from useAgentOrchestrator
         messages,
         isStreaming,
         error,
@@ -35,7 +41,15 @@ const App: React.FC = () => {
         handleStopStreaming,
         setError,
         handleClassificationChange,
+        reset: resetOrchestrator,
     } = useAgentOrchestrator();
+
+    useEffect(() => {
+        if (auditReport) {
+            setAnalysisHistory(prev => [...prev, auditReport]);
+        }
+    }, [auditReport]);
+
 
     const exportableContentRef = useRef<HTMLDivElement>(null);
 
@@ -52,9 +66,35 @@ const App: React.FC = () => {
         }
     }, [isPipelineComplete, pipelineError]);
 
+    const handleStartAnalysis = (files: File[]) => {
+        setProcessedFiles(files);
+        runPipeline(files);
+    };
+
+    const handleIncrementalUpload = (newFiles: File[]) => {
+        const uniqueNewFiles = newFiles.filter(
+            (newFile) => !processedFiles.some((processedFile) => processedFile.name === newFile.name)
+        );
+
+        if (uniqueNewFiles.length === 0 && newFiles.length > 0) {
+            setError("Todos os arquivos selecionados já foram incluídos na análise atual.");
+            return;
+        }
+        
+        if (uniqueNewFiles.length === 0) return;
+
+        const allFiles = [...processedFiles, ...uniqueNewFiles];
+        setProcessedFiles(allFiles);
+        runPipeline(allFiles);
+    };
+
     const handleReset = () => {
         setPipelineStep('UPLOAD');
-        setError(null); 
+        setError(null);
+        setAnalysisHistory([]);
+        setAuditReport(null);
+        setProcessedFiles([]);
+        resetOrchestrator();
     };
 
     const handleExport = async (type: ExportType) => {
@@ -99,7 +139,7 @@ const App: React.FC = () => {
             case 'UPLOAD':
                 return (
                     <div className="max-w-2xl mx-auto">
-                        <FileUpload onFileUpload={runPipeline} disabled={isPipelineRunning} />
+                        <FileUpload onStartAnalysis={handleStartAnalysis} disabled={isPipelineRunning} />
                     </div>
                 );
             case 'PROCESSING':
@@ -121,6 +161,11 @@ const App: React.FC = () => {
                                 <button onClick={() => setActiveView('dashboard')} className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-colors ${activeView === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}>
                                     Dashboard
                                 </button>
+                                {analysisHistory.length > 1 && (
+                                    <button onClick={() => setActiveView('comparative')} className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-colors ${activeView === 'comparative' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}>
+                                       Análise Comparativa
+                                    </button>
+                                )}
                             </div>
                             <div ref={exportableContentRef}>
                                 {activeView === 'report' ? (
@@ -128,8 +173,10 @@ const App: React.FC = () => {
                                         report={auditReport} 
                                         onClassificationChange={handleClassificationChange} 
                                     />
-                                ) : (
+                                ) : activeView === 'dashboard' ? (
                                     <Dashboard report={auditReport} />
+                                ) : (
+                                    <IncrementalInsights history={analysisHistory} />
                                 )}
                             </div>
                         </div>
@@ -141,6 +188,7 @@ const App: React.FC = () => {
                                 onStopStreaming={handleStopStreaming}
                                 reportTitle={auditReport.summary.title}
                                 setError={setError}
+                                onAddFiles={handleIncrementalUpload}
                             />
                         </div>
                     </div>
@@ -155,9 +203,8 @@ const App: React.FC = () => {
     return (
         <div className="bg-gray-900 text-white min-h-screen font-sans">
             <Header
-                showExports={pipelineStep === 'COMPLETE' && !!auditReport}
+                showExports={pipelineStep === 'COMPLETE' && !!auditReport && activeView === 'report'}
                 showSpedExport={pipelineStep === 'COMPLETE' && !!auditReport?.spedFile}
-                isReportView={activeView === 'report'}
                 onExport={handleExport}
                 isExporting={isExporting}
                 onToggleLogs={() => setShowLogs(!showLogs)}

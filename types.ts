@@ -34,6 +34,7 @@ export interface AnalysisResult {
   summary: string;
   keyMetrics: KeyMetric[];
   actionableInsights: string[];
+  strategicRecommendations?: string[];
 }
 
 export interface NfeData {
@@ -96,10 +97,37 @@ export interface SpedFile {
     content: string;
 }
 
+// --- New Types for AI-Driven Analysis ---
+
+export type AIFindingSeverity = 'INFO' | 'BAIXA' | 'MÉDIA' | 'ALTA';
+
+export interface AIDrivenInsight {
+    category: 'Eficiência Operacional' | 'Risco Fiscal' | 'Oportunidade de Otimização' | 'Anomalia de Dados';
+    description: string;
+    severity: AIFindingSeverity;
+    evidence: string[]; // e.g., document names or product names
+}
+
+export interface CrossValidationResult {
+    attribute: string;
+    observation: string;
+    documents: {
+        name: string;
+        value: string | number;
+    }[];
+}
+
+export interface SmartSearchResult {
+    summary: string;
+    data?: Record<string, any>[]; // Optional structured data for a table
+}
+
 export interface AuditReport {
   summary: AnalysisResult;
   documents: AuditedDocument[];
   aggregatedMetrics?: Record<string, number | string>;
   accountingEntries?: AccountingEntry[];
   spedFile?: SpedFile;
+  aiDrivenInsights?: AIDrivenInsight[];
+  crossValidationResults?: CrossValidationResult[];
 }

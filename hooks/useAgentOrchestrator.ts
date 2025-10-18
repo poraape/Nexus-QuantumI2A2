@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { importFiles } from '../utils/importPipeline';
 import { runAudit } from '../agents/auditorAgent';
 import { runClassification } from '../agents/classifierAgent';
+import { runIntelligenceAnalysis } from '../agents/intelligenceAgent';
 import { runAccountingAnalysis } from '../agents/accountantAgent';
 import { startChat, sendMessageStream } from '../services/chatService';
 import type { ChatMessage, ImportedDoc, AuditReport, ClassificationResult } from '../types';
@@ -9,7 +10,7 @@ import type { Chat } from '@google/genai';
 import Papa from 'papaparse';
 import { logger } from '../services/logger';
 
-export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'accountant';
+export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'intelligence' | 'accountant';
 export type AgentStatus = 'pending' | 'running' | 'completed' | 'error';
 export interface AgentProgress {
   step: string;
@@ -25,6 +26,7 @@ const initialAgentStates: AgentStates = {
     ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
     auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+    intelligence: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     accountant: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
 };
 
@@ -55,10 +57,8 @@ export const useAgentOrchestrator = () => {
             logger.log('Orchestrator', 'ERROR', 'Falha ao carregar correções do localStorage.', { error: e });
         }
     }, []);
-
-    const runPipeline = useCallback(async (files: FileList) => {
-        logger.clear();
-        logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.');
+    
+    const reset = useCallback(() => {
         setAgentStates(initialAgentStates);
         setError(null);
         setPipelineError(false);
@@ -66,6 +66,12 @@ export const useAgentOrchestrator = () => {
         setMessages([]);
         chatRef.current = null;
         setIsPipelineComplete(false);
+    }, []);
+
+    const runPipeline = useCallback(async (files: File[]) => {
+        logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.');
+        // Don't clear logs on incremental runs, just reset pipeline state
+        reset();
         
         try {
             const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
@@ -79,7 +85,7 @@ export const useAgentOrchestrator = () => {
 
             // 1. Agente OCR / NLP
             updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
-            const importedDocs = await importFiles(Array.from(files), (current, total) => {
+            const importedDocs = await importFiles(files, (current, total) => {
                 updateAgentState('ocr', 'running', { step: 'Processando arquivos...', current, total });
             });
             updateAgentState('ocr', 'completed');
@@ -105,9 +111,14 @@ export const useAgentOrchestrator = () => {
             const classifiedReport = await runClassification(auditedReport, classificationCorrections);
             updateAgentState('classifier', 'completed');
 
-            // 4. Agente Contador
+            // 4. Agente de Inteligência (IA)
+            updateAgentState('intelligence', 'running', { step: 'Analisando padrões com IA...' });
+            const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(classifiedReport);
+            updateAgentState('intelligence', 'completed');
+
+            // 5. Agente Contador
             updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
-            const finalReport = await runAccountingAnalysis(classifiedReport);
+            const finalReport = await runAccountingAnalysis({ ...classifiedReport, aiDrivenInsights, crossValidationResults });
             setAuditReport(finalReport);
             updateAgentState('accountant', 'completed');
             
@@ -116,7 +127,7 @@ export const useAgentOrchestrator = () => {
                 .flatMap(d => d.doc.data!);
             const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
-            // 5. Preparar para Chat
+            // 6. Preparar para Chat
             logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.');
             chatRef.current = startChat(dataSampleForAI, finalReport.aggregatedMetrics);
             setMessages([
@@ -129,12 +140,14 @@ export const useAgentOrchestrator = () => {
 
         } catch (err: unknown) {
             console.error('Pipeline failed:', err);
-            // FIX: Add type guard before accessing 'message' property on unknown error type.
+            // FIX: Refactored error handling to safely extract the error message from various possible thrown types.
             let errorMessage = 'Ocorreu um erro desconhecido.';
             if (err instanceof Error) {
                 errorMessage = err.message;
-            } else if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
-                errorMessage = err.message;
+            } else if (typeof err === 'string') {
+                errorMessage = err;
+            } else if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+                errorMessage = (err as { message: string }).message;
             }
             setError(errorMessage);
             setPipelineError(true);
@@ -151,7 +164,7 @@ export const useAgentOrchestrator = () => {
         } finally {
             setIsPipelineComplete(true);
         }
-    }, [classificationCorrections]);
+    }, [classificationCorrections, reset]);
 
     const handleSendMessage = useCallback(async (message: string) => {
         if (!chatRef.current) {
@@ -205,11 +218,25 @@ export const useAgentOrchestrator = () => {
                 );
             } else {
                 console.error('Chat stream failed:', err);
+                // FIX: Refactored error handling to safely extract the error message from various possible thrown types.
                 let errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
                 if (err instanceof Error) {
                     errorText = err.message;
-                } else if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
-                    errorText = err.message;
+                } else if (typeof err === 'string') {
+                    errorText = err;
+                } else if (err && typeof err === 'object') {
+                    // Safely check for a message property.
+                    if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
+                        errorText = (err as { message: string }).message;
+                    }
+                    // FIX: Safely check for and access the 'status' property on the unknown error object.
+                    if ('status' in err) {
+                        // FIX: Replaced direct property access on an 'unknown' error object with a safer type assertion to `Record<string, unknown>` to resolve the TypeScript error 'Property 'status' does not exist on type 'unknown''. This ensures type safety when accessing properties on caught errors of unknown shape.
+                        const status = (err as Record<string, unknown>).status;
+                        if (typeof status === 'string' || typeof status === 'number') {
+                            errorText += ` (Status: ${status})`;
+                        }
+                    }
                 }
                  logger.log('ChatService', 'ERROR', 'Falha no stream do chat', { error: err });
                 setMessages((prev) =>
@@ -260,6 +287,7 @@ export const useAgentOrchestrator = () => {
     return {
         agentStates,
         auditReport,
+        setAuditReport,
         messages,
         isStreaming,
         error,
@@ -270,6 +298,7 @@ export const useAgentOrchestrator = () => {
         handleSendMessage,
         handleStopStreaming,
         setError,
-        handleClassificationChange
+        handleClassificationChange,
+        reset,
     };
 };

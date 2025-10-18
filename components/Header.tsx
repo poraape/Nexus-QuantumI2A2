@@ -6,13 +6,12 @@ import LogoIcon from './LogoIcon'; // Importa o novo ícone
 interface HeaderProps {
     showExports: boolean;
     showSpedExport: boolean;
-    isReportView: boolean;
     isExporting: ExportType | null;
     onExport: (type: ExportType) => void;
     onToggleLogs: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ showExports, showSpedExport, isReportView, isExporting, onExport, onToggleLogs }) => {
+const Header: React.FC<HeaderProps> = ({ showExports, showSpedExport, isExporting, onExport, onToggleLogs }) => {
   const exportOptions: { type: ExportType, label: string, icon: React.ReactNode }[] = [
       { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
       { type: 'html', label: 'HTML', icon: <span className="font-bold text-sm">H</span> },
@@ -37,7 +36,7 @@ const Header: React.FC<HeaderProps> = ({ showExports, showSpedExport, isReportVi
             </div>
 
             <div className="flex items-center gap-2">
-                 {showExports && isReportView && (
+                 {showExports && (
                     <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-400 hidden sm:block">Exportar Relatório:</span>
                         {exportOptions.map(({ type, label, icon }) => (

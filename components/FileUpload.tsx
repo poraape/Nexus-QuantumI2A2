@@ -3,16 +3,16 @@ import { UploadIcon, FileIcon } from './icons';
 import { logger } from '../services/logger';
 
 interface FileUploadProps {
-  onFileUpload: (files: FileList) => void;
+  onStartAnalysis: (files: File[]) => void;
   disabled: boolean;
 }
 
 const FILE_SIZE_LIMIT_MB = 200;
 const FILE_SIZE_LIMIT_BYTES = FILE_SIZE_LIMIT_MB * 1024 * 1024;
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ onStartAnalysis, disabled }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const formatBytes = (bytes: number, decimals = 2) => {
@@ -24,34 +24,31 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   };
 
-  const processFiles = (files: FileList) => {
-      logger.log('FileUpload', 'INFO', `${files.length} arquivo(s) recebido(s) para processamento.`);
+  const handleFilesAdded = (newFiles: FileList) => {
+      logger.log('FileUpload', 'INFO', `${newFiles.length} arquivo(s) recebido(s) para processamento.`);
       setError(null);
       const acceptedFiles: File[] = [];
       const rejectedFiles: {name: string, reason: string}[] = [];
 
-      for (const file of Array.from(files)) {
+      for (const file of Array.from(newFiles)) {
           if (file.size > FILE_SIZE_LIMIT_BYTES) {
               rejectedFiles.push({name: file.name, reason: `Tamanho excede ${FILE_SIZE_LIMIT_MB} MB`});
-          } else {
+          } else if (files.some(f => f.name === file.name)) {
+              rejectedFiles.push({name: file.name, reason: 'Arquivo já adicionado.'});
+          }
+          else {
               acceptedFiles.push(file);
           }
       }
 
       if(rejectedFiles.length > 0) {
-        const errorMessage = `Arquivo(s) rejeitado(s): ${rejectedFiles.map(f => f.name).join(', ')}. Verifique os limites.`;
+        const errorMessage = `Arquivo(s) rejeitado(s): ${rejectedFiles.map(f => `${f.name} (${f.reason})`).join(', ')}.`;
         setError(errorMessage);
         logger.log('FileUpload', 'WARN', errorMessage, { rejectedFiles });
       }
 
       if (acceptedFiles.length > 0) {
-        logger.log('FileUpload', 'INFO', `${acceptedFiles.length} arquivo(s) aceito(s) e enviados para o pipeline.`);
-        const dataTransfer = new DataTransfer();
-        acceptedFiles.forEach(file => dataTransfer.items.add(file));
-        onFileUpload(dataTransfer.files);
-        setUploadedFiles(acceptedFiles);
-      } else if (files.length > 0) {
-        logger.log('FileUpload', 'ERROR', 'Nenhum arquivo foi aceito para o pipeline.');
+        setFiles(prev => [...prev, ...acceptedFiles]);
       }
   };
 
@@ -77,13 +74,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
     e.stopPropagation();
     setIsDragging(false);
     if (!disabled && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFiles(e.dataTransfer.files);
+      handleFilesAdded(e.dataTransfer.files);
     }
-  }, [disabled]);
+  }, [disabled, files]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!disabled && e.target.files && e.target.files.length > 0) {
-      processFiles(e.target.files);
+      handleFilesAdded(e.target.files);
       e.target.value = ''; // Reset input to allow re-uploading the same file
     }
   };
@@ -147,8 +144,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
     const demoFile = new File([mockXml], "NFe_Demonstracao.xml", { type: "text/xml" });
     const dataTransfer = new DataTransfer();
     dataTransfer.items.add(demoFile);
-    onFileUpload(dataTransfer.files);
-    setUploadedFiles([demoFile]);
+    handleFilesAdded(dataTransfer.files);
+  };
+  
+  const handleStart = () => {
+    if (files.length > 0 && !disabled) {
+        onStartAnalysis(files);
+        setFiles([]);
+    }
   };
 
   const fileTypes = ".xml,.csv,.xlsx,.pdf,.png,.jpeg,.jpg,.zip,application/zip,application/x-zip-compressed";
@@ -184,7 +187,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
           <div className="flex flex-col items-center justify-center">
             <UploadIcon className={`w-12 h-12 mb-4 ${disabled ? 'text-gray-600' : 'text-gray-400'}`} />
             <p className={`font-semibold ${disabled ? 'text-gray-500' : 'text-blue-400'}`}>
-              Clique ou arraste seus arquivos
+              Clique ou arraste novos arquivos
             </p>
             <p className="text-xs text-gray-500 mt-1">
               Suportados: XML, CSV, XLSX, PDF, Imagens (PNG, JPG), ZIP (limite de {FILE_SIZE_LIMIT_MB}MB)
@@ -202,11 +205,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
           </button>
       </div>
        {error && <p className="text-xs text-red-400 mt-2 text-center">{error}</p>}
-       {uploadedFiles.length > 0 && (
+       {files.length > 0 && (
         <div className="mt-4">
-          <h3 className="text-sm font-semibold text-gray-400 mb-2">Arquivos selecionados:</h3>
+          <h3 className="text-sm font-semibold text-gray-400 mb-2">Fila de processamento:</h3>
           <ul className="max-h-32 overflow-y-auto space-y-1 pr-2">
-            {uploadedFiles.map((file, index) => (
+            {files.map((file, index) => (
               <li key={index} className="flex items-center justify-between text-xs bg-gray-700/50 p-2 rounded">
                 <div className="flex items-center truncate">
                     <FileIcon className="w-4 h-4 mr-2 text-gray-500 flex-shrink-0" />
@@ -216,6 +219,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, disabled }) => {
               </li>
             ))}
           </ul>
+           <button
+            onClick={handleStart}
+            disabled={disabled || files.length === 0}
+            className="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
+           >
+            Analisar {files.length} Arquivo(s)
+           </button>
         </div>
       )}
     </div>

@@ -1,46 +1,47 @@
 import React, { useMemo, useState } from 'react';
-import type { AuditReport } from '../types';
+import type { AuditReport, ChartData } from '../types';
 import Chart from './Chart';
+import CrossValidationPanel from './CrossValidationPanel';
+import SmartSearch from './SmartSearch';
+import { parseSafeFloat } from '../utils/parsingUtils';
 
 interface DashboardProps {
     report: AuditReport;
 }
 
+interface MemoizedDashboardData {
+    cfopChart: ChartData;
+    ncmChart: ChartData;
+    ufChart: ChartData;
+    totalValue: number;
+}
+
 const Dashboard: React.FC<DashboardProps> = ({ report }) => {
     const [simAliquot, setSimAliquot] = useState(18);
 
-    const dashboardData = useMemo(() => {
+    const dashboardData = useMemo((): MemoizedDashboardData => {
         const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data);
         const allItems = validDocs.flatMap(d => d.doc.data!);
 
-        const cfopData = allItems.reduce((acc, item) => {
+        const cfopData = allItems.reduce((acc: Record<string, number>, item) => {
             const cfop = item.produto_cfop?.toString() || 'N/A';
-            acc[cfop] = (acc[cfop] || 0) + parseFloat(item.produto_valor_total || 0);
+            acc[cfop] = (acc[cfop] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
-        }, {} as Record<string, number>);
+        }, {});
 
-        const ncmData = allItems.reduce((acc, item) => {
+        const ncmData = allItems.reduce((acc: Record<string, number>, item) => {
             const ncm = item.produto_ncm?.toString() || 'N/A';
-            acc[ncm] = (acc[ncm] || 0) + parseFloat(item.produto_valor_total || 0);
+            acc[ncm] = (acc[ncm] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
-        }, {} as Record<string, number>);
+        }, {});
 
-        const ufData = allItems.reduce((acc, item) => {
+        const ufData = allItems.reduce((acc: Record<string, number>, item) => {
             const uf = item.destinatario_uf || 'N/A';
             acc[uf] = (acc[uf] || 0) + 1;
             return acc;
-        }, {} as Record<string, number>);
+        }, {});
         
-        const totalValue = (() => {
-            const metric = report.aggregatedMetrics?.['Valor Total das NFes'];
-            if (typeof metric === 'number') return metric;
-            if (typeof metric === 'string') {
-                 // FIX: Use global regex to replace all thousand separators (dots).
-                const cleaned = metric.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
-                return parseFloat(cleaned) || 0;
-            }
-            return 0;
-        })();
+        const totalValue = parseSafeFloat(report.aggregatedMetrics?.['Valor Total das NFes']);
             
         return {
             cfopChart: {
@@ -63,7 +64,7 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
             totalValue
         };
     }, [report]);
-
+    
     const simulatedIcms = (dashboardData.totalValue * (simAliquot / 100));
 
     return (
@@ -116,6 +117,19 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
                  <p className="text-xs text-gray-500 mt-2 text-center">
                     Nota: A simulação é uma estimativa baseada no valor total dos documentos e não considera isenções, reduções ou substituição tributária.
                 </p>
+            </div>
+            
+            <div>
+                <h2 className="text-xl font-bold text-gray-200 mb-4 border-t border-gray-700 pt-8">Busca Inteligente com IA</h2>
+                 <SmartSearch report={report} />
+            </div>
+
+            <div>
+                <h2 className="text-xl font-bold text-gray-200 mb-4 border-t border-gray-700 pt-8">Validação Cruzada Interdocumental (IA)</h2>
+                <p className="text-xs text-gray-500 mb-4">
+                    A IA compara atributos fiscais e valores entre todos os itens para encontrar inconsistências sutis ou padrões que merecem atenção.
+                </p>
+                <CrossValidationPanel results={report.crossValidationResults} />
             </div>
         </div>
     );

@@ -1,5 +1,6 @@
 import { INCONSISTENCIES } from './rulesDictionary';
 import type { Inconsistency } from '../types';
+import { parseSafeFloat } from './parsingUtils';
 
 export const runFiscalValidation = (item: Record<string, any>): Inconsistency[] => {
   const findings: Inconsistency[] = [];
@@ -8,9 +9,9 @@ export const runFiscalValidation = (item: Record<string, any>): Inconsistency[] 
   const cstIcms = item.produto_cst_icms?.toString();
   const cstPis = item.produto_cst_pis?.toString();
   const cstCofins = item.produto_cst_cofins?.toString();
-  const qCom = parseFloat(item.produto_qtd || 0);
-  const vUnCom = parseFloat(item.produto_valor_unit || 0);
-  const vProd = parseFloat(item.produto_valor_total || 0);
+  const qCom = parseSafeFloat(item.produto_qtd);
+  const vUnCom = parseSafeFloat(item.produto_valor_unit);
+  const vProd = parseSafeFloat(item.produto_valor_total);
 
   // Rule 1: Validate CFOP for sales vs. purchases.
   // This is a simplified check. A real system would cross-reference against more company data.

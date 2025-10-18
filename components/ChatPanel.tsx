@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { ChatMessage } from '../types';
 import type { ExportType } from '../App';
 import Chart from './Chart';
-import { SendIcon, UserIcon, AiIcon, LoadingSpinnerIcon, StopIcon, DownloadIcon, DocumentTextIcon } from './icons';
+import { SendIcon, UserIcon, AiIcon, LoadingSpinnerIcon, StopIcon, DownloadIcon, DocumentTextIcon, PaperClipIcon } from './icons';
 import { exportConversationToDocx, exportConversationToHtml, exportConversationToPdf } from '../utils/exportConversationUtils';
 
 interface ChatPanelProps {
@@ -12,14 +12,16 @@ interface ChatPanelProps {
   onStopStreaming: () => void;
   reportTitle: string;
   setError: (message: string | null) => void;
+  onAddFiles: (files: File[]) => void;
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStreaming, onStopStreaming, reportTitle, setError }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStreaming, onStopStreaming, reportTitle, setError, onAddFiles }) => {
   const [input, setInput] = useState('');
   const [isExporting, setIsExporting] = useState<ExportType | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -45,6 +47,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
     if (input.trim() && !isStreaming) {
       onSendMessage(input.trim());
       setInput('');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        onAddFiles(Array.from(e.target.files));
+        e.target.value = ''; // Reset input to allow re-selection
     }
   };
   
@@ -153,12 +162,30 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
         <div ref={messagesEndRef} />
       </div>
       <div className="p-4 border-t border-gray-700">
-        <form onSubmit={handleSubmit} className="flex items-center gap-3">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            accept=".xml,.csv,.xlsx,.pdf,.png,.jpeg,.jpg,.zip"
+            onChange={handleFileChange}
+            disabled={isStreaming}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming}
+            className="p-2.5 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Adicionar mais arquivos à análise"
+          >
+            <PaperClipIcon className="w-5 h-5" />
+          </button>
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isStreaming ? "Aguardando resposta..." : "Faça uma pergunta sobre os dados..."}
+            placeholder={isStreaming ? "Aguardando resposta..." : "Faça uma pergunta ou adicione arquivos..."}
             disabled={isStreaming}
             className="flex-grow bg-gray-700 rounded-full py-2 px-4 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow disabled:opacity-50"
           />
