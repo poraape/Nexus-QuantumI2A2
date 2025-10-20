@@ -61,10 +61,11 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
     const infNFe = getInfNFe(nfeData);
     if (!infNFe) return [];
 
-    const det = infNFe.det;
-    if (!det) return [];
-
-    const items = Array.isArray(det) ? det : [det];
+    const items = infNFe.det; // Guaranteed to be an array by the parser config if the tag exists
+    if (!items || items.length === 0) {
+        return [];
+    }
+    
     const ide = infNFe.ide || {};
     const emit = infNFe.emit || {};
     const dest = infNFe.dest || {};
@@ -132,34 +133,43 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
         const { XMLParser } = await import('fast-xml-parser');
         const text = await file.text();
         const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: "", // Do not add prefix to attributes
-            parseAttributeValue: true,
-            parseNodeValue: true,
-            ignoreNameSpace: true,
+            // Performance and Consistency options
+            ignoreAttributes: false, // Keep attributes like 'Id' and 'nItem'
+            ignoreNameSpace: true,  // Simplifies path by removing namespace prefixes
+            parseNodeValue: false,  // Delegate parsing to our specific functions for performance
+            parseAttributeValue: false, // Delegate parsing to our specific functions for performance
+            trimValues: true,       // Sanitize data by removing whitespace
+            attributeNamePrefix: "",// Clean attribute names
+            // Ensure <det> is always an array for consistent data structure
+            isArray: (name) => name === 'det',
         });
         const jsonObj = parser.parse(text);
         const data = normalizeNFeData(jsonObj);
 
         if (data.length === 0) {
-            return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'error', error: 'Nenhum item de produto encontrado no XML.', raw: file };
+            return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'error', error: 'Nenhum item de produto encontrado no XML ou XML malformado.', raw: file };
         }
         return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'parsed', data, raw: file };
-    } catch (error: any) {
-        return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'error', error: `Erro ao processar XML: ${error.message}`, raw: file };
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'error', error: `Erro ao processar XML: ${message}`, raw: file };
     }
 };
 
 const handleCSV = (file: File): Promise<ImportedDoc> => {
     return new Promise((resolve) => {
         Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
+            header: true, // Automatically detect and use the first row as headers.
+            skipEmptyLines: true, // Ignore empty lines to avoid processing invalid data.
+            dynamicTyping: true, // Automatically convert numeric and boolean strings to their types.
+            // Normalize headers to snake_case for consistency, improving AI interpretation.
+            transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
             complete: (results) => {
                 resolve({ kind: 'CSV', name: file.name, size: file.size, status: 'parsed', data: results.data as Record<string, any>[], raw: file });
             },
-            error: (error: any) => {
-                resolve({ kind: 'CSV', name: file.name, size: file.size, status: 'error', error: `Erro ao processar CSV: ${error.message}`, raw: file });
+            error: (error: unknown) => {
+                const message = error instanceof Error ? error.message : String(error);
+                resolve({ kind: 'CSV', name: file.name, size: file.size, status: 'error', error: `Erro ao processar CSV: ${message}`, raw: file });
             },
         });
     });
@@ -174,8 +184,9 @@ const handleXLSX = async (file: File): Promise<ImportedDoc> => {
         const worksheet = workbook.Sheets[sheetName];
         const data = utils.sheet_to_json(worksheet) as Record<string, any>[];
         return { kind: 'XLSX', name: file.name, size: file.size, status: 'parsed', data, raw: file };
-    } catch (error: any) {
-        return { kind: 'XLSX', name: file.name, size: file.size, status: 'error', error: `Erro ao processar XLSX: ${error.message}`, raw: file };
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { kind: 'XLSX', name: file.name, size: file.size, status: 'error', error: `Erro ao processar XLSX: ${message}`, raw: file };
     }
 };
 
@@ -191,8 +202,9 @@ const handleImage = async (file: File): Promise<ImportedDoc> => {
             logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto da imagem ${file.name}`);
         }
         return { kind: 'IMAGE', name: file.name, size: file.size, status: 'parsed', text, data, raw: file };
-    } catch (error: any) {
-        return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: error.message, raw: file };
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: message, raw: file };
     }
 };
 
@@ -226,8 +238,9 @@ const handlePDF = async (file: File): Promise<ImportedDoc> => {
         }
         return doc;
 
-    } catch (error: any) {
-        return { kind: 'PDF', name: file.name, size: file.size, status: 'error', error: `Falha no processamento do PDF: ${error.message}`, raw: file };
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { kind: 'PDF', name: file.name, size: file.size, status: 'error', error: `Falha no processamento do PDF: ${message}`, raw: file };
     }
 };
 
@@ -284,22 +297,46 @@ export const importFiles = async (
                     logger.log('ImportPipeline', 'INFO', `Descompactando arquivo zip: ${file.name}`);
                     const jszip = new JSZip();
                     const zip = await jszip.loadAsync(file);
-                    const filesInZip = Object.values(zip.files).filter(
-                        (zipFile: JSZipObject) => !zipFile.dir && isSupportedExtension(zipFile.name) && !zipFile.name.startsWith('__MACOSX/') && !zipFile.name.endsWith('.DS_Store')
+                    
+                    // Get all file-like entries, excluding common metadata folders/files
+                    const allFileEntries = Object.values(zip.files).filter(
+                        (zipFile: JSZipObject) => !zipFile.dir && !zipFile.name.startsWith('__MACOSX/') && !zipFile.name.endsWith('.DS_Store')
+                    );
+            
+                    const supportedFileEntries = allFileEntries.filter(
+                        (zipFile: JSZipObject) => isSupportedExtension(zipFile.name)
                     );
                     
-                    const innerDocs = await Promise.all(filesInZip.map(async (zipEntry: JSZipObject) => {
-                        const blob = await zipEntry.async('blob');
-                        const innerFile = new File([blob], zipEntry.name, { type: blob.type });
-                        const doc = await processSingleFile(innerFile);
-                        doc.meta = { source_zip: file.name, internal_path: zipEntry.name };
-                        return doc;
-                    }));
-                    result = innerDocs;
-                    logger.log('ImportPipeline', 'INFO', `Processados ${innerDocs.length} arquivos de dentro de ${file.name}`);
-
-                } catch (e: any) {
-                    const errorMsg = `Falha ao descompactar o arquivo: ${e.message}`;
+                    // If no supported files are found, create a specific error message.
+                    if (supportedFileEntries.length === 0) {
+                        let reason = 'O arquivo ZIP está vazio.';
+                        if (allFileEntries.length > 0) {
+                            const foundFiles = allFileEntries.map(f => f.name).slice(0, 5).join(', ');
+                            reason = `O ZIP não contém arquivos com formato suportado. Arquivos encontrados: ${foundFiles}${allFileEntries.length > 5 ? '...' : ''}.`;
+                        }
+                        // This will be caught by the orchestrator and displayed to the user.
+                        result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: reason };
+            
+                    } else {
+                        // If there are supported files, process them.
+                        const innerDocs = await Promise.all(supportedFileEntries.map(async (zipEntry: JSZipObject) => {
+                            const blob = await zipEntry.async('blob');
+                            const innerFile = new File([blob], zipEntry.name, { type: blob.type });
+                            const doc = await processSingleFile(innerFile);
+                            doc.meta = { source_zip: file.name, internal_path: zipEntry.name };
+                            return doc;
+                        }));
+                        result = innerDocs;
+                        logger.log('ImportPipeline', 'INFO', `Processados ${innerDocs.length} arquivos de dentro de ${file.name}`);
+                    }
+            
+                } catch (e: unknown) {
+                    const message = e instanceof Error ? e.message : String(e);
+                    const errorMsg = `Falha ao descompactar o arquivo: ${message}`;
+                    // The error `e` is of type `unknown` and does not have a `name` property.
+                    // The intended behavior is to log the name of the file that failed to process.
+                    // Changed `e.name` to `file.name` to correctly log the file that caused the error.
+                    // FIX: Changed e.name to file.name to correctly log the file that caused the error, as `e` is of type `unknown`.
                     logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name});
                     result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: errorMsg };
                 }

@@ -95,9 +95,16 @@ export const useAgentOrchestrator = () => {
 
             if (!hasValidDocs) {
                 let errorMessage = "Nenhum arquivo válido foi processado. Verifique os formatos.";
-                if (isSingleZip) {
+            
+                // If a single zip was uploaded and resulted in exactly one error document, use its specific error message.
+                if (isSingleZip && importedDocs.length === 1 && importedDocs[0].error) {
+                    errorMessage = importedDocs[0].error;
+                } 
+                // Fallback for a single zip that might have produced multiple error docs or an empty result.
+                else if (isSingleZip) {
                     errorMessage = "O arquivo ZIP está vazio ou não contém arquivos com formato suportado.";
                 }
+            
                 throw new Error(errorMessage);
             }
             
@@ -140,7 +147,6 @@ export const useAgentOrchestrator = () => {
 
         } catch (err: unknown) {
             console.error('Pipeline failed:', err);
-            // FIX: Refactored error handling to safely extract the error message from various possible thrown types.
             let errorMessage = 'Ocorreu um erro desconhecido.';
             if (err instanceof Error) {
                 errorMessage = err.message;
@@ -218,8 +224,8 @@ export const useAgentOrchestrator = () => {
                 );
             } else {
                 console.error('Chat stream failed:', err);
-                // FIX: Refactored error handling to safely extract the error message from various possible thrown types.
                 let errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
+                // FIX: Safely handle properties on the 'unknown' error object by using type guards.
                 if (err instanceof Error) {
                     errorText = err.message;
                 } else if (typeof err === 'string') {
@@ -229,10 +235,9 @@ export const useAgentOrchestrator = () => {
                     if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
                         errorText = (err as { message: string }).message;
                     }
-                    // FIX: Safely check for and access the 'status' property on the unknown error object.
+                    // Safely check for and access the 'status' property.
                     if ('status' in err) {
-                        // FIX: Replaced direct property access on an 'unknown' error object with a safer type assertion to `Record<string, unknown>` to resolve the TypeScript error 'Property 'status' does not exist on type 'unknown''. This ensures type safety when accessing properties on caught errors of unknown shape.
-                        const status = (err as Record<string, unknown>).status;
+                        const status = (err as { status: unknown }).status;
                         if (typeof status === 'string' || typeof status === 'number') {
                             errorText += ` (Status: ${status})`;
                         }

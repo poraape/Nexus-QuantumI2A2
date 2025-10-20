@@ -153,7 +153,7 @@ const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Rec
     `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-pro',
+    model: 'gemini-2.5-flash',
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
@@ -173,13 +173,13 @@ const generateAccountingEntries = (documents: AuditedDocument[]): AccountingEntr
     const entries: AccountingEntry[] = [];
     
     for (const doc of documents) {
-        if (doc.status === 'ERRO' || !doc.classification || !doc.doc.data) continue;
+        if (doc.status === 'ERRO' || !doc.classification || !doc.doc.data || doc.doc.data.length === 0) continue;
         
         const totalNfe = parseSafeFloat(doc.doc.data[0]?.valor_total_nfe);
         const totalProducts = doc.doc.data.reduce((sum, item) => sum + parseSafeFloat(item.produto_valor_total), 0);
         const totalIcms = doc.doc.data.reduce((sum, item) => sum + parseSafeFloat(item.produto_valor_icms), 0);
         
-        if (totalNfe === 0 || totalProducts === 0) continue;
+        if (totalNfe === 0 && totalProducts === 0) continue; // Skip docs with no values
 
         switch (doc.classification.operationType) {
             case 'Compra':
@@ -197,7 +197,44 @@ const generateAccountingEntries = (documents: AuditedDocument[]): AccountingEntr
                      entries.push({ docName: doc.doc.name, account: '2.1.2 ICMS a Recolher', type: 'C', value: totalIcms });
                 }
                 break;
-            // Simplified: No entries for other types for now
+            case 'Devolução':
+                const firstCfopDev = doc.doc.data[0]?.produto_cfop?.toString();
+                if (firstCfopDev?.startsWith('1') || firstCfopDev?.startsWith('2')) { // Devolução de Compra
+                    entries.push({ docName: doc.doc.name, account: '2.1.1 Fornecedores', type: 'D', value: totalNfe });
+                    if (totalIcms > 0) {
+                        entries.push({ docName: doc.doc.name, account: '1.2.1 ICMS a Recuperar', type: 'C', value: totalIcms });
+                    }
+                    entries.push({ docName: doc.doc.name, account: '1.1.2 Estoques', type: 'C', value: totalProducts });
+                } else if (firstCfopDev?.startsWith('5') || firstCfopDev?.startsWith('6')) { // Devolução de Venda
+                    entries.push({ docName: doc.doc.name, account: '4.1.2 Devoluções de Vendas', type: 'D', value: totalProducts });
+                    if (totalIcms > 0) {
+                        // This should be a debit to reduce liability, but accounting can be complex.
+                        // For simplicity, we debit the tax liability account.
+                        entries.push({ docName: doc.doc.name, account: '2.1.2 ICMS a Recolher', type: 'D', value: totalIcms });
+                    }
+                    entries.push({ docName: doc.doc.name, account: '1.1.3 Clientes', type: 'C', value: totalNfe });
+                }
+                break;
+            case 'Serviço':
+                const firstCfopServ = doc.doc.data[0]?.produto_cfop?.toString();
+                 if (firstCfopServ?.startsWith('5') || firstCfopServ?.startsWith('6') || firstCfopServ?.startsWith('7')) { // Serviço Prestado
+                    entries.push({ docName: doc.doc.name, account: '1.1.3 Clientes', type: 'D', value: totalNfe });
+                    entries.push({ docName: doc.doc.name, account: '4.1.3 Receita de Serviços', type: 'C', value: totalNfe });
+                } else { // Serviço Tomado (compra)
+                    entries.push({ docName: doc.doc.name, account: '3.1.1 Despesa com Serviços', type: 'D', value: totalNfe });
+                    entries.push({ docName: doc.doc.name, account: '2.1.1 Fornecedores', type: 'C', value: totalNfe });
+                }
+                break;
+            case 'Transferência':
+                const firstCfopTransf = doc.doc.data[0]?.produto_cfop?.toString();
+                if (firstCfopTransf?.startsWith('5') || firstCfopTransf?.startsWith('6')) { // Transferência de saída
+                    entries.push({ docName: doc.doc.name, account: '3.1.2 Custo de Transferência', type: 'D', value: totalProducts });
+                    entries.push({ docName: doc.doc.name, account: '1.1.2 Estoques', type: 'C', value: totalProducts });
+                } else { // Transferência de entrada
+                    entries.push({ docName: doc.doc.name, account: '1.1.2 Estoques', type: 'D', value: totalProducts });
+                    entries.push({ docName: doc.doc.name, account: '4.1.4 Receita de Transferência', type: 'C', value: totalProducts });
+                }
+                break;
         }
     }
     return entries;

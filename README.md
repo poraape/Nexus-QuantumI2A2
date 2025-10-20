@@ -26,37 +26,32 @@ Esta aplicação demonstra uma arquitetura robusta para processamento de dados e
 
 ## 🏗️ Arquitetura do Sistema Multiagente
 
-O núcleo da aplicação é um pipeline orquestrado que simula o trabalho de uma equipe de especialistas fiscais. Cada "agente" é um módulo de software com uma responsabilidade específica.
+A arquitetura do sistema foi refatorada para um modelo **Multiagente Assíncrono** (Padrão Orquestrador-Trabalhador), utilizando a API **Gemini 2.5 Flash** como núcleo de inteligência. Este design garante escalabilidade, resiliência a falhas de API e um processamento de documentos desacoplado e eficiente.
 
-1.  **Agente OCR & NLP (`importPipeline.ts`):**
-    *   **Responsabilidade:** Extrair texto e dados estruturados de diversos formatos de arquivo, usando Tesseract.js para imagens e parsers específicos para cada tipo.
-    *   **Entrada:** Arquivos brutos.
-    *   **Saída:** `ImportedDoc` com dados normalizados.
+1.  **OrchestratorAgent-01 (Agente Orquestrador):**
+    *   **Responsabilidade:** É o agente central que atua como ponto de entrada. Recebe novos documentos (XML de NFe, PDF de CTe) e os direciona para a fila de processamento do agente especializado apropriado, com base no tipo de documento e na tarefa necessária (ex: 'para_extrair', 'para_validar').
 
-2.  **Agente Auditor (`auditorAgent.ts`):**
-    *   **Responsabilidade:** Aplicar um conjunto de regras fiscais determinísticas (`rulesEngine.ts`) para identificar inconsistências óbvias em cada documento.
-    *   **Entrada:** Documentos com dados estruturados.
-    *   **Saída:** `AuditedDocument` com status (`OK`, `ALERTA`, `ERRO`) e lista de inconsistências.
+2.  **ExtractionAgent-02 (Agente de Extração):**
+    *   **Responsabilidade:** Consome da fila 'para_extrair'. Utiliza a API Gemini 2.5 Flash para executar OCR e NLP, extraindo dados estruturados (emitente, destinatário, itens, impostos, CFOP, CST) de documentos. Publica o JSON extraído na fila 'para_validar'.
 
-3.  **Agente Classificador (`classifierAgent.ts`):**
-    *   **Responsabilidade:** Classificar a natureza de cada operação (Compra, Venda, etc.) com base em heurísticas sobre códigos CFOP e NCM.
-    *   **Entrada:** `AuditedDocument`.
-    *   **Saída:** `AuditedDocument` enriquecido com dados de classificação.
-    
-4.  **⚡ Agente de Inteligência (`intelligenceAgent.ts`):**
-    *   **Responsabilidade:** Utilizar a API Gemini para realizar análises complexas que regras determinísticas não conseguem capturar.
-        1.  **Detecção de Anomalias:** Identifica padrões incomuns nos dados (ex: volatilidade de preços, combinações estranhas de CFOP/NCM).
-        2.  **Validação Cruzada:** Compara todos os documentos entre si para encontrar discrepâncias em atributos fiscais e valores.
-    *   **Entrada:** Relatório de auditoria e classificação.
-    *   **Saída:** `aiDrivenInsights` e `crossValidationResults`.
+3.  **ValidationAgent-03 (Agente de Validação):**
+    *   **Responsabilidade:** Consome da fila 'para_validar'. Utiliza a API Gemini 2.5 Flash com chamadas de função (function calling) para consultar bancos de dados de regras fiscais e cadastros (clientes, fornecedores). Identifica e sugere correções para inconsistências (cálculo de impostos, códigos fiscais). Publica os dados validados junto com um relatório de auditoria na fila 'para_classificar'.
 
-5.  **Agente Contador (`accountantAgent.ts`):**
-    *   **Responsabilidade:**
-        1.  Executar agregações determinísticas (somas, contagens).
-        2.  Gerar os lançamentos contábeis e o arquivo SPED.
-        3.  Utilizar a API Gemini para gerar o resumo executivo, insights acionáveis e **recomendações estratégicas** com base em todos os dados coletados.
-    *   **Entrada:** Relatório completo, incluindo os insights do Agente de Inteligência.
-    *   **Saída:** O `AuditReport` final.
+4.  **ClassificationAgent-04 (Agente de Classificação):**
+    *   **Responsabilidade:** Consome da fila 'para_classificar'. Utiliza a API Gemini 2.5 Flash para classificar automaticamente documentos por tipo (compra, venda), centro de custo e aplicar lógicas de customização por ramo de atividade (ex: Agronegócio, Indústria). Publica os dados classificados na fila 'para_automatizar'.
+
+5.  **AutomationAgent-05 (Agente de Automação):**
+    *   **Responsabilidade:** Consome da fila 'para_automatizar'. Utiliza a API Gemini 2.5 Flash para gerar os artefatos finais: lançamentos contábeis, cálculo de impostos e insumos para obrigações acessórias (SPED). Formata as saídas para integração direta com sistemas ERP.
+
+6.  **ReportingAgent-06 (Agente de Relatórios):**
+    *   **Responsabilidade:** Atua como um "Assistente Consultor Especializado". Utiliza a API Gemini 2.5 Flash (com RAG sobre os dados processados) para gerar relatórios personalizados, análises preditivas e responder a consultas em linguagem natural sobre contabilidade e tributação, alimentando a funcionalidade de Chat e Busca Inteligente da interface.
+
+### Stack Tecnológico de Referência (Backend)
+
+*   **Core Intelligence (LLM):** API Gratuita Gemini 2.5 Flash
+*   **Application Framework (Agents):** Python 3.11 (FastAPI, LangGraph)
+*   **Task Queuing (Async):** Redis (via Celery)
+*   **Data Storage:** PostgreSQL (Regras Fiscais, Cadastros) & S3-compatible (Documentos)
 
 ---
 
@@ -83,7 +78,7 @@ O núcleo da aplicação é um pipeline orquestrado que simula o trabalho de uma
     *   Crie um arquivo `.env` na raiz do projeto, copiando o `.env.example`.
     *   Adicione sua chave da API Gemini:
         ```
-        GEMINI_API_KEY=SUA_API_KEY_AQUI
+        API_KEY=SUA_API_KEY_AQUI
         ```
 
 4.  **Inicie o Servidor de Desenvolvimento:**
@@ -105,7 +100,7 @@ O núcleo da aplicação é um pipeline orquestrado que simula o trabalho de uma
 
 As configurações principais da aplicação podem ser gerenciadas através de variáveis de ambiente. Veja o arquivo `.env.example` para a lista completa.
 
-*   `GEMINI_API_KEY`: **Obrigatório.** Sua chave de API para o Google Gemini.
+*   `API_KEY`: **Obrigatório.** Sua chave de API para o Google Gemini.
 *   `MAX_UPLOAD_MB`: Limite de tamanho para upload de arquivos.
 *   `LOG_LEVEL`: Nível de detalhe dos logs a serem capturados (`INFO`, `WARN`, `ERROR`).
 *   `ENABLE_SPED_EXPORT`: Habilita a funcionalidade de exportação SPED/EFD.

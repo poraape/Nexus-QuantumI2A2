@@ -35,9 +35,11 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
             return acc;
         }, {});
 
-        const ufData = allItems.reduce((acc: Record<string, number>, item) => {
-            const uf = item.destinatario_uf || 'N/A';
-            acc[uf] = (acc[uf] || 0) + 1;
+        const ufData = validDocs.reduce((acc: Record<string, number>, auditedDoc) => {
+            if (auditedDoc.doc.data && auditedDoc.doc.data.length > 0) {
+                const uf = auditedDoc.doc.data[0].destinatario_uf || 'N/A';
+                acc[uf] = (acc[uf] || 0) + 1;
+            }
             return acc;
         }, {});
         
@@ -47,18 +49,21 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
             cfopChart: {
                 type: 'bar',
                 title: 'Valor por CFOP',
-                data: Object.entries(cfopData).slice(0, 10).map(([label, value]) => ({ label, value })),
+                // FIX: Cast value to number to ensure type compatibility with ChartDataPoint.
+                data: Object.entries(cfopData).slice(0, 10).map(([label, value]) => ({ label, value: value as number })),
                 yAxisLabel: 'Valor (R$)',
             },
             ncmChart: {
                 type: 'pie',
                 title: 'Distribuição por NCM (Top 5)',
-                data: Object.entries(ncmData).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value })),
+                // FIX: Cast values to number for sorting and to ensure type compatibility with ChartDataPoint.
+                data: Object.entries(ncmData).sort((a,b) => (b[1] as number) - (a[1] as number)).slice(0, 5).map(([label, value]) => ({ label, value: value as number })),
             },
             ufChart: {
                 type: 'bar',
                 title: 'Documentos por UF de Destino',
-                data: Object.entries(ufData).map(([label, value]) => ({ label, value })),
+                // FIX: Cast value to number to ensure type compatibility with ChartDataPoint.
+                data: Object.entries(ufData).map(([label, value]) => ({ label, value: value as number })),
                 yAxisLabel: 'Qtd. Documentos',
             },
             totalValue

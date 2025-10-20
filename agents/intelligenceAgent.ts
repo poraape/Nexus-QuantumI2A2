@@ -37,7 +37,8 @@ const intelligenceSchema = {
               type: Type.OBJECT,
               properties: {
                 name: { type: Type.STRING, description: "Nome do documento de origem." },
-                // FIX: Replaced invalid `Type.ONE_OF` with `Type.STRING` as Gemini schema does not support union types. The description guides the model to return a string representation for both numbers and text.
+                // FIX: Replaced invalid union type with `Type.STRING` as Gemini schema does not support it. 
+                // The description guides the model to return a string representation for both numbers and text.
                 value: { type: Type.STRING, description: "O valor conflitante, retornado como uma string para acomodar tanto números quanto texto." }
               },
               required: ['name', 'value']
@@ -50,6 +51,28 @@ const intelligenceSchema = {
   },
   required: ['aiDrivenInsights', 'crossValidationResults']
 };
+
+/**
+ * Sanitizes a value before including it in a prompt for the AI.
+ * This helps prevent the AI from generating malformed JSON when it includes
+ * the sanitized data in its response.
+ * @param value The value to sanitize.
+ * @returns The sanitized value.
+ */
+const sanitizeForAI = (value: any): any => {
+    if (typeof value === 'string') {
+        // Replace characters that can break JSON strings or confuse the LLM.
+        // - Replace double quotes with single quotes.
+        // - Remove backslashes to prevent incorrect escaping.
+        // - Replace newlines/carriage returns with a space.
+        return value
+            .replace(/"/g, "'")
+            .replace(/\\/g, '')
+            .replace(/(\r\n|\n|\r)/gm, " ");
+    }
+    return value;
+};
+
 
 /**
  * Runs advanced AI-driven analysis to find anomalies and cross-document inconsistencies.
@@ -71,7 +94,17 @@ export const runIntelligenceAnalysis = async (
         return d.doc.data!.map(item => ({ ...item, doc_source: docName }));
     });
 
-    const dataSampleForAI = Papa.unparse(allItems.slice(0, 300));
+    // Sanitize text fields before sending them to the AI to prevent JSON parsing errors.
+    const sanitizedItems = allItems.map(item => {
+        const newItem: Record<string, any> = {};
+        for (const key in item) {
+            newItem[key] = sanitizeForAI((item as any)[key]);
+        }
+        return newItem;
+    });
+
+    const dataSampleForAI = Papa.unparse(sanitizedItems.slice(0, 300));
+    
     const deterministicFindings = report.documents
         .flatMap(d => d.inconsistencies.map(inc => ({ document: d.doc.name, message: inc.message })))
         .slice(0, 20);
@@ -104,7 +137,7 @@ export const runIntelligenceAnalysis = async (
     
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',
