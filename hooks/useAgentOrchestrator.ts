@@ -214,15 +214,13 @@ export const useAgentOrchestrator = () => {
 
         } catch (err: unknown) {
              let finalMessage = 'Ocorreu um erro na comunicação com a IA.';
-            if (err && typeof err === 'object' && 'status' in err) {
-                const typedErr = err as { status?: unknown, message?: string };
-                if (typedErr.status === 401) {
-                    finalMessage = 'Chave de API inválida. Verifique sua configuração.';
-                } else if (typedErr.message) {
-                    finalMessage = typedErr.message;
-                }
+            // FIX: Safely check for properties on an unknown error type, prioritizing specific checks.
+            if (err && typeof err === 'object' && 'status' in err && typeof (err as any).status === 'number' && (err as any).status === 401) {
+                finalMessage = 'Chave de API inválida. Verifique sua configuração.';
             } else if (err instanceof Error) {
                 finalMessage = err.message;
+            } else if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+                finalMessage = (err as { message: string }).message;
             }
             setError(finalMessage);
             setMessages(prev => prev.filter(m => m.id !== aiMessageId)); // Remove placeholder

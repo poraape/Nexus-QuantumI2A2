@@ -23,25 +23,28 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
         const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data);
         const allItems = validDocs.flatMap(d => d.doc.data!);
 
-        const cfopData = allItems.reduce((acc, item) => {
+        // FIX: Add generic type to `reduce` to ensure correct type inference for the accumulator.
+        const cfopData = allItems.reduce<Record<string, number>>((acc, item) => {
             const cfop = item.produto_cfop?.toString() || 'N/A';
             acc[cfop] = (acc[cfop] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
-        }, {} as Record<string, number>);
+        }, {});
 
-        const ncmData = allItems.reduce((acc, item) => {
+        // FIX: Add generic type to `reduce` to ensure correct type inference for the accumulator.
+        const ncmData = allItems.reduce<Record<string, number>>((acc, item) => {
             const ncm = item.produto_ncm?.toString() || 'N/A';
             acc[ncm] = (acc[ncm] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
-        }, {} as Record<string, number>);
+        }, {});
 
-        const ufData = validDocs.reduce((acc, auditedDoc) => {
+        // FIX: Add generic type to `reduce` to ensure correct type inference for the accumulator.
+        const ufData = validDocs.reduce<Record<string, number>>((acc, auditedDoc) => {
             if (auditedDoc.doc.data && auditedDoc.doc.data.length > 0) {
                 const uf = auditedDoc.doc.data[0].destinatario_uf || 'N/A';
                 acc[uf] = (acc[uf] || 0) + 1;
             }
             return acc;
-        }, {} as Record<string, number>);
+        }, {});
         
         const totalValue = parseSafeFloat(report.aggregatedMetrics?.['Valor Total das NFes']);
             

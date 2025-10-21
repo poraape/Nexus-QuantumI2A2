@@ -1,11 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import type { AuditReport, SmartSearchResult } from '../types';
 import Papa from 'papaparse';
 import { AiIcon, LoadingSpinnerIcon, SendIcon } from './icons';
 import { logger } from '../services/logger';
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { generateJSON } from '../services/geminiService';
 
 const searchResponseSchema = {
     type: Type.OBJECT,
@@ -70,16 +69,12 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
                 - Se aplicável, retorne uma tabela de 'data'. As chaves do objeto se tornarão os cabeçalhos.
             `;
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: {
-                    responseMimeType: 'application/json',
-                    responseSchema: searchResponseSchema,
-                },
-            });
+            const searchResult = await generateJSON<SmartSearchResult>(
+                'gemini-2.5-flash',
+                prompt,
+                searchResponseSchema
+            );
             
-            const searchResult = JSON.parse(response.text) as SmartSearchResult;
             setResult(searchResult);
             logger.log('SmartSearch', 'INFO', `Busca inteligente concluída com sucesso.`);
 

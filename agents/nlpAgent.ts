@@ -1,8 +1,7 @@
 // nlpAgent.ts
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { logger } from "../services/logger";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { generateJSON } from "../services/geminiService";
 
 const nlpExtractionSchema = {
   type: Type.OBJECT,
@@ -61,16 +60,11 @@ export const extractDataFromText = async (text: string): Promise<Record<string, 
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: nlpExtractionSchema,
-            },
-        });
-
-        const extracted = JSON.parse(response.text) as { items?: any[] } & Record<string, any>;
+        const extracted = await generateJSON<{ items?: any[] } & Record<string, any>>(
+            'gemini-2.5-flash',
+            prompt,
+            nlpExtractionSchema
+        );
         
         if (!extracted.items || extracted.items.length === 0) {
             logger.log('nlpAgent', 'WARN', 'IA não extraiu itens do texto.');
@@ -88,8 +82,9 @@ export const extractDataFromText = async (text: string): Promise<Record<string, 
         return result;
 
     } catch (e) {
+        // A log e o erro já são tratados dentro de `generateJSON`.
+        // Apenas logamos o contexto específico do NLP Agent.
         logger.log('nlpAgent', 'ERROR', 'Falha na extração de dados com IA.', { error: e });
-        console.error("Gemini NLP extraction failed:", e);
         return []; // Retorna vazio em caso de falha para não quebrar o pipeline.
     }
 };

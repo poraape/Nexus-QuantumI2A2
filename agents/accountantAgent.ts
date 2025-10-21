@@ -1,9 +1,8 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import type { AnalysisResult, AuditReport, AccountingEntry, AuditedDocument, SpedFile } from '../types';
 import { logger } from "../services/logger";
 import { parseSafeFloat } from "../utils/parsingUtils";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { generateJSON } from "../services/geminiService";
 
 const analysisResponseSchema = {
   type: Type.OBJECT,
@@ -153,22 +152,12 @@ const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Rec
 
         The entire response must be in Brazilian Portuguese and formatted as a single JSON object adhering to the required schema. Do not include any text outside of the JSON object.
     `;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: analysisResponseSchema,
-    },
-  });
-
-  try {
-    return JSON.parse(response.text) as AnalysisResult;
-  } catch (e) {
-    console.error('Failed to parse analysis JSON:', response.text);
-    throw new Error('A resposta da IA não estava em um formato JSON válido.');
-  }
+  
+  return generateJSON<AnalysisResult>(
+    'gemini-2.5-flash',
+    prompt,
+    analysisResponseSchema
+  );
 };
 
 const generateAccountingEntries = (documents: AuditedDocument[]): AccountingEntry[] => {

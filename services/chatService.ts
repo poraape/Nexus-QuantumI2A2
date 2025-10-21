@@ -1,6 +1,5 @@
-import { GoogleGenAI, Chat, Type } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { Type, Chat } from "@google/genai";
+import { createChatSession, streamChatMessage } from './geminiService';
 
 const chatResponseSchema = {
   type: Type.OBJECT,
@@ -58,28 +57,13 @@ export const startChat = (dataSample: string, aggregatedMetrics?: Record<string,
         5.  Language and Format: Always respond in Brazilian Portuguese. Your entire response must be a single, valid JSON object, adhering to the required schema.
     `;
 
-  return ai.chats.create({
-    model: 'gemini-2.5-flash',
-    config: {
-      systemInstruction: systemInstruction,
-      responseMimeType: 'application/json',
-      responseSchema: chatResponseSchema,
-    },
-  });
+  return createChatSession(
+    'gemini-2.5-flash',
+    systemInstruction,
+    chatResponseSchema
+  );
 };
 
-export async function* sendMessageStream(chat: Chat, message: string): AsyncGenerator<string> {
-  if (!chat) {
-    throw new Error('Chat not initialized.');
-  }
-
-  try {
-    const stream = await chat.sendMessageStream({ message });
-    for await (const chunk of stream) {
-      yield chunk.text;
-    }
-  } catch (e) {
-    console.error('Error during streaming or parsing:', e);
-    throw new Error('Desculpe, ocorreu um erro ao processar sua solicitação. A IA pode ter retornado uma resposta inválida.');
-  }
+export const sendMessageStream = (chat: Chat, message: string): AsyncGenerator<string> => {
+  return streamChatMessage(chat, message);
 }

@@ -1,9 +1,8 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import type { AuditReport, AIDrivenInsight, CrossValidationResult } from '../types';
 import Papa from 'papaparse';
 import { logger } from "../services/logger";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { generateJSON } from "../services/geminiService";
 
 const intelligenceSchema = {
   type: Type.OBJECT,
@@ -131,20 +130,15 @@ export const runIntelligenceAnalysis = async (
     `;
     
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: intelligenceSchema,
-            },
-        });
-        
-        const result = JSON.parse(response.text) as {
+        const result = await generateJSON<{
             aiDrivenInsights: AIDrivenInsight[],
             crossValidationResults: CrossValidationResult[]
-        };
-
+        }>(
+            'gemini-2.5-flash',
+            prompt,
+            intelligenceSchema
+        );
+        
         return result;
 
     } catch (e) {

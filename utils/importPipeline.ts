@@ -339,9 +339,9 @@ export const importFiles = async (
                 } catch (e: unknown) {
                     const message = e instanceof Error ? e.message : String(e);
                     const errorMsg = `Falha ao descompactar ou processar o arquivo ZIP: ${message}`;
-                    // FIX: Use file.name for context, as the exception 'e' is of type 'unknown' and may not have a 'name' property.
                     // FIX: Correctly use file.name for logging context as 'e' is of type 'unknown'.
-                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name, error: e});
+                    const errorDetails = e instanceof Error ? { name: e.name, message: e.message } : { message: String(e) };
+                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name, error: errorDetails});
                     result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: errorMsg };
                 }
             } else if (isSupportedExtension(file.name)) {
