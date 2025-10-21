@@ -1,0 +1,504 @@
+{
+  "manifest": {
+    "version": "4.0.0",
+    "name": "nexus_connectivity_validator",
+    "description": "Diagnóstico, validação e correção automática de comunicação end-to-end entre serviços.",
+    "execution_modes": [
+      "dry_run",
+      "safe_apply"
+    ],
+    "targets": [
+      "Codex",
+      "AIStudio Code Assistant"
+    ],
+    "metadata": {
+      "schema_version": "4.0.0",
+      "owner_team": "Nexus Reliability Engineering",
+      "maintainers": [
+        "@jotavesf",
+        "@infra-aiops"
+      ],
+      "environments": [
+        "dev",
+        "stage",
+        "prod"
+      ],
+      "sla": {
+        "availability": "99.9%",
+        "latency_p95_ms": 500
+      },
+      "slo": {
+        "error_budget_pct": 0.1,
+        "incident_rto_h": 2,
+        "incident_rpo_min": 10
+      },
+      "audit_trail": true,
+      "telemetry": "OpenTelemetry + Prometheus + Loki + Jaeger"
+    },
+    "scope": {
+      "system_boundaries": {
+        "internal": [
+          "api-gateway",
+          "backend",
+          "agents",
+          "queue",
+          "db",
+          "cache"
+        ],
+        "external": [
+          "auth_provider",
+          "llm_api",
+          "object_storage",
+          "webhook_targets"
+        ]
+      },
+      "critical_services": [
+        "gateway",
+        "fastapi",
+        "celery",
+        "postgres",
+        "redis",
+        "minio"
+      ],
+      "non_critical_services": [
+        "grafana",
+        "otlp_exporter"
+      ],
+      "dependencies": [
+        "dns_resolver",
+        "tls_ca_bundle",
+        "network_policy"
+      ]
+    },
+    "topology": {
+      "protocols": [
+        "HTTP/1.1",
+        "HTTP/2",
+        "gRPC",
+        "WebSocket",
+        "AMQP",
+        "TLS1.3"
+      ],
+      "ports": {
+        "frontend": 5173,
+        "backend_api": 8000,
+        "grpc_server": 50051,
+        "redis": 6379,
+        "postgres": 5432,
+        "minio": 9000
+      },
+      "policies": {
+        "ingress": [
+          "allow:80/tcp",
+          "allow:443/tcp"
+        ],
+        "egress": [
+          "allow:https",
+          "deny:icmp"
+        ],
+        "firewall_rules": [
+          "stateful",
+          "drop_unknown"
+        ]
+      },
+      "graph": {
+        "gateway": [
+          "backend_api",
+          "websocket_server"
+        ],
+        "backend_api": [
+          "redis",
+          "postgres",
+          "minio",
+          "queue"
+        ],
+        "celery_worker": [
+          "redis",
+          "backend_api"
+        ],
+        "observability_stack": [
+          "grafana",
+          "prometheus",
+          "jaeger"
+        ]
+      }
+    },
+    "endpoints": {
+      "backend_api": {
+        "base_url": "https://api.nexus-quantum.internal",
+        "methods": {
+          "GET /healthz": {
+            "expected_status": 200
+          },
+          "POST /orchestrate": {
+            "headers": {
+              "Authorization": "Bearer <token>"
+            },
+            "request_schema": {
+              "type": "object",
+              "properties": {
+                "document": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "document"
+              ]
+            },
+            "response_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "enum": [
+                    "processing",
+                    "completed",
+                    "error"
+                  ]
+                },
+                "trace_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "example_request": {
+              "document": "base64-encoded-xml"
+            },
+            "example_response": {
+              "status": "completed",
+              "trace_id": "abc123"
+            }
+          }
+        }
+      }
+    },
+    "auth": {
+      "supported": [
+        "OAuth2",
+        "JWT",
+        "mTLS"
+      ],
+      "token_endpoint": "https://auth.nexus-quantum.internal/token",
+      "vault_refs": {
+        "jwt_secret": "vault://secrets/jwt_signing_key",
+        "tls_cert": "vault://certs/nexus-wildcard.crt",
+        "tls_key": "vault://certs/nexus-wildcard.key"
+      },
+      "scopes": [
+        "read:docs",
+        "write:docs",
+        "audit:system"
+      ]
+    },
+    "env_matrix": {
+      "dev": {
+        "base_url": "https://dev.api.nexus-quantum.internal",
+        "feature_flags": [
+          "debug_mode=true",
+          "tracing=verbose"
+        ]
+      },
+      "stage": {
+        "base_url": "https://stage.api.nexus-quantum.internal",
+        "feature_flags": [
+          "debug_mode=false",
+          "tracing=standard"
+        ]
+      },
+      "prod": {
+        "base_url": "https://api.nexus-quantum.internal",
+        "feature_flags": [
+          "safe_apply_only=true",
+          "anomaly_alerts=true"
+        ]
+      }
+    },
+    "healthchecks": {
+      "liveness": [
+        "GET /healthz"
+      ],
+      "readiness": [
+        "HEAD /ready"
+      ],
+      "synthetic_probes": [
+        {
+          "name": "end-to-end-upload",
+          "steps": [
+            "POST /upload -> expect 202",
+            "poll /status/{job_id} until completed",
+            "assert metrics.totalNotas > 0"
+          ],
+          "frequency_sec": 300,
+          "alert_on_failure": true
+        }
+      ]
+    },
+    "resilience": {
+      "timeouts": {
+        "connect_ms": 3000,
+        "read_ms": 5000
+      },
+      "retries": {
+        "max_attempts": 3,
+        "strategy": "exponential_backoff",
+        "base_ms": 500
+      },
+      "circuit_breaker": {
+        "failure_threshold": 5,
+        "recovery_time_s": 60
+      },
+      "idempotency": {
+        "key_header": "Idempotency-Key",
+        "ttl_min": 15
+      }
+    },
+    "fixtures": {
+      "test_data": [
+        {
+          "type": "xml",
+          "path": "tests/fixtures/sample_nfe.xml"
+        },
+        {
+          "type": "pdf",
+          "path": "tests/fixtures/invoice.pdf"
+        }
+      ],
+      "fault_injection": [
+        {
+          "scenario": "dns_failure",
+          "simulate": "invalid_host"
+        },
+        {
+          "scenario": "tls_expired",
+          "simulate": "expired_cert"
+        },
+        {
+          "scenario": "cors_block",
+          "simulate": "missing_origin_header"
+        }
+      ]
+    },
+    "e2e_flows": [
+      {
+        "name": "upload_and_analyze",
+        "preconditions": [
+          "network up",
+          "db reachable"
+        ],
+        "steps": [
+          "Authenticate via OAuth2",
+          "POST /upload sample file",
+          "GET /status until completed",
+          "validate InsightReport has metrics"
+        ],
+        "acceptance": [
+          "latency_p95_ms < 2000",
+          "no null totals",
+          "status=completed"
+        ]
+      }
+    ],
+    "chaos_tests": [
+      {
+        "type": "pod_failure",
+        "target": "redis",
+        "duration_s": 20
+      },
+      {
+        "type": "packet_loss",
+        "target": "grpc_server",
+        "loss_pct": 15
+      },
+      {
+        "type": "cert_expiration",
+        "target": "api_gateway",
+        "advance_days": 0
+      }
+    ],
+    "observability": {
+      "logs": {
+        "format": "json",
+        "level": "INFO",
+        "include_trace_id": true
+      },
+      "metrics": [
+        "latency_ms",
+        "error_rate",
+        "queue_depth",
+        "db_conn_pool_usage"
+      ],
+      "traces": [
+        "frontend -> gateway -> backend -> db"
+      ],
+      "sli_slo_map": {
+        "availability": "uptime_probe_success",
+        "latency": "p95_latency_ms",
+        "error_budget": "1-availability"
+      },
+      "alerts": [
+        {
+          "metric": "error_rate",
+          "threshold_pct": 5,
+          "severity": "critical"
+        },
+        {
+          "metric": "latency_ms",
+          "threshold": 1000,
+          "severity": "warning"
+        }
+      ]
+    },
+    "failure_signatures": {
+      "DNS_FAIL": "NameResolutionError or ENOTFOUND",
+      "TLS_HANDSHAKE_ERROR": "certificate verify failed",
+      "CORS_BLOCK": "No 'Access-Control-Allow-Origin' header present",
+      "HTTP_502": "Bad Gateway or proxy timeout",
+      "WEBSOCKET_DROP": "Unexpected close frame",
+      "GRPC_UNAVAILABLE": "Status 14 UNAVAILABLE",
+      "DEADLETTER": "message moved to DLQ",
+      "DB_CONN_REFUSED": "ECONNREFUSED:5432",
+      "CACHE_TIMEOUT": "RedisTimeoutError"
+    },
+    "auto_remediation": {
+      "playbooks": [
+        {
+          "trigger": "DNS_FAIL",
+          "actions": [
+            "verify /etc/resolv.conf",
+            "flush local DNS cache",
+            "retry using backup resolver 8.8.8.8"
+          ]
+        },
+        {
+          "trigger": "TLS_HANDSHAKE_ERROR",
+          "actions": [
+            "renew certificate via ACME",
+            "reload nginx / gateway",
+            "validate expiry_date > 30d"
+          ]
+        },
+        {
+          "trigger": "CORS_BLOCK",
+          "actions": [
+            "update Access-Control-Allow-Origin to '*' for dev",
+            "validate OPTIONS preflight returns 204"
+          ]
+        },
+        {
+          "trigger": "DEADLETTER",
+          "actions": [
+            "requeue DLQ messages",
+            "scale worker pool +1",
+            "validate queue_depth < 10"
+          ]
+        }
+      ],
+      "rollback_policy": "auto if remediation worsens latency >20%"
+    },
+    "patch_plan": {
+      "diffs": [
+        {
+          "file": "gateway/conf.d/cors.conf",
+          "change": "add allow-origin *"
+        },
+        {
+          "file": "certs/tls.crt",
+          "change": "renew via Let's Encrypt"
+        }
+      ],
+      "post_validation": [
+        "re-run synthetic probes",
+        "confirm metrics stabilized"
+      ],
+      "rollback": [
+        "git revert HEAD",
+        "restore previous config backup"
+      ]
+    },
+    "compliance_security": {
+      "tls_min_version": "1.2",
+      "cipher_suites_allowed": [
+        "TLS_AES_128_GCM_SHA256",
+        "TLS_AES_256_GCM_SHA384"
+      ],
+      "cors_policies": [
+        "allow-list only production origins"
+      ],
+      "rate_limits": {
+        "per_ip_per_min": 120
+      },
+      "owasp_checks": [
+        "A1-BrokenAuth",
+        "A3-SensitiveDataExposure",
+        "A9-UsingComponentsWithKnownVulns"
+      ]
+    },
+    "reporting": {
+      "severity_levels": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "score_weights": {
+        "availability": 0.3,
+        "latency": 0.2,
+        "security": 0.3,
+        "compliance": 0.2
+      },
+      "output_formats": [
+        "html",
+        "json",
+        "markdown"
+      ],
+      "blocking_conditions": [
+        "critical_count > 0",
+        "score_overall < 85"
+      ]
+    },
+    "artifacts": {
+      "paths": {
+        "logs": "artifacts/logs/",
+        "traces": "artifacts/traces/",
+        "pcap": "artifacts/network/",
+        "reports": "artifacts/reports/"
+      },
+      "sbom": "artifacts/sbom.json",
+      "attestation": "artifacts/supplychain-attestation.json"
+    },
+    "ci_hooks": {
+      "github_actions": {
+        "workflow_file": ".github/workflows/connectivity_validator.yml",
+        "jobs": {
+          "validate_connectivity": {
+            "runs_on": "ubuntu-latest",
+            "steps": [
+              "checkout repo",
+              "run python validator.py --mode=dry_run",
+              "upload artifacts"
+            ]
+          },
+          "auto_remediate": {
+            "needs": "validate_connectivity",
+            "if": "failure_detected",
+            "steps": [
+              "run python validator.py --mode=safe_apply",
+              "create_pull_request with patch_plan"
+            ]
+          }
+        },
+        "gates": {
+          "block_merge_if": [
+            "score_overall < 85",
+            "critical_count > 0"
+          ],
+          "approve_if": [
+            "all_healthchecks_passed",
+            "alerts_resolved"
+          ]
+        }
+      }
+    }
+  }
+}
