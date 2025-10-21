@@ -23,25 +23,25 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
         const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data);
         const allItems = validDocs.flatMap(d => d.doc.data!);
 
-        const cfopData = allItems.reduce((acc: Record<string, number>, item) => {
+        const cfopData = allItems.reduce((acc, item) => {
             const cfop = item.produto_cfop?.toString() || 'N/A';
             acc[cfop] = (acc[cfop] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
-        }, {});
+        }, {} as Record<string, number>);
 
-        const ncmData = allItems.reduce((acc: Record<string, number>, item) => {
+        const ncmData = allItems.reduce((acc, item) => {
             const ncm = item.produto_ncm?.toString() || 'N/A';
             acc[ncm] = (acc[ncm] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
-        }, {});
+        }, {} as Record<string, number>);
 
-        const ufData = validDocs.reduce((acc: Record<string, number>, auditedDoc) => {
+        const ufData = validDocs.reduce((acc, auditedDoc) => {
             if (auditedDoc.doc.data && auditedDoc.doc.data.length > 0) {
                 const uf = auditedDoc.doc.data[0].destinatario_uf || 'N/A';
                 acc[uf] = (acc[uf] || 0) + 1;
             }
             return acc;
-        }, {});
+        }, {} as Record<string, number>);
         
         const totalValue = parseSafeFloat(report.aggregatedMetrics?.['Valor Total das NFes']);
             
@@ -49,21 +49,18 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
             cfopChart: {
                 type: 'bar',
                 title: 'Valor por CFOP',
-                // FIX: Cast value to number to ensure type compatibility with ChartDataPoint.
-                data: Object.entries(cfopData).slice(0, 10).map(([label, value]) => ({ label, value: value as number })),
+                data: Object.entries(cfopData).slice(0, 10).map(([label, value]) => ({ label, value })),
                 yAxisLabel: 'Valor (R$)',
             },
             ncmChart: {
                 type: 'pie',
                 title: 'Distribuição por NCM (Top 5)',
-                // FIX: Cast values to number for sorting and to ensure type compatibility with ChartDataPoint.
-                data: Object.entries(ncmData).sort((a,b) => (b[1] as number) - (a[1] as number)).slice(0, 5).map(([label, value]) => ({ label, value: value as number })),
+                data: Object.entries(ncmData).sort((a,b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value })),
             },
             ufChart: {
                 type: 'bar',
                 title: 'Documentos por UF de Destino',
-                // FIX: Cast value to number to ensure type compatibility with ChartDataPoint.
-                data: Object.entries(ufData).map(([label, value]) => ({ label, value: value as number })),
+                data: Object.entries(ufData).map(([label, value]) => ({ label, value })),
                 yAxisLabel: 'Qtd. Documentos',
             },
             totalValue

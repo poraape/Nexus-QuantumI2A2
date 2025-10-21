@@ -76,6 +76,20 @@ export const runFiscalValidation = (item: Record<string, any>): Inconsistency[] 
       findings.push(INCONSISTENCIES.ICMS_CST_INVALIDO_PARA_CFOP);
   }
 
+  const vBCIcms = parseSafeFloat(item.produto_base_calculo_icms);
+  const pIcms = parseSafeFloat(item.produto_aliquota_icms);
+  const vIcms = parseSafeFloat(item.produto_valor_icms);
+
+  // Rule 9: ICMS calculation check
+  if (vBCIcms > 0 && pIcms > 0 && vIcms > 0) {
+      const calculatedIcms = vBCIcms * (pIcms / 100);
+      const difference = Math.abs(calculatedIcms - vIcms);
+      // Allow for a small rounding difference (e.g., 1.5 cents) to account for float precision.
+      if (difference > 0.015) { 
+          findings.push(INCONSISTENCIES.ICMS_CALCULO_DIVERGENTE);
+      }
+  }
+
 
   return findings;
 };

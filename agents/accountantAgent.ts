@@ -68,11 +68,13 @@ const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Recor
 
     const allItems = validDocs.flatMap(d => d.doc.data!);
     
-    // Use a Map with the unique NFe ID to correctly sum total values once per note.
+    // **BUG FIX:** Correctly aggregate total NFe value by using a Map on unique documents, not all items.
     const uniqueNfes = new Map<string, number>();
-    allItems.forEach(item => {
-        if (item.nfe_id) {
-            uniqueNfes.set(item.nfe_id, parseSafeFloat(item.valor_total_nfe));
+    validDocs.forEach(doc => {
+        // Assume the first item holds the NFe-level data, which is how normalizeNFeData works.
+        const firstItem = doc.doc.data?.[0];
+        if (firstItem?.nfe_id) {
+            uniqueNfes.set(firstItem.nfe_id, parseSafeFloat(firstItem.valor_total_nfe));
         }
     });
     
@@ -246,36 +248,75 @@ const generateSpedEfd = (report: Pick<AuditReport, 'documents'>): SpedFile => {
     const dataIni = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('pt-BR').replace(/\//g, '');
     const dataFim = new Date(today.getFullYear(), today.getMonth() + 1, 0).toLocaleDateString('pt-BR').replace(/\//g, '');
 
+    const recordCounts: Record<string, number> = {};
+    const countRecord = (type: string) => { recordCounts[type] = (recordCounts[type] || 0) + 1; };
+
     // Bloco 0
     lines.push(`|0000|017|0|${dataIni}|${dataFim}|Nexus QuantumI2A2|12345678000195||SP|||A|1|`);
+    countRecord('0000');
     lines.push('|0001|0|');
-    lines.push('|0990|2|');
+    countRecord('0001');
 
     // Bloco C
     lines.push('|C001|0|');
+    countRecord('C001');
     const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data && d.doc.data.length > 0);
     
     for(const doc of validDocs) {
         const firstItem = doc.doc.data![0];
         lines.push(`|C100|${doc.classification?.operationType === 'Compra' ? '0' : '1'}|0||55|||${parseSafeFloat(firstItem.valor_total_nfe).toFixed(2).replace('.',',')}||||||||`);
+        countRecord('C100');
+
+        const c190Aggregator: Record<string, { vBC: number, vIcms: number, vOper: number }> = {};
+        
+        doc.doc.data?.forEach((item) => {
+            const cst = (item.produto_cst_icms?.toString() || '00').slice(0, 3);
+            const cfop = item.produto_cfop?.toString() || '0000';
+            const aliq = (item.produto_aliquota_icms || 0).toFixed(2).replace('.',',');
+            const key = `${cst}|${cfop}|${aliq}`;
+
+            if (!c190Aggregator[key]) {
+                c190Aggregator[key] = { vBC: 0, vIcms: 0, vOper: 0 };
+            }
+            c190Aggregator[key].vBC += parseSafeFloat(item.produto_base_calculo_icms);
+            c190Aggregator[key].vIcms += parseSafeFloat(item.produto_valor_icms);
+            c190Aggregator[key].vOper += parseSafeFloat(item.produto_valor_total);
+        });
+
+        Object.entries(c190Aggregator).forEach(([key, values]) => {
+            const [cst, cfop, aliq] = key.split('|');
+            lines.push(`|C190|${cst}|${cfop}|${aliq}|${values.vOper.toFixed(2).replace('.',',')}|${values.vBC.toFixed(2).replace('.',',')}|${values.vIcms.toFixed(2).replace('.',',')}||||`);
+            countRecord('C190');
+        });
         
         doc.doc.data?.forEach((item, index) => {
-            lines.push(`|C170|${index+1}|${item.produto_nome}|${parseSafeFloat(item.produto_qtd).toFixed(2).replace('.',',')}|UN|${parseSafeFloat(item.produto_valor_total).toFixed(2).replace('.',',')}||${item.produto_cfop}|${item.produto_cst_icms}||||`);
+            lines.push(`|C170|${index+1}|${item.produto_nome || ''}|${parseSafeFloat(item.produto_qtd).toFixed(2).replace('.',',')}|UN|${parseSafeFloat(item.produto_valor_total).toFixed(2).replace('.',',')}||${item.produto_cfop}|${item.produto_cst_icms}||||`);
+            countRecord('C170');
         });
     }
-    lines.push(`|C990|${lines.length - 2}|`); // count lines in block C
-
+    
+    lines.push(`|C990|${1 + (recordCounts['C100'] || 0) + (recordCounts['C170'] || 0) + (recordCounts['C190'] || 0) + 1}|`);
+    countRecord('C990');
+    
     // Bloco 9
     lines.push('|9001|0|');
-    lines.push('|9900|0000|1|');
-    lines.push('|9900|0001|1|');
-    lines.push('|9900|0990|1|');
-    lines.push('|9900|C001|1|');
-    lines.push(`|9900|C100|${validDocs.length}|`);
-    lines.push(`|9900|C170|${validDocs.flatMap(d => d.doc.data!).length}|`);
-    lines.push('|9900|C990|1|');
-    lines.push('|9900|9001|1|');
-    lines.push('|9990|10|'); // total lines in block 9
+    countRecord('9001');
+
+    lines.push('|0990|2|');
+    countRecord('0990');
+    
+    const finalRecordCounts = { ...recordCounts };
+    finalRecordCounts['9990'] = 1; // Self-reference for 9990
+    finalRecordCounts['9999'] = 1; // Self-reference for 9999
+    
+    const sortedRecords = Object.keys(finalRecordCounts).sort();
+    sortedRecords.forEach(rec => {
+        lines.push(`|9900|${rec}|${finalRecordCounts[rec]}|`);
+        countRecord('9900');
+    });
+
+    lines.push(`|9990|${(recordCounts['9001'] || 0) + (recordCounts['9900'] || 0) + 1}|`);
+    countRecord('9990');
 
     const totalLines = lines.length + 1;
     lines.push(`|9999|${totalLines}|`);

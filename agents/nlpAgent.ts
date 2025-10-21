@@ -1,59 +1,95 @@
 // nlpAgent.ts
+import { GoogleGenAI, Type } from "@google/genai";
+import { logger } from "../services/logger";
 
-// Regex simplificados para demonstração. Em um sistema real, seriam mais robustos.
-const CNPJ_REGEX = /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/g;
-const VALOR_REGEX = /(?:R\$|VALOR\sTOTAL)\s*(\d{1,3}(?:\.\d{3})*,\d{2})/gi;
-const DATE_REGEX = /(\d{2}\/\d{2}\/\d{4})/g;
-const CFOP_REGEX = /CFOP\s*(\d{4})/gi;
-const NCM_REGEX = /NCM\s*(\d{8})/gi;
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-interface NlpResult {
-    emitente_cnpj?: string;
-    destinatario_cnpj?: string;
-    data_emissao?: string;
-    valor_total_nfe?: number;
-    produto_nome?: string;
-    produto_cfop?: string;
-    produto_ncm?: string;
-    produto_valor_total?: number;
-}
-
-const parseBRL = (value: string): number => {
-    return parseFloat(value.replace(/\./g, '').replace(',', '.'));
-}
+const nlpExtractionSchema = {
+  type: Type.OBJECT,
+  properties: {
+    data_emissao: { type: Type.STRING, description: "Data de emissão no formato DD/MM/AAAA.", nullable: true },
+    valor_total_nfe: { type: Type.NUMBER, description: "Valor monetário total da nota.", nullable: true },
+    emitente_nome: { type: Type.STRING, nullable: true },
+    emitente_cnpj: { type: Type.STRING, nullable: true },
+    destinatario_nome: { type: Type.STRING, nullable: true },
+    destinatario_cnpj: { type: Type.STRING, nullable: true },
+    items: {
+      type: Type.ARRAY,
+      description: "Lista de todos os produtos ou serviços na nota.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          produto_nome: { type: Type.STRING },
+          produto_ncm: { type: Type.STRING, nullable: true },
+          produto_cfop: { type: Type.STRING, nullable: true },
+          produto_qtd: { type: Type.NUMBER, nullable: true },
+          produto_valor_unit: { type: Type.NUMBER, nullable: true },
+          produto_valor_total: { type: Type.NUMBER, nullable: true },
+        },
+        required: ['produto_nome'],
+      },
+    },
+  },
+};
 
 /**
- * Tenta extrair dados fiscais estruturados de um bloco de texto.
+ * Tenta extrair dados fiscais estruturados de um bloco de texto usando a IA do Gemini.
  * @param text O texto bruto extraído de um PDF ou imagem.
- * @returns Um array de objetos de dados extraídos. Retorna array vazio se nada for encontrado.
+ * @returns Uma promessa que resolve para um array de objetos de dados extraídos. Retorna array vazio se nada for encontrado.
  */
-export const extractDataFromText = (text: string): Record<string, any>[] => {
-    const result: NlpResult = {};
-    const cnpjs = [...text.matchAll(CNPJ_REGEX)].map(m => m[1]);
-    if (cnpjs.length > 0) result.emitente_cnpj = cnpjs[0];
-    if (cnpjs.length > 1) result.destinatario_cnpj = cnpjs[1];
-
-    const dates = [...text.matchAll(DATE_REGEX)].map(m => m[1]);
-    if (dates.length > 0) result.data_emissao = dates[0];
-    
-    const allValues = [...text.matchAll(VALOR_REGEX)].map(m => parseBRL(m[1]));
-    if(allValues.length > 0) {
-        result.valor_total_nfe = Math.max(...allValues); // Assume o maior valor é o total da nota
+export const extractDataFromText = async (text: string): Promise<Record<string, any>[]> => {
+    if (!text || text.trim().length < 20) {
+        logger.log('nlpAgent', 'WARN', 'Texto muito curto para extração com IA, pulando.');
+        return [];
     }
 
-    const cfops = [...text.matchAll(CFOP_REGEX)].map(m => m[1]);
-    if (cfops.length > 0) result.produto_cfop = cfops[0];
+    // Trunca o texto para evitar exceder os limites de token, mantendo as partes mais relevantes.
+    const truncatedText = text.length > 15000 ? text.substring(0, 15000) : text;
 
-    const ncms = [...text.matchAll(NCM_REGEX)].map(m => m[1]);
-    if (ncms.length > 0) result.produto_ncm = ncms[0];
-    
-    // Se extraímos pelo menos alguns dados chave, retornamos um item.
-    // Uma implementação mais complexa dividiria o texto em itens de produto.
-    if (Object.keys(result).length > 2) {
-        result.produto_nome = "Item extraído via NLP";
-        result.produto_valor_total = result.valor_total_nfe;
-        return [result];
+    const prompt = `
+      Você é um sistema de extração de dados (OCR/NLP) especializado em documentos fiscais brasileiros.
+      Analise o texto a seguir e extraia as informações estruturadas de acordo com o schema JSON fornecido.
+      - Se um campo não for encontrado, omita-o ou use null.
+      - Converta todos os valores monetários para números (ex: "1.234,56" se torna 1234.56).
+      - Se múltiplos itens forem encontrados, liste todos eles no array 'items'.
+      - Se for um DANFE, pode haver apenas um item genérico representando a nota inteira.
+
+      Texto para análise:
+      ---
+      ${truncatedText}
+      ---
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: nlpExtractionSchema,
+            },
+        });
+
+        const extracted = JSON.parse(response.text) as { items?: any[] } & Record<string, any>;
+        
+        if (!extracted.items || extracted.items.length === 0) {
+            logger.log('nlpAgent', 'WARN', 'IA não extraiu itens do texto.');
+            return [];
+        }
+
+        // Achata a estrutura para corresponder ao formato esperado pelo resto do pipeline.
+        const { items, ...headerData } = extracted;
+        const result = items.map(item => ({
+            ...headerData,
+            ...item
+        }));
+
+        logger.log('nlpAgent', 'INFO', `IA extraiu ${result.length} item(ns) do texto.`);
+        return result;
+
+    } catch (e) {
+        logger.log('nlpAgent', 'ERROR', 'Falha na extração de dados com IA.', { error: e });
+        console.error("Gemini NLP extraction failed:", e);
+        return []; // Retorna vazio em caso de falha para não quebrar o pipeline.
     }
-    
-    return [];
 };

@@ -90,58 +90,283 @@ const FileUpload: React.FC<FileUploadProps> = ({ onStartAnalysis, disabled }) =>
     const mockXml = `<?xml version="1.0" encoding="UTF-8"?>
 <nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
     <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
-    <infNFe versao="4.00" Id="NFe35240101234567890123550010000001231000001234">
-        <ide>
-        <dhEmi>2024-05-20T10:00:00-03:00</dhEmi>
-        </ide>
-        <emit>
-        <xNome>Nexus Tech Solutions LTDA</xNome>
-        </emit>
-        <dest>
-        <xNome>Quantum Innovations S.A.</xNome>
-        </dest>
-        <det nItem="1">
-        <prod>
-            <cProd>P001</cProd>
-            <xProd>PROCESSADOR QUÂNTICO I2A2</xProd>
-            <NCM>84715010</NCM>
-            <CFOP>5101</CFOP>
-            <qCom>2.0000</qCom>
-            <vUnCom>75000.00</vUnCom>
-            <vProd>150000.00</vProd>
-        </prod>
-        </det>
-        <det nItem="2">
-        <prod>
-            <cProd>P002</cProd>
-            <xProd>PLACA DE CRIPTOGRAFIA AVANÇADA</xProd>
-            <NCM>85423190</NCM>
-            <CFOP>5101</CFOP>
-            <qCom>10.0000</qCom>
-            <vUnCom>12500.00</vUnCom>
-            <vProd>125000.00</vProd>
-        </prod>
-        </det>
-        <det nItem="3">
-        <prod>
-            <cProd>S001</cProd>
-            <xProd>CONSULTORIA EM ANÁLISE FISCAL</xProd>
-            <NCM>00000000</NCM>
-            <CFOP>5933</CFOP>
-            <qCom>50.0000</qCom>
-            <vUnCom>800.00</vUnCom>
-            <vProd>40000.00</vProd>
-        </prod>
-        </det>
-        <total>
-        <ICMSTot>
-            <vNF>315000.00</vNF>
-        </ICMSTot>
-        </total>
-    </infNFe>
+        <infNFe versao="4.00" Id="NFe35240712345678000195550010001234561000000015">
+            <ide>
+                <cUF>35</cUF>
+                <cNF>00000001</cNF>
+                <natOp>VENDA DE MERCADORIA</natOp>
+                <mod>55</mod>
+                <serie>1</serie>
+                <nNF>123456</nNF>
+                <dhEmi>2024-07-15T14:30:00-03:00</dhEmi>
+                <tpNF>1</tpNF>
+                <idDest>2</idDest>
+                <cMunFG>3550308</cMunFG>
+                <tpImp>1</tpImp>
+                <tpEmis>1</tpEmis>
+                <cDV>5</cDV>
+                <tpAmb>2</tpAmb>
+                <finNFe>1</finNFe>
+                <indFinal>1</indFinal>
+                <indPres>1</indPres>
+                <procEmi>0</procEmi>
+                <verProc>NexusI2A2-1.0</verProc>
+            </ide>
+            <emit>
+                <CNPJ>12345678000195</CNPJ>
+                <xNome>Nexus Tech Solutions LTDA</xNome>
+                <xFant>Nexus Tech</xFant>
+                <enderEmit>
+                    <xLgr>Av. da Inovação</xLgr>
+                    <nro>2048</nro>
+                    <xBairro>Distrito Tecnológico</xBairro>
+                    <cMun>3550308</cMun>
+                    <xMun>São Paulo</xMun>
+                    <UF>SP</UF>
+                    <CEP>01010010</CEP>
+                    <cPais>1058</cPais>
+                    <xPais>BRASIL</xPais>
+                </enderEmit>
+                <IE>111222333444</IE>
+            </emit>
+            <dest>
+                <CNPJ>98765432000110</CNPJ>
+                <xNome>Quantum Innovations S.A.</xNome>
+                <enderDest>
+                    <xLgr>Rua da Computação Quântica</xLgr>
+                    <nro>42</nro>
+                    <xBairro>Centro</xBairro>
+                    <cMun>3304557</cMun>
+                    <xMun>Rio de Janeiro</xMun>
+                    <UF>RJ</UF>
+                    <CEP>20020020</CEP>
+                    <cPais>1058</cPais>
+                    <xPais>BRASIL</xPais>
+                </enderDest>
+                <indIEDest>1</indIEDest>
+                <email>compras@quantuminnovations.com</email>
+            </dest>
+            <det nItem="1">
+                <prod>
+                    <cProd>P001</cProd>
+                    <xProd>PROCESSADOR QUÂNTICO I2A2</xProd>
+                    <NCM>84715010</NCM>
+                    <CFOP>6101</CFOP>
+                    <uCom>UN</uCom>
+                    <qCom>2.0000</qCom>
+                    <vUnCom>75000.00</vUnCom>
+                    <vProd>150000.00</vProd>
+                    <uTrib>UN</uTrib>
+                    <qTrib>2.0000</qTrib>
+                    <vUnTrib>75000.00</vUnTrib>
+                    <indTot>1</indTot>
+                </prod>
+                <imposto>
+                    <vTotTrib>54300.00</vTotTrib>
+                    <ICMS>
+                        <ICMS00>
+                            <orig>0</orig>
+                            <CST>00</CST>
+                            <modBC>3</modBC>
+                            <vBC>150000.00</vBC>
+                            <pICMS>12.00</pICMS>
+                            <vICMS>18000.00</vICMS>
+                        </ICMS00>
+                    </ICMS>
+                    <PIS>
+                        <PISAliq>
+                            <CST>01</CST>
+                            <vBC>150000.00</vBC>
+                            <pPIS>1.65</pPIS>
+                            <vPIS>2475.00</vPIS>
+                        </PISAliq>
+                    </PIS>
+                    <COFINS>
+                        <COFINSAliq>
+                            <CST>01</CST>
+                            <vBC>150000.00</vBC>
+                            <pCOFINS>7.60</pCOFINS>
+                            <vCOFINS>11400.00</vCOFINS>
+                        </COFINSAliq>
+                    </COFINS>
+                </imposto>
+            </det>
+            <det nItem="2">
+                <prod>
+                    <cProd>P002</cProd>
+                    <xProd>PLACA DE CRIPTOGRAFIA AVANÇADA</xProd>
+                    <NCM>85423190</NCM>
+                    <CFOP>6101</CFOP>
+                    <uCom>UN</uCom>
+                    <qCom>10.0000</qCom>
+                    <vUnCom>12500.00</vUnCom>
+                    <vProd>125000.00</vProd>
+                    <uTrib>UN</uTrib>
+                    <qTrib>10.0000</qTrib>
+                    <vUnTrib>12500.00</vUnTrib>
+                    <indTot>1</indTot>
+                </prod>
+                <imposto>
+                    <vTotTrib>45250.00</vTotTrib>
+                    <ICMS>
+                        <ICMS00>
+                            <orig>0</orig>
+                            <CST>00</CST>
+                            <modBC>3</modBC>
+                            <vBC>125000.00</vBC>
+                            <pICMS>12.00</pICMS>
+                            <vICMS>15000.00</vICMS>
+                        </ICMS00>
+                    </ICMS>
+                    <PIS>
+                        <PISAliq>
+                            <CST>01</CST>
+                            <vBC>125000.00</vBC>
+                            <pPIS>1.65</pPIS>
+                            <vPIS>2062.50</vPIS>
+                        </PISAliq>
+                    </PIS>
+                    <COFINS>
+                        <COFINSAliq>
+                            <CST>01</CST>
+                            <vBC>125000.00</vBC>
+                            <pCOFINS>7.60</pCOFINS>
+                            <vCOFINS>9500.00</vCOFINS>
+                        </COFINSAliq>
+                    </COFINS>
+                </imposto>
+            </det>
+            <det nItem="3">
+                <prod>
+                    <cProd>S001</cProd>
+                    <xProd>CONSULTORIA EM ANÁLISE FISCAL</xProd>
+                    <NCM>00000000</NCM>
+                    <CFOP>5933</CFOP>
+                    <uCom>HR</uCom>
+                    <qCom>50.0000</qCom>
+                    <vUnCom>800.00</vUnCom>
+                    <vProd>40000.00</vProd>
+                    <uTrib>HR</uTrib>
+                    <qTrib>50.0000</qTrib>
+                    <vUnTrib>800.00</vUnTrib>
+                    <indTot>1</indTot>
+                </prod>
+                <imposto>
+                    <vTotTrib>1850.00</vTotTrib>
+                     <ISSQN>
+                        <vBC>40000.00</vBC>
+                        <vAliq>5.00</vAliq>
+                        <vISSQN>2000.00</vISSQN>
+                        <cMunFG>3550308</cMunFG>
+                        <cListServ>01.06</cListServ>
+                        <indIss>1</indIss>
+                        <indIncentivo>2</indIncentivo>
+                    </ISSQN>
+                    <PIS>
+                        <PISAliq>
+                            <CST>01</CST>
+                            <vBC>40000.00</vBC>
+                            <pPIS>0.65</pPIS>
+                            <vPIS>260.00</vPIS>
+                        </PISAliq>
+                    </PIS>
+                    <COFINS>
+                        <COFINSAliq>
+                            <CST>01</CST>
+                            <vBC>40000.00</vBC>
+                            <pCOFINS>3.00</pCOFINS>
+                            <vCOFINS>1200.00</vCOFINS>
+                        </COFINSAliq>
+                    </COFINS>
+                </imposto>
+            </det>
+            <det nItem="4">
+                <prod>
+                    <cProd>P003-ERR</cProd>
+                    <xProd>CABO DE DADOS (ERRO VALOR)</xProd>
+                    <NCM>85444200</NCM>
+                    <CFOP>5102</CFOP>
+                    <uCom>M</uCom>
+                    <qCom>100.0000</qCom>
+                    <vUnCom>15.50</vUnCom>
+                    <vProd>1550.01</vProd>
+                    <uTrib>M</uTrib>
+                    <qTrib>100.0000</qTrib>
+                    <vUnTrib>15.50</vUnTrib>
+                    <indTot>1</indTot>
+                </prod>
+                <imposto>
+                    <vTotTrib>421.15</vTotTrib>
+                    <ICMS>
+                        <ICMS00>
+                            <orig>0</orig>
+                            <CST>00</CST>
+                            <modBC>3</modBC>
+                            <vBC>1550.01</vBC>
+                            <pICMS>18.00</pICMS>
+                            <vICMS>279.00</vICMS>
+                        </ICMS00>
+                    </ICMS>
+                    <PIS><PISAliq><CST>01</CST><vBC>1550.01</vBC><pPIS>1.65</pPIS><vPIS>25.58</vPIS></PISAliq></PIS>
+                    <COFINS><COFINSAliq><CST>01</CST><vBC>1550.01</vBC><pCOFINS>7.60</pCOFINS><vCOFINS>117.80</vCOFINS></COFINSAliq></COFINS>
+                </imposto>
+            </det>
+            <det nItem="5">
+                <prod>
+                    <cProd>P004-BONIF</cProd>
+                    <xProd>MOUSEPAD BRINDE</xProd>
+                    <NCM>39269090</NCM>
+                    <CFOP>5910</CFOP>
+                    <uCom>UN</uCom>
+                    <qCom>5.0000</qCom>
+                    <vUnCom>0.00</vUnCom>
+                    <vProd>0.00</vProd>
+                    <uTrib>UN</uTrib>
+                    <qTrib>5.0000</qTrib>
+                    <vUnTrib>0.00</vUnTrib>
+                    <indTot>1</indTot>
+                </prod>
+                <imposto>
+                    <ICMS><ICMS40><orig>0</orig><CST>41</CST></ICMS40></ICMS>
+                    <PIS><PISNT><CST>08</CST></PISNT></PIS>
+                    <COFINS><COFINSNT><CST>08</CST></COFINSNT></COFINS>
+                </imposto>
+            </det>
+            <total>
+                <ICMSTot>
+                    <vBC>276550.01</vBC>
+                    <vICMS>33279.00</vICMS>
+                    <vICMSDeson>0.00</vICMSDeson>
+                    <vFCP>0.00</vFCP>
+                    <vBCST>0.00</vBCST>
+                    <vST>0.00</vST>
+                    <vFCPST>0.00</vFCPST>
+                    <vFCPSTRet>0.00</vFCPSTRet>
+                    <vProd>316550.01</vProd>
+                    <vFrete>0.00</vFrete>
+                    <vSeg>0.00</vSeg>
+                    <vDesc>0.00</vDesc>
+                    <vII>0.00</vII>
+                    <vIPI>0.00</vIPI>
+                    <vIPIDevol>0.00</vIPIDevol>
+                    <vPIS>4823.08</vPIS>
+                    <vCOFINS>22217.80</vCOFINS>
+                    <vOutro>0.00</vOutro>
+                    <vNF>352046.81</vNF>
+                </ICMSTot>
+                <ISSQNtot>
+                    <vServ>40000.00</vServ>
+                    <vBC>40000.00</vBC>
+                    <vISS>2000.00</vISS>
+                    <vPIS>260.00</vPIS>
+                    <vCOFINS>1200.00</vCOFINS>
+                    <dCompet>2024-07-15</dCompet>
+                </ISSQNtot>
+            </total>
+        </infNFe>
     </NFe>
 </nfeProc>`;
-    const demoFile = new File([mockXml], "NFe_Demonstracao.xml", { type: "text/xml" });
+    const demoFile = new File([mockXml], "NFe_Demonstracao_Completa.xml", { type: "text/xml" });
     const dataTransfer = new DataTransfer();
     dataTransfer.items.add(demoFile);
     handleFilesAdded(dataTransfer.files);

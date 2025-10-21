@@ -37,7 +37,7 @@ const checkMagicNumbers = async (file: File): Promise<boolean> => {
     if (!signatures) return true; // No signature to check
 
     try {
-        const slice = file.slice(0, 4);
+        const slice = file.slice(0, 8); // Increased slice size to handle longer signatures
         const buffer = await slice.arrayBuffer();
         const view = new DataView(buffer);
         const fileHeader = Array.from({ length: view.byteLength }, (_, i) => view.getUint8(i).toString(16).padStart(2, '0')).join('');
@@ -72,7 +72,7 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
     const total = infNFe.total?.ICMSTot || {};
     const nfeId = infNFe.Id;
 
-    const findTaxInfo = (imposto: any, tributo: 'ICMS' | 'PIS' | 'COFINS'): { cst?: string; value?: number } => {
+    const findTaxInfo = (imposto: any, tributo: 'ICMS' | 'PIS' | 'COFINS'): { cst?: string; value?: number; baseCalculo?: number; aliquota?: number } => {
         const impostoBlock = imposto?.[tributo];
         if (!impostoBlock) return {};
         
@@ -80,9 +80,13 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
         if (typeKey && impostoBlock[typeKey]) {
             const taxDetails = impostoBlock[typeKey];
             const valueKey = `v${tributo}`;
+            const baseCalculoKey = 'vBC';
+            const aliquotaKey = `p${tributo}`;
             return {
                 cst: taxDetails.CST?.toString(),
-                value: taxDetails[valueKey]
+                value: taxDetails[valueKey],
+                baseCalculo: taxDetails[baseCalculoKey],
+                aliquota: taxDetails[aliquotaKey]
             };
         }
         return {};
@@ -98,7 +102,7 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
             logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} não possui valor (vProd).`);
         }
         if (!item.prod?.CFOP) {
-            logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} não possui CFOP.`);
+            logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} не possui CFOP.`);
         }
 
         return {
@@ -113,6 +117,8 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
             produto_ncm: item.prod?.NCM,
             produto_cfop: item.prod?.CFOP,
             produto_cst_icms: icmsInfo.cst,
+            produto_base_calculo_icms: parseSafeFloat(icmsInfo.baseCalculo),
+            produto_aliquota_icms: parseSafeFloat(icmsInfo.aliquota),
             produto_valor_icms: parseSafeFloat(icmsInfo.value),
             produto_cst_pis: pisInfo.cst,
             produto_valor_pis: parseSafeFloat(pisInfo.value),
@@ -197,7 +203,7 @@ const handleImage = async (file: File): Promise<ImportedDoc> => {
         if (!text.trim()) {
             return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: 'Nenhum texto detectado na imagem (OCR).', raw: file };
         }
-         const data = extractDataFromText(text);
+         const data = await extractDataFromText(text);
         if (data.length === 0) {
             logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto da imagem ${file.name}`);
         }
@@ -222,7 +228,7 @@ const handlePDF = async (file: File): Promise<ImportedDoc> => {
         let doc: ImportedDoc = { kind: 'PDF', name: file.name, size: file.size, status: 'parsed', text: fullText, raw: file };
 
         if (fullText.trim().length > 10) { // Check if text was extracted
-             const data = extractDataFromText(fullText);
+             const data = await extractDataFromText(fullText);
              if (data.length === 0) {
                 logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto do PDF ${file.name}`);
              }
@@ -234,7 +240,7 @@ const handlePDF = async (file: File): Promise<ImportedDoc> => {
                 throw new Error("Documento PDF parece estar vazio ou não contém texto legível (falha no OCR).");
             }
             doc.text = ocrText;
-            doc.data = extractDataFromText(ocrText);
+            doc.data = await extractDataFromText(ocrText);
         }
         return doc;
 
@@ -332,12 +338,10 @@ export const importFiles = async (
             
                 } catch (e: unknown) {
                     const message = e instanceof Error ? e.message : String(e);
-                    const errorMsg = `Falha ao descompactar o arquivo: ${message}`;
-                    // The error `e` is of type `unknown` and does not have a `name` property.
-                    // The intended behavior is to log the name of the file that failed to process.
-                    // Changed `e.name` to `file.name` to correctly log the file that caused the error.
-                    // FIX: Changed e.name to file.name to correctly log the file that caused the error, as `e` is of type `unknown`.
-                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name});
+                    const errorMsg = `Falha ao descompactar ou processar o arquivo ZIP: ${message}`;
+                    // FIX: Use file.name for context, as the exception 'e' is of type 'unknown' and may not have a 'name' property.
+                    // FIX: Correctly use file.name for logging context as 'e' is of type 'unknown'.
+                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name, error: e});
                     result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: errorMsg };
                 }
             } else if (isSupportedExtension(file.name)) {

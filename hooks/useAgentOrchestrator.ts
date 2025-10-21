@@ -73,15 +73,16 @@ export const useAgentOrchestrator = () => {
         // Don't clear logs on incremental runs, just reset pipeline state
         reset();
         
+        const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
+            setAgentStates(prev => {
+                const newState = { ...prev, [agent]: { status, progress: { ...prev[agent].progress, ...progress } } };
+                if(status === 'running') logger.log(agent, 'INFO', `Iniciando - ${progress?.step || ''}`);
+                if(status === 'completed') logger.log(agent, 'INFO', `Concluído.`);
+                return newState;
+            });
+        };
+        
         try {
-            const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
-                setAgentStates(prev => {
-                    const newState = { ...prev, [agent]: { status, progress: { ...prev[agent].progress, ...progress } } };
-                    if(status === 'running') logger.log(agent, 'INFO', `Iniciando - ${progress?.step || ''}`);
-                    if(status === 'completed') logger.log(agent, 'INFO', `Concluído.`);
-                    return newState;
-                });
-            };
 
             // 1. Agente OCR / NLP
             updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
@@ -157,146 +158,116 @@ export const useAgentOrchestrator = () => {
             }
             setError(errorMessage);
             setPipelineError(true);
-             const runningAgent = (Object.keys(agentStates) as AgentName[]).find(key => agentStates[key].status === 'running') || 'Orchestrator';
-            logger.log(runningAgent, 'ERROR', `Falha no pipeline: ${errorMessage}`, { error: err });
-
-            setAgentStates(prev => {
-                const newStates = { ...prev };
-                if(runningAgent && newStates[runningAgent]) {
-                    newStates[runningAgent].status = 'error';
-                }
-                return newStates;
-            });
+             const runningAgent = (Object.keys(agentStates) as AgentName[]).find(a => agentStates[a].status === 'running');
+             if(runningAgent) {
+                updateAgentState(runningAgent, 'error');
+             }
         } finally {
             setIsPipelineComplete(true);
         }
-    }, [classificationCorrections, reset]);
-
-    const handleSendMessage = useCallback(async (message: string) => {
-        if (!chatRef.current) {
-            setError('O chat não foi iniciado. Por favor, faça o upload de arquivos primeiro.');
-            logger.log('ChatPanel', 'ERROR', 'Tentativa de envio de mensagem sem chat iniciado.');
-            return;
-        }
-
-        const userMessage: ChatMessage = { id: Date.now().toString(), sender: 'user', text: message };
-        setMessages((prev) => [...prev, userMessage]);
-        setIsStreaming(true);
-
-        streamController.current = new AbortController();
-        const signal = streamController.current.signal;
-
-        const aiMessageId = (Date.now() + 1).toString();
-        setMessages((prev) => [...prev, { id: aiMessageId, sender: 'ai', text: '' }]);
-
-        try {
-            let fullResponseText = '';
-            const stream = sendMessageStream(chatRef.current, message);
-            for await (const chunk of stream) {
-                if (signal.aborted) break;
-                fullResponseText += chunk;
-            }
-
-            if (!signal.aborted) {
-                let jsonString = fullResponseText.trim();
-                const jsonStart = jsonString.indexOf('{');
-                const jsonEnd = jsonString.lastIndexOf('}');
-
-                if (jsonStart !== -1 && jsonEnd > jsonStart) {
-                    jsonString = jsonString.substring(jsonStart, jsonEnd + 1);
-                }
-                
-                const finalAiResponse = JSON.parse(jsonString);
-                setMessages((prev) =>
-                    prev.map((msg) =>
-                        msg.id === aiMessageId
-                            ? { ...msg, text: finalAiResponse.text, chartData: finalAiResponse.chartData }
-                            : msg
-                    )
-                );
-            }
-        } catch (err: unknown) {
-            if (err instanceof Error && err.name === 'AbortError') {
-                setMessages((prev) =>
-                    prev.map((msg) =>
-                        msg.id === aiMessageId ? { ...msg, text: '[Geração de resposta interrompida]' } : msg
-                    )
-                );
-            } else {
-                console.error('Chat stream failed:', err);
-                let errorText = 'Desculpe, não consegui processar sua resposta. Tente novamente.';
-                // FIX: Safely handle properties on the 'unknown' error object by using type guards.
-                if (err instanceof Error) {
-                    errorText = err.message;
-                } else if (typeof err === 'string') {
-                    errorText = err;
-                } else if (err && typeof err === 'object') {
-                    // Safely check for a message property.
-                    if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
-                        errorText = (err as { message: string }).message;
-                    }
-                    // Safely check for and access the 'status' property.
-                    if ('status' in err) {
-                        const status = (err as { status: unknown }).status;
-                        if (typeof status === 'string' || typeof status === 'number') {
-                            errorText += ` (Status: ${status})`;
-                        }
-                    }
-                }
-                 logger.log('ChatService', 'ERROR', 'Falha no stream do chat', { error: err });
-                setMessages((prev) =>
-                    prev.map((msg) => (msg.id === aiMessageId ? { ...msg, text: errorText } : msg))
-                );
-            }
-        } finally {
-            setIsStreaming(false);
-            streamController.current = null;
-        }
-    }, []);
+    }, [classificationCorrections]); // Added dependency
 
     const handleStopStreaming = useCallback(() => {
         if (streamController.current) {
             streamController.current.abort();
-            logger.log('ChatPanel', 'INFO', 'Geração de resposta interrompida pelo usuário.');
+            setIsStreaming(false);
+            logger.log('ChatService', 'WARN', 'Geração de resposta do chat interrompida pelo usuário.');
         }
-        setIsStreaming(false);
     }, []);
+    
+    const handleSendMessage = useCallback(async (message: string) => {
+        if (!chatRef.current) {
+            setError('O chat não foi inicializado. Por favor, execute uma análise primeiro.');
+            return;
+        }
 
-     const handleClassificationChange = useCallback((docName: string, newClassification: ClassificationResult['operationType']) => {
-        const updatedCorrections = { ...classificationCorrections, [docName]: newClassification };
-        setClassificationCorrections(updatedCorrections);
+        const userMessage: ChatMessage = { id: Date.now().toString(), sender: 'user', text: message };
+        setMessages(prev => [...prev, userMessage]);
+        setIsStreaming(true);
+
+        const aiMessageId = (Date.now() + 1).toString();
+        let fullAiResponse = '';
+        setMessages(prev => [...prev, { id: aiMessageId, sender: 'ai', text: '...' }]);
+
+        streamController.current = new AbortController();
+        const signal = streamController.current.signal;
 
         try {
-            localStorage.setItem(CORRECTIONS_STORAGE_KEY, JSON.stringify(updatedCorrections));
-        } catch (e) {
-             logger.log('Orchestrator', 'ERROR', 'Falha ao salvar correções no localStorage.', { error: e });
-        }
+            const stream = sendMessageStream(chatRef.current, message);
+            for await (const chunk of stream) {
+                if (signal.aborted) break;
+                fullAiResponse += chunk;
+                setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, text: fullAiResponse } : m));
+            }
 
-        // Update the report in state to reflect the change immediately
+            if (!signal.aborted) {
+                try {
+                    const finalJson = JSON.parse(fullAiResponse);
+                    setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, ...finalJson } : m));
+                } catch(parseError) {
+                     logger.log('ChatService', 'ERROR', 'Falha ao analisar a resposta JSON final da IA.', { error: parseError, response: fullAiResponse });
+                     const errorMessage = 'A IA retornou uma resposta em formato inválido. Por favor, tente novamente.';
+                     setError(errorMessage);
+                     setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, text: errorMessage } : m));
+                }
+            }
+
+        } catch (err: unknown) {
+             let finalMessage = 'Ocorreu um erro na comunicação com a IA.';
+            if (err && typeof err === 'object' && 'status' in err) {
+                const typedErr = err as { status?: unknown, message?: string };
+                if (typedErr.status === 401) {
+                    finalMessage = 'Chave de API inválida. Verifique sua configuração.';
+                } else if (typedErr.message) {
+                    finalMessage = typedErr.message;
+                }
+            } else if (err instanceof Error) {
+                finalMessage = err.message;
+            }
+            setError(finalMessage);
+            setMessages(prev => prev.filter(m => m.id !== aiMessageId)); // Remove placeholder
+        } finally {
+            setIsStreaming(false);
+            streamController.current = null;
+        }
+    }, [chatRef, messages]);
+
+    const handleClassificationChange = useCallback((docName: string, newClassification: ClassificationResult['operationType']) => {
         setAuditReport(prevReport => {
             if (!prevReport) return null;
-            const newDocs = prevReport.documents.map(doc => {
+            const updatedDocs = prevReport.documents.map(doc => {
                 if (doc.doc.name === docName && doc.classification) {
-                    return { ...doc, classification: { ...doc.classification, operationType: newClassification }};
+                    return {
+                        ...doc,
+                        classification: { ...doc.classification, operationType: newClassification, confidence: 1.0 }
+                    };
                 }
                 return doc;
             });
-            return { ...prevReport, documents: newDocs };
+            return { ...prevReport, documents: updatedDocs };
         });
-        logger.log('Orchestrator', 'INFO', `Classificação do documento '${docName}' corrigida para '${newClassification}'.`);
+        
+        // Update and save corrections for future runs
+        const newCorrections = { ...classificationCorrections, [docName]: newClassification };
+        setClassificationCorrections(newCorrections);
+        try {
+            localStorage.setItem(CORRECTIONS_STORAGE_KEY, JSON.stringify(newCorrections));
+            logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`);
+        } catch(e) {
+            logger.log('Orchestrator', 'ERROR', `Falha ao salvar correção no localStorage.`, { error: e });
+            setError('Não foi possível salvar a correção de classificação. Ela será perdida ao recarregar a página.');
+        }
+
     }, [classificationCorrections]);
 
-
-    const isPipelineRunning = Object.values(agentStates).some(s => s.status === 'running');
-    
     return {
         agentStates,
         auditReport,
         setAuditReport,
         messages,
         isStreaming,
-        error,
-        isPipelineRunning,
+        error: error,
+        isPipelineRunning: Object.values(agentStates).some(s => s.status === 'running'),
         isPipelineComplete,
         pipelineError,
         runPipeline,

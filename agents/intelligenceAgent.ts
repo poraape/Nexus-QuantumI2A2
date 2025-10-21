@@ -10,7 +10,7 @@ const intelligenceSchema = {
   properties: {
     aiDrivenInsights: {
       type: Type.ARRAY,
-      description: "Anomalias, riscos ou oportunidades que não são violações de regras, mas são fiscalmente relevantes.",
+      description: "Anomalias, riscos ou oportunidades que não são violações de regras, but are fiscally relevant.",
       items: {
         type: Type.OBJECT,
         properties: {
@@ -53,22 +53,17 @@ const intelligenceSchema = {
 };
 
 /**
- * Sanitizes a value before including it in a prompt for the AI.
+ * Sanitizes a value for safe inclusion in a CSV string for an AI prompt.
  * This helps prevent the AI from generating malformed JSON when it includes
  * the sanitized data in its response.
  * @param value The value to sanitize.
- * @returns The sanitized value.
+ * @returns The sanitized value, properly escaped.
  */
 const sanitizeForAI = (value: any): any => {
     if (typeof value === 'string') {
-        // Replace characters that can break JSON strings or confuse the LLM.
-        // - Replace double quotes with single quotes.
-        // - Remove backslashes to prevent incorrect escaping.
-        // - Replace newlines/carriage returns with a space.
-        return value
-            .replace(/"/g, "'")
-            .replace(/\\/g, '')
-            .replace(/(\r\n|\n|\r)/gm, " ");
+        // Use JSON.stringify to correctly escape quotes, backslashes, and control characters,
+        // then slice off the outer quotes it adds. This is safer than regex replacement.
+        return JSON.stringify(value).slice(1, -1);
     }
     return value;
 };
@@ -103,18 +98,18 @@ export const runIntelligenceAnalysis = async (
         return newItem;
     });
 
-    const dataSampleForAI = Papa.unparse(sanitizedItems.slice(0, 300));
+    const dataSampleForAI = Papa.unparse(sanitizedItems.slice(0, 500));
     
     const deterministicFindings = report.documents
-        .flatMap(d => d.inconsistencies.map(inc => ({ document: d.doc.name, message: inc.message })))
-        .slice(0, 20);
+        .flatMap(d => d.inconsistencies.map(inc => ({ document: d.doc.name, message: inc.message, severity: inc.severity })))
+        .slice(0, 30);
 
     const prompt = `
         Você é um auditor fiscal sênior com IA. Sua tarefa é realizar uma análise profunda em um conjunto de dados fiscais extraídos de várias notas fiscais.
         
-        Já realizei uma auditoria baseada em regras e encontrei estas inconsistências:
+        Já realizei uma auditoria baseada em regras e encontrei estas inconsistências de ALTA PRIORIDADE:
         ---
-        Resultados da Auditoria Determinística (Amostra):
+        Resultados da Auditoria Determinística (Amostra Prioritária):
         ${JSON.stringify(deterministicFindings, null, 2)}
         ---
 

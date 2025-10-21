@@ -63,5 +63,12 @@ export const INCONSISTENCIES: Record<string, Inconsistency> = {
         explanation: 'O CST do ICMS indica um tipo de tributação (ex: "00 - Tributada integralmente") que não é compatível com o CFOP de devolução (1.202), que deveria ter um CST não-tributado ou de substituição tributária, por exemplo.',
         normativeBase: 'Anexo I (Códigos de Situação Tributária) do Convênio S/Nº, de 1970.',
         severity: 'ALERTA'
+    },
+    ICMS_CALCULO_DIVERGENTE: {
+        code: 'ICMS-CALC-01',
+        message: 'Valor do ICMS (vICMS) não corresponde ao cálculo (vBC x pICMS).',
+        explanation: 'O valor do ICMS informado no item diverge do cálculo da Base de Cálculo (vBC) pela Alíquota (pICMS). Isso pode indicar erros de cálculo, arredondamento incorreto ou manipulação fiscal.',
+        normativeBase: 'Lei Complementar nº 87/1996 (Lei Kandir).',
+        severity: 'ERRO'
     }
 };
