@@ -1,0 +1,282 @@
+{
+  "runtime_evaluator": {
+    "version": "2.0.0",
+    "type": "Performance & Completeness Diagnostic Manifest",
+    "compatible_with": [
+      "Codex",
+      "AIStudio Code Assistant"
+    ],
+    "execution_modes": [
+      "dry_run",
+      "safe_apply"
+    ],
+    "metadata": {
+      "app_name": "Nexus QuantumI2A2",
+      "build_id": "nq2a2-2025.10.21",
+      "environment": "stage",
+      "analysis_timestamp": "auto:now()",
+      "runtime_engine": "FastAPI + Celery + Frontend React/Vite",
+      "analyst_agent": "PerformanceAnalyzerAI",
+      "target_metric": "runtime_efficiency_score >= 90"
+    },
+    "metrics_targets": {
+      "response_time_ms": {
+        "expected": 1200,
+        "max_allowed": 2000
+      },
+      "data_analysis_ms": {
+        "expected": 1500,
+        "max_allowed": 2500
+      },
+      "render_time_ms": {
+        "expected": 700,
+        "max_allowed": 1500
+      },
+      "agent_inference_ms": {
+        "expected": 1000,
+        "max_allowed": 1800
+      },
+      "overall_completion_ms": {
+        "expected": 4000,
+        "max_allowed": 6000
+      }
+    },
+    "runtime_tracking": {
+      "tracked_events": [
+        "app_init",
+        "frontend_request",
+        "backend_receive",
+        "agent_analysis_start",
+        "agent_analysis_end",
+        "response_render"
+      ],
+      "log_format": "JSONL",
+      "log_fields": [
+        "timestamp",
+        "event",
+        "duration_ms",
+        "trace_id",
+        "user_id"
+      ],
+      "markers": {
+        "t0": "frontend request start",
+        "t1": "backend processing start",
+        "t2": "agent analysis start",
+        "t3": "agent analysis end",
+        "t4": "response ready",
+        "t5": "frontend render complete"
+      },
+      "compute_durations": {
+        "frontend_latency": "t1 - t0",
+        "backend_latency": "t2 - t1",
+        "agent_inference_time": "t3 - t2",
+        "response_build_time": "t4 - t3",
+        "total_roundtrip": "t5 - t0"
+      },
+      "export": {
+        "output": "artifacts/performance/runtime_trace.json",
+        "aggregation": "mean,stddev,p95"
+      }
+    },
+    "agent_analysis": {
+      "agent_name": "AnalysisAgent",
+      "model": "Gemini 2.5 Flash (primary) / GPT-4o-mini (fallback)",
+      "parameters": {
+        "context_window": 128000,
+        "temperature": 0.2,
+        "response_mime": "application/json",
+        "batch_size": 1
+      },
+      "measured_metrics": {
+        "latency_ms": "auto_measure",
+        "tokens_in": "auto_measure",
+        "tokens_out": "auto_measure",
+        "inference_duration": "end_time - start_time",
+        "confidence_score": "LLM output confidence (0-1)"
+      },
+      "acceptance": {
+        "max_latency_ms": 1800,
+        "min_confidence_score": 0.85,
+        "error_rate_pct": "<2%"
+      }
+    },
+    "data_validation": {
+      "validation_scope": "end-to-end",
+      "rules": [
+        {
+          "rule_id": "DV001",
+          "description": "App deve reconhecer 100% dos itens e totais de documentos processados.",
+          "condition": "len(output.items) == len(input.items)",
+          "action_on_failure": "reprocessar lote com modo seguro"
+        },
+        {
+          "rule_id": "DV002",
+          "description": "Campos nulos ou NaN não são permitidos em métricas de totais.",
+          "condition": "not any(field is null for field in [valor_total, totalNotas, ticketMedio])",
+          "action_on_failure": "forçar recomputação determinística"
+        },
+        {
+          "rule_id": "DV003",
+          "description": "Valores negativos ou inconsistentes devem ser sinalizados.",
+          "condition": "min(all_totals) >= 0",
+          "action_on_failure": "gerar alerta e fallback de recalculo"
+        }
+      ],
+      "output_report": "artifacts/performance/data_validation.json"
+    },
+    "null_metric_detection": {
+      "detection_logic": {
+        "check_fields": [
+          "totalNotas",
+          "totalProdutos",
+          "valorTotal",
+          "ticketMedio"
+        ],
+        "trigger_threshold": "value == null OR value == 0 for all fields"
+      },
+      "diagnostic_actions": [
+        "verificar logs de nlpAgent e accountantAgent",
+        "testar resposta do modelo LLM (Gemini) para schema incompleto",
+        "executar recomputação determinística dos totais"
+      ],
+      "auto_resolution": [
+        "forçar recalculo via accountantAgent determinístico",
+        "se persistir nulo, acionar fallback regexFallback (nlpAgent)",
+        "registrar causa e tempos em logs de auditoria"
+      ],
+      "remediation_output": "artifacts/performance/null_fix_report.json"
+    },
+    "optimization_plan": {
+      "strategies": {
+        "threads": {
+          "min": 4,
+          "max": 16,
+          "policy": "auto-scale CPU-bound"
+        },
+        "cache": {
+          "enabled": true,
+          "ttl_s": 300,
+          "invalidate_on_change": true
+        },
+        "parallelism": {
+          "use_asyncio": true,
+          "batch_size": 4
+        },
+        "io_priority": "balanced",
+        "db_pool_size": 10,
+        "profiling": "enabled"
+      },
+      "expected_effect": {
+        "response_time_gain_pct": 30,
+        "cpu_usage_stabilization_pct": "<70",
+        "memory_leak_tolerance_mb": "<=50"
+      },
+      "validation_method": "rerun_benchmark_post_optimization"
+    },
+    "benchmark_report": {
+      "metrics_collected": [
+        "frontend_latency",
+        "backend_latency",
+        "agent_inference_time",
+        "total_roundtrip"
+      ],
+      "aggregation": [
+        "mean",
+        "median",
+        "p95",
+        "p99",
+        "stddev"
+      ],
+      "thresholds": {
+        "overall_efficiency_score": ">= 0.90",
+        "variance_tolerance_pct": "<15"
+      },
+      "output_format": "json + html",
+      "path": "artifacts/performance/benchmark_summary.json",
+      "sample_schema": {
+        "frontend_latency_ms": 850,
+        "backend_latency_ms": 1100,
+        "agent_inference_time_ms": 900,
+        "total_roundtrip_ms": 3800,
+        "score_efficiency": 0.93
+      }
+    },
+    "auto_tuning": {
+      "iterations": 5,
+      "parameters": [
+        "thread_count",
+        "cache_ttl",
+        "batch_size"
+      ],
+      "optimization_goal": "minimize total_roundtrip_ms",
+      "method": "gradient_adjustment",
+      "constraints": {
+        "min_response_time": 500,
+        "max_cpu_usage": 85
+      },
+      "auto_correct": [
+        "ajustar tamanho de lote de agentes",
+        "reduzir paralelismo se CPU > 90%",
+        "redefinir cache em caso de inconsistência"
+      ],
+      "stop_condition": "efficiency_score >= 0.95 OR iterations_exceeded",
+      "output": "artifacts/performance/auto_tuning_report.json"
+    },
+    "logging_audit": {
+      "audit_fields": [
+        "session_id",
+        "trace_id",
+        "execution_hash",
+        "analyzed_agent",
+        "start_time",
+        "end_time",
+        "total_duration_ms"
+      ],
+      "retention_days": 30,
+      "encryption": "AES256",
+      "storage_path": "artifacts/logs/runtime_audit.jsonl",
+      "integrity_check": "sha256sum"
+    },
+    "ci_cd_integration": {
+      "workflow_file": ".github/workflows/performance_validator.yml",
+      "job_name": "runtime-performance-benchmark",
+      "steps": [
+        "checkout repo",
+        "install deps",
+        "execute performance_evaluator.py --mode=dry_run",
+        "collect artifacts",
+        "execute performance_evaluator.py --mode=safe_apply if issues_found"
+      ],
+      "gates": {
+        "block_if": [
+          "efficiency_score < 0.85",
+          "total_roundtrip_ms > 6000",
+          "missing_data_fields > 0"
+        ],
+        "approve_if": [
+          "efficiency_score >= 0.90",
+          "null_metric_count == 0"
+        ]
+      }
+    },
+    "final_criteria": {
+      "success_conditions": [
+        "Nenhuma métrica nula detectada",
+        "Reconhecimento completo dos dados totais",
+        "Tempo total médio < 4s",
+        "Score de eficiência >= 90"
+      ],
+      "failure_actions": [
+        "Gerar relatório de gargalo detalhado",
+        "Marcar execução como 'needs_retrain'",
+        "Iniciar novo ciclo de otimização auto_tuning"
+      ],
+      "deliverables": [
+        "runtime_trace.json",
+        "benchmark_summary.json",
+        "null_fix_report.json",
+        "auto_tuning_report.json"
+      ]
+    }
+  }
+}

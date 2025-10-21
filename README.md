@@ -133,3 +133,22 @@ O comando gera relatórios em `artifacts/reports/` (JSON e Markdown) e encerra c
 ### Integração CI/CD
 
 Um workflow dedicado (`.github/workflows/connectivity_validator.yml`) executa o modo `dry_run` e publica os artefatos. Em caso de falha, o job `auto_remediate` dispara automaticamente o modo `safe_apply`, anexando o plano de correções e sugerindo pull requests com base no patch plan do manifesto.
+
+---
+
+## Runtime Performance Evaluator
+
+O manifesto `docs/runtime_evaluator_manifest.json` descreve o **Runtime Performance Evaluator**, focado em diagnosticar latência, completude de dados e estratégias de otimização.
+
+### Como executar
+
+```bash
+python performance_evaluator.py --mode=dry_run --environment=stage
+# use --format=json para saída estruturada e --output ./performance-report.json para salvar o resultado
+```
+
+Os relatórios são gerados em `artifacts/performance/` e `artifacts/logs/`. Em modo `safe_apply`, o avaliador inclui sugestões de auto tuning conforme o manifesto.
+
+### Integração CI/CD
+
+O workflow `.github/workflows/performance_validator.yml` executa o modo `dry_run` a cada 12 horas. Em caso de falha, o job dependente reexecuta em `safe_apply`, anexando os relatórios de otimização.
