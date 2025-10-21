@@ -24,21 +24,21 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
         const allItems = validDocs.flatMap(d => d.doc.data!);
 
         // FIX: Add generic type to `reduce` to ensure correct type inference for the accumulator.
-        const cfopData = allItems.reduce<Record<string, number>>((acc, item) => {
+        const cfopData = allItems.reduce((acc: Record<string, number>, item) => {
             const cfop = item.produto_cfop?.toString() || 'N/A';
             acc[cfop] = (acc[cfop] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
         }, {});
 
         // FIX: Add generic type to `reduce` to ensure correct type inference for the accumulator.
-        const ncmData = allItems.reduce<Record<string, number>>((acc, item) => {
+        const ncmData = allItems.reduce((acc: Record<string, number>, item) => {
             const ncm = item.produto_ncm?.toString() || 'N/A';
             acc[ncm] = (acc[ncm] || 0) + (parseSafeFloat(item.produto_valor_total));
             return acc;
         }, {});
 
         // FIX: Add generic type to `reduce` to ensure correct type inference for the accumulator.
-        const ufData = validDocs.reduce<Record<string, number>>((acc, auditedDoc) => {
+        const ufData = validDocs.reduce((acc: Record<string, number>, auditedDoc) => {
             if (auditedDoc.doc.data && auditedDoc.doc.data.length > 0) {
                 const uf = auditedDoc.doc.data[0].destinatario_uf || 'N/A';
                 acc[uf] = (acc[uf] || 0) + 1;
