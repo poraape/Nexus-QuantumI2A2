@@ -4,6 +4,30 @@ import { logger } from "../services/logger";
 import { parseSafeFloat } from "../utils/parsingUtils";
 import { generateJSON } from "../services/geminiService";
 
+type Metrics = {
+  totalNotas: number;
+  totalProdutos: number;
+  valorTotal: number;
+  ticketMedio: number;
+};
+
+const computeMetrics = (docs: AuditedDocument[]): Metrics => {
+  const acc = {
+    totalNotas: 0,
+    totalProdutos: 0,
+    valorTotal: 0,
+  };
+  for (const doc of docs) {
+    const itens = doc.doc.data || [];
+    const totalDocumento = itens.reduce((sum, item) => sum + parseSafeFloat(item.produto_valor_total), 0);
+    acc.valorTotal += totalDocumento;
+    acc.totalProdutos += itens.length;
+    acc.totalNotas += 1;
+  }
+  const ticketMedio = acc.totalNotas ? acc.valorTotal / acc.totalNotas : 0;
+  return { ...acc, ticketMedio };
+};
+
 const analysisResponseSchema = {
   type: Type.OBJECT,
   properties: {
@@ -319,6 +343,7 @@ const generateSpedEfd = (report: Pick<AuditReport, 'documents'>): SpedFile => {
 export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>): Promise<AuditReport> => {
     // 1. Run deterministic calculations first
     const aggregatedMetrics = runDeterministicAccounting(report);
+    const metrics = computeMetrics(report.documents);
 
     // 2. Generate Accounting Entries
     const accountingEntries = generateAccountingEntries(report.documents);
@@ -346,7 +371,24 @@ export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>
     const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
     // 4. Run AI analysis with deterministic data as context
-    const summary = await runAIAccountingSummary(dataSampleForAI, aggregatedMetrics);
+    let summary: AnalysisResult;
+    try {
+        summary = await runAIAccountingSummary(dataSampleForAI, aggregatedMetrics);
+    } catch (error) {
+        logger.log('accountantAgent', 'ERROR', 'IA indisponível; seguindo com determinístico', { error });
+        summary = {
+            title: 'Análise determinística',
+            summary: 'Resumo com base em métricas determinísticas.',
+            keyMetrics: [
+                { metric: 'Notas', value: metrics.totalNotas.toString(), insight: 'Total de documentos processados.' },
+                { metric: 'Itens', value: metrics.totalProdutos.toString(), insight: 'Quantidade total de itens avaliados.' },
+                { metric: 'Valor Total', value: metrics.valorTotal.toFixed(2), insight: 'Somatório dos valores dos itens.' },
+                { metric: 'Ticket Médio', value: metrics.ticketMedio.toFixed(2), insight: 'Média por nota fiscal.' },
+            ],
+            actionableInsights: [],
+            strategicRecommendations: [],
+        };
+    }
 
     // 5. Combine results
     return { ...report, summary, aggregatedMetrics, accountingEntries, spedFile };

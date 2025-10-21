@@ -109,3 +109,7 @@ O projeto adere a um rigoroso padrão de qualidade, imposto por automação no p
 ├── index.html             # Arquivo HTML principal
 └── README.md              # Este arquivo
 ```
+
+## Backend FastAPI
+
+O backend FastAPI reside no diretório `backend/`. Consulte `docs/architecture/overview.md` para visão geral, `docs/guides/agent_development.md` para orientar o desenvolvimento de agentes e `docs/api/reference.md` para detalhes das rotas REST.
