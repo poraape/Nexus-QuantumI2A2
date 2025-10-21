@@ -31,6 +31,29 @@ const nlpExtractionSchema = {
   },
 };
 
+const regexFallback = (text: string) => {
+  const lines = text.split(/\r?\n/);
+  const out: any[] = [];
+  let total = 0;
+  for (const ln of lines) {
+    const m = ln.match(/(\d{2,8})\s+(.*?)(\d+[.,]\d{2})\s*$/);
+    if (m) {
+      const ncm = m[1];
+      const nome = m[2].trim();
+      const v = parseFloat(m[3].replace(/\./g, '').replace(',', '.'));
+      total += isNaN(v) ? 0 : v;
+      out.push({ produto_ncm: ncm, produto_nome: nome, produto_valor_total: v });
+    }
+  }
+  if (!out.length) {
+    const t = text.match(/total\s*[:=]?\s*(\d+[.,]\d{2})/i);
+    if (t) {
+      out.push({ produto_nome: 'TOTAL', produto_valor_total: parseFloat(t[1].replace(/\./g, '').replace(',', '.')) });
+    }
+  }
+  return out;
+};
+
 /**
  * Tenta extrair dados fiscais estruturados de um bloco de texto usando a IA do Gemini.
  * @param text O texto bruto extraído de um PDF ou imagem.
@@ -42,7 +65,6 @@ export const extractDataFromText = async (text: string): Promise<Record<string, 
         return [];
     }
 
-    // Trunca o texto para evitar exceder os limites de token, mantendo as partes mais relevantes.
     const truncatedText = text.length > 15000 ? text.substring(0, 15000) : text;
 
     const prompt = `
@@ -60,31 +82,15 @@ export const extractDataFromText = async (text: string): Promise<Record<string, 
     `;
 
     try {
-        const extracted = await generateJSON<{ items?: any[] } & Record<string, any>>(
-            'gemini-2.5-flash',
-            prompt,
-            nlpExtractionSchema
-        );
-        
-        if (!extracted.items || extracted.items.length === 0) {
-            logger.log('nlpAgent', 'WARN', 'IA não extraiu itens do texto.');
-            return [];
+        const out = await generateJSON('gemini-2.5-flash', prompt, nlpExtractionSchema) as any;
+        let items = Array.isArray(out?.items) ? out.items : [];
+        if (!items.length) {
+            logger.log('nlpAgent', 'WARN', 'LLM vazio, usando regexFallback');
+            items = regexFallback(truncatedText);
         }
-
-        // Achata a estrutura para corresponder ao formato esperado pelo resto do pipeline.
-        const { items, ...headerData } = extracted;
-        const result = items.map(item => ({
-            ...headerData,
-            ...item
-        }));
-
-        logger.log('nlpAgent', 'INFO', `IA extraiu ${result.length} item(ns) do texto.`);
-        return result;
-
+        return items;
     } catch (e) {
-        // A log e o erro já são tratados dentro de `generateJSON`.
-        // Apenas logamos o contexto específico do NLP Agent.
-        logger.log('nlpAgent', 'ERROR', 'Falha na extração de dados com IA.', { error: e });
-        return []; // Retorna vazio em caso de falha para não quebrar o pipeline.
+        logger.log('nlpAgent', 'ERROR', 'Falha IA; usando regexFallback', { error: e });
+        return regexFallback(truncatedText);
     }
 };

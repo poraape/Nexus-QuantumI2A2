@@ -61,7 +61,7 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
     const infNFe = getInfNFe(nfeData);
     if (!infNFe) return [];
 
-    const items = infNFe.det; // Guaranteed to be an array by the parser config if the tag exists
+    const items = Array.isArray(infNFe?.det) ? infNFe.det : (infNFe?.det ? [infNFe.det] : []);
     if (!items || items.length === 0) {
         return [];
     }
@@ -93,7 +93,8 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
     };
 
 
-    return items.map((item: any) => {
+    let recomputedTotal = 0;
+    const normalized = items.map((item: any) => {
         const icmsInfo = findTaxInfo(item.imposto, 'ICMS');
         const pisInfo = findTaxInfo(item.imposto, 'PIS');
         const cofinsInfo = findTaxInfo(item.imposto, 'COFINS');
@@ -104,6 +105,9 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
         if (!item.prod?.CFOP) {
             logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} не possui CFOP.`);
         }
+
+        const valorTotal = parseSafeFloat(item.prod?.vProd);
+        recomputedTotal += valorTotal || 0;
 
         return {
             nfe_id: nfeId,
@@ -126,15 +130,20 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
             produto_valor_cofins: parseSafeFloat(cofinsInfo.value),
             produto_qtd: parseSafeFloat(item.prod?.qCom),
             produto_valor_unit: parseSafeFloat(item.prod?.vUnCom),
-            produto_valor_total: parseSafeFloat(item.prod?.vProd),
+            produto_valor_total: valorTotal,
         }
     });
+    if (normalized.length && (!total.vNF || parseSafeFloat(total.vNF) === 0)) {
+        normalized[0].valor_total_nfe = recomputedTotal;
+    }
+    return normalized;
 };
 
 
 // --- Individual File Handlers ---
 
 const handleXML = async (file: File): Promise<ImportedDoc> => {
+    /* Guard size */
     try {
         const { XMLParser } = await import('fast-xml-parser');
         const text = await file.text();

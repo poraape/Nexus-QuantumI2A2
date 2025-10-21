@@ -1,0 +1,49 @@
+name: Runtime Performance Benchmark
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 */12 * * *"
+
+jobs:
+  runtime-performance-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: pip install -e backend[dev]
+      - name: Run performance evaluator (dry run)
+        run: |
+          python performance_evaluator.py --mode=dry_run --environment=stage --output artifacts/performance/performance-report.json
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-performance-dry-run
+          path: |
+            artifacts/performance/
+            artifacts/logs/
+
+  runtime-performance-remediation:
+    needs: runtime-performance-benchmark
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: pip install -e backend[dev]
+      - name: Run performance evaluator (safe apply)
+        run: |
+          python performance_evaluator.py --mode=safe_apply --environment=stage --output artifacts/performance/performance-report-safe.json
+      - name: Upload remediation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-performance-safe-apply
+          path: |
+            artifacts/performance/
+            artifacts/logs/

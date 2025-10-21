@@ -112,6 +112,14 @@ export const useAgentOrchestrator = () => {
             // 2. Agente Auditor
             updateAgentState('auditor', 'running', { step: `Validando ${importedDocs.length} documentos...` });
             const auditedReport = await runAudit(importedDocs);
+            if (!auditedReport || !auditedReport.documents?.length) {
+                setPipelineError(true);
+                const errMessage = 'Auditoria sem documentos válidos.';
+                setError(errMessage);
+                logger.log('Orchestrator', 'ERROR', 'runAudit vazio');
+                updateAgentState('auditor', 'error');
+                return;
+            }
             updateAgentState('auditor', 'completed');
 
             // 3. Agente Classificador

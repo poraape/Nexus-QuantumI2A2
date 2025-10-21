@@ -109,3 +109,46 @@ O projeto adere a um rigoroso padrão de qualidade, imposto por automação no p
 ├── index.html             # Arquivo HTML principal
 └── README.md              # Este arquivo
 ```
+
+## Backend FastAPI
+
+O backend FastAPI reside no diretório `backend/`. Consulte `docs/architecture/overview.md` para visão geral, `docs/guides/agent_development.md` para orientar o desenvolvimento de agentes e `docs/api/reference.md` para detalhes das rotas REST.
+
+---
+
+## Connectivity Validator
+
+O artefato `docs/nexus_connectivity_validator_manifest.json` descreve o **Nexus Connectivity Validator**, responsável por diagnosticar, validar e sugerir correções para a comunicação fim a fim entre serviços críticos.
+
+### Como executar
+
+```bash
+python validator.py --mode=dry_run --environment=dev
+# modos disponíveis: dry_run (somente diagnóstico) e safe_apply (inclui plano de remediação)
+# use --format=json para saída estruturada e --output ./relatorio.json para salvar o relatório
+```
+
+O comando gera relatórios em `artifacts/reports/` (JSON e Markdown) e encerra com código de saída `1` quando condições bloqueadoras definidas no manifesto forem detectadas.
+
+### Integração CI/CD
+
+Um workflow dedicado (`.github/workflows/connectivity_validator.yml`) executa o modo `dry_run` e publica os artefatos. Em caso de falha, o job `auto_remediate` dispara automaticamente o modo `safe_apply`, anexando o plano de correções e sugerindo pull requests com base no patch plan do manifesto.
+
+---
+
+## Runtime Performance Evaluator
+
+O manifesto `docs/runtime_evaluator_manifest.json` descreve o **Runtime Performance Evaluator**, focado em diagnosticar latência, completude de dados e estratégias de otimização.
+
+### Como executar
+
+```bash
+python performance_evaluator.py --mode=dry_run --environment=stage
+# use --format=json para saída estruturada e --output ./performance-report.json para salvar o resultado
+```
+
+Os relatórios são gerados em `artifacts/performance/` e `artifacts/logs/`. Em modo `safe_apply`, o avaliador inclui sugestões de auto tuning conforme o manifesto.
+
+### Integração CI/CD
+
+O workflow `.github/workflows/performance_validator.yml` executa o modo `dry_run` a cada 12 horas. Em caso de falha, o job dependente reexecuta em `safe_apply`, anexando os relatórios de otimização.

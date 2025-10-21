@@ -1,0 +1,45 @@
+name: Connectivity Validator
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  validate_connectivity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: pip install -e backend[dev]
+      - name: Run connectivity validator (dry-run)
+        run: |
+          python validator.py --mode=dry_run --environment=stage --output artifacts/reports/gha-connectivity-report.json --format console
+      - name: Upload connectivity reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: connectivity-reports-dry-run
+          path: artifacts/reports/
+
+  auto_remediate:
+    needs: validate_connectivity
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: pip install -e backend[dev]
+      - name: Run connectivity validator (safe-apply)
+        run: |
+          python validator.py --mode=safe_apply --environment=stage --output artifacts/reports/gha-connectivity-safe-apply.json --format console
+      - name: Upload remediation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: connectivity-reports-safe-apply
+          path: artifacts/reports/
