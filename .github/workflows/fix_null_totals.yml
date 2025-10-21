@@ -1,0 +1,50 @@
+name: Fix Null Totals
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  detect_and_fix_nulls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        run: pip install -e backend[dev]
+
+      - name: Execute Codex manifest placeholder
+        run: echo "Executing codex --manifest fix_null_totals.json (placeholder)"
+
+      - name: Run pytest validation_phase
+        run: |
+          pytest backend/tests/unit/test_accountant_agent.py::test_recompute_totals
+          pytest backend/tests/integration/test_orchestrator_flow.py::test_null_total_correction
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Run frontend Insights tests
+        run: pnpm run test --filter "Insights"
+
+      - name: Prepare report directory
+        run: mkdir -p artifacts/fix_reports
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: null-total-reports
+          path: artifacts/fix_reports
+          if-no-files-found: ignore

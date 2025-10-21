@@ -43,6 +43,7 @@ class AuditIssue(BaseModel):
 
 class AuditReport(BaseModel):
     document_id: str
+    document: Optional["Document"] = Field(default=None, description="Documento analisado com totais")
     issues: List[AuditIssue] = Field(default_factory=list)
     passed: bool = Field(default=True)
     audited_at: datetime = Field(default_factory=datetime.utcnow)
@@ -53,6 +54,9 @@ class ClassificationResult(BaseModel):
     type: str
     sector: str
     confidence: float = Field(default=1.0, ge=0, le=1)
+    document: Optional["Document"] = Field(
+        default=None, description="Documento associado para continuidade do pipeline"
+    )
 
 
 class AccountingOutput(BaseModel):
@@ -60,6 +64,12 @@ class AccountingOutput(BaseModel):
     ledger_entries: List[dict[str, Any]] = Field(default_factory=list)
     sped_files: List[str] = Field(default_factory=list)
     generated_at: datetime = Field(default_factory=datetime.utcnow)
+    document: Optional["Document"] = Field(
+        default=None, description="Documento original com totais recalculados"
+    )
+    totals: Optional[DocumentTotals] = Field(
+        default=None, description="Totais agregados apos validacao contabil"
+    )
 
 
 class InsightReference(BaseModel):

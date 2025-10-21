@@ -19,6 +19,7 @@ class ClassifierAgent(Agent):
                 type=doc_type,
                 sector=sector,
                 confidence=confidence,
+                document=report.document,
             )
 
         return self._execute_with_metrics(_execute)
