@@ -5,6 +5,7 @@ import CrossValidationPanel from './CrossValidationPanel';
 import SmartSearch from './SmartSearch';
 import { parseSafeFloat } from '../utils/parsingUtils';
 import WhatIfICMS from './Insights/WhatIfICMS';
+import ExportButton from './ExportButton';
 
 interface DashboardProps {
     report: AuditReport;
@@ -127,6 +128,10 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
 
             <section className="mt-8">
                 <WhatIfICMS report={report} />
+            </section>
+
+            <section className="mt-10 flex justify-center">
+                <ExportButton />
             </section>
             
             <div>

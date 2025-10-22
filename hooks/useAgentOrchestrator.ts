@@ -9,6 +9,7 @@ import type { ChatMessage, ImportedDoc, AuditReport, ClassificationResult } from
 import type { Chat } from '@google/genai';
 import Papa from 'papaparse';
 import { logger } from '../services/logger';
+import { saveAnalysisBundle } from '../services/exportService';
 
 export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'intelligence' | 'accountant';
 export type AgentStatus = 'pending' | 'running' | 'completed' | 'error';
@@ -44,6 +45,7 @@ export const useAgentOrchestrator = () => {
 
     const chatRef = useRef<Chat | null>(null);
     const streamController = useRef<AbortController | null>(null);
+    const lastPersistedSnapshot = useRef<string>('');
     
     // Load corrections from localStorage on initial mount
     useEffect(() => {
@@ -267,6 +269,81 @@ export const useAgentOrchestrator = () => {
         }
 
     }, [classificationCorrections]);
+
+    const sanitizeImportedDoc = useCallback((doc: ImportedDoc): ImportedDoc => {
+        const { raw, ...rest } = doc;
+        return rest as ImportedDoc;
+    }, []);
+
+    const sanitizeAuditReport = useCallback((report: AuditReport): AuditReport => {
+        return {
+            ...report,
+            documents: report.documents.map(document => ({
+                ...document,
+                doc: sanitizeImportedDoc(document.doc),
+            })),
+        };
+    }, [sanitizeImportedDoc]);
+
+    useEffect(() => {
+        if (pipelineStep !== 'COMPLETE' || !auditReport) {
+            return;
+        }
+
+        const sanitizedReport = sanitizeAuditReport(auditReport);
+        const sanitizedHistory = analysisHistory.map(sanitizeAuditReport);
+
+        const filesMetadata = processedFiles.map(file => ({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+        }));
+
+        const bundle = {
+            metadata: {
+                generated_at: new Date().toISOString(),
+                files_processed: filesMetadata,
+                pipeline_step: pipelineStep,
+                pipeline_error: pipelineError,
+            },
+            agent_states: agentStates,
+            executive_analysis: sanitizedReport.summary,
+            audit_report: sanitizedReport,
+            aggregated_metrics: sanitizedReport.aggregatedMetrics,
+            accounting_entries: sanitizedReport.accountingEntries,
+            cross_validation_results: sanitizedReport.crossValidationResults,
+            insights: sanitizedReport.aiDrivenInsights,
+            analysis_history: sanitizedHistory,
+            chat_history: messages,
+            errors: error ? [error] : [],
+        };
+
+        const snapshot = JSON.stringify(bundle);
+        if (snapshot === lastPersistedSnapshot.current) {
+            return;
+        }
+
+        lastPersistedSnapshot.current = snapshot;
+
+        saveAnalysisBundle(bundle).then(bundleId => {
+            if (bundleId) {
+                logger.log('Export', 'INFO', `Bundle persisted com ID ${bundleId}`);
+            } else {
+                logger.log('Export', 'ERROR', 'Falha ao persistir bundle de exportação.');
+            }
+        });
+
+    }, [
+        pipelineStep,
+        auditReport,
+        sanitizeAuditReport,
+        analysisHistory,
+        messages,
+        agentStates,
+        pipelineError,
+        processedFiles,
+        error,
+    ]);
 
     return {
         agentStates,
