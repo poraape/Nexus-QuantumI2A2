@@ -1,5 +1,7 @@
 # Nexus QuantumI2A2: Análise Fiscal com IA
 
+[![Quality Gate](https://github.com/<owner>/Nexus-QuantumI2A2/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/Nexus-QuantumI2A2/actions/workflows/ci.yml)
+
 **Nexus QuantumI2A2** é uma Single Page Application (SPA) de análise fiscal interativa que processa dados de Notas Fiscais Eletrônicas (NFe) e gera insights acionáveis através de um sistema de IA que simula múltiplos agentes especializados.
 
 Esta aplicação demonstra uma arquitetura frontend completa e robusta, onde todo o processamento, desde o parsing de arquivos até a análise por IA, ocorre diretamente no navegador do cliente, combinando análise determinística com o poder de modelos de linguagem generativa (LLMs) para fornecer uma análise fiscal completa e um assistente de chat inteligente.
@@ -18,6 +20,17 @@ Esta aplicação demonstra uma arquitetura frontend completa e robusta, onde tod
 *   **Chat Interativo com IA:** Um assistente de IA, contextualizado com os dados do relatório, permite explorar os resultados e gera visualizações de dados sob demanda.
 *   **Dashboards Dinâmicos:** Painéis interativos com KPIs, gráficos e filtros para uma visão aprofundada dos dados fiscais.
 *   **Apuração Contábil e Geração de SPED/EFD:** Geração automática de lançamentos contábeis e de um arquivo de texto no layout simplificado do SPED Fiscal.
+
+## 🧪 Qualidade & Testes
+
+| Comando | Descrição |
+| --- | --- |
+| `npm test` | Executa a suíte de testes unitários com Jest/Testing Library e gera relatório de cobertura (≥90% para agentes, serviços, orchestrator e dashboard). |
+| `npm run e2e` | Sobe o build de preview do Vite e roda os testes E2E de fumaça com Cypress. |
+| `npm run load` | Executa o teste de carga do k6 (configurável via `K6_BASE_URL`, `K6_VUS`, `K6_DURATION`) e exporta métricas em `reports/k6-summary.json`. |
+| `npm run report:quality` | Consolida cobertura + performance, envia para o backend de auditoria (`AUDIT_BACKEND_URL`) e falha caso algum gate esteja abaixo do mínimo. |
+
+> **Importante:** substitua `<owner>` na badge do topo pelo nome da organização/usuário GitHub que hospeda o repositório para ativar o selo de conformidade.
 *   **Exportação de Relatórios:** Exporte a análise completa ou as conversas do chat para formatos como `PDF`, `DOCX`, `HTML` e `Markdown`.
 
 ---

@@ -2,6 +2,7 @@
 import { Type } from "@google/genai";
 import { logger } from "../services/logger";
 import { generateJSON } from "../services/geminiService";
+import { measureExecution, telemetry } from "../services/telemetry";
 
 const nlpExtractionSchema = {
   type: Type.OBJECT,
@@ -36,13 +37,13 @@ const nlpExtractionSchema = {
  * @param text O texto bruto extraído de um PDF ou imagem.
  * @returns Uma promessa que resolve para um array de objetos de dados extraídos. Retorna array vazio se nada for encontrado.
  */
-export const extractDataFromText = async (text: string): Promise<Record<string, any>[]> => {
+export const extractDataFromText = async (text: string, correlationId?: string): Promise<Record<string, any>[]> => {
+    const cid = correlationId || telemetry.createCorrelationId('agent');
     if (!text || text.trim().length < 20) {
-        logger.log('nlpAgent', 'WARN', 'Texto muito curto para extração com IA, pulando.');
+        logger.log('nlpAgent', 'WARN', 'Texto muito curto para extração com IA, pulando.', undefined, { correlationId: cid, scope: 'agent' });
         return [];
     }
 
-    // Trunca o texto para evitar exceder os limites de token, mantendo as partes mais relevantes.
     const truncatedText = text.length > 15000 ? text.substring(0, 15000) : text;
 
     const prompt = `
@@ -58,16 +59,18 @@ export const extractDataFromText = async (text: string): Promise<Record<string, 
       ${truncatedText}
       ---
     `;
-
     try {
-        const extracted = await generateJSON<{ items?: any[] } & Record<string, any>>(
-            'gemini-2.5-flash',
-            prompt,
-            nlpExtractionSchema
-        );
-        
+        const extracted = await measureExecution('agent', 'NLP.extractData', async () => {
+            return generateJSON<{ items?: any[] } & Record<string, any>>(
+                'gemini-2.5-flash',
+                prompt,
+                nlpExtractionSchema,
+                { correlationId: cid, attributes: { textLength: truncatedText.length } }
+            );
+        }, { correlationId: cid, attributes: { textLength: truncatedText.length } });
+
         if (!extracted.items || extracted.items.length === 0) {
-            logger.log('nlpAgent', 'WARN', 'IA não extraiu itens do texto.');
+            logger.log('nlpAgent', 'WARN', 'IA não extraiu itens do texto.', undefined, { correlationId: cid, scope: 'agent' });
             return [];
         }
 
@@ -78,13 +81,11 @@ export const extractDataFromText = async (text: string): Promise<Record<string, 
             ...item
         }));
 
-        logger.log('nlpAgent', 'INFO', `IA extraiu ${result.length} item(ns) do texto.`);
+        logger.log('nlpAgent', 'INFO', `IA extraiu ${result.length} item(ns) do texto.`, undefined, { correlationId: cid, scope: 'agent' });
         return result;
 
     } catch (e) {
-        // A log e o erro já são tratados dentro de `generateJSON`.
-        // Apenas logamos o contexto específico do NLP Agent.
-        logger.log('nlpAgent', 'ERROR', 'Falha na extração de dados com IA.', { error: e });
+        logger.log('nlpAgent', 'ERROR', 'Falha na extração de dados com IA.', { error: e }, { correlationId: cid, scope: 'agent' });
         return []; // Retorna vazio em caso de falha para não quebrar o pipeline.
     }
 };

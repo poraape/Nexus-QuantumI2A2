@@ -33,7 +33,12 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ onClose }) => {
             const blob = new Blob([content], { type: 'application/json' });
             saveAs(blob, `${filename}.json`);
         } else {
-            content = logs.map(l => `${l.timestamp} [${l.level}] (${l.agent}): ${l.message} ${l.metadata ? JSON.stringify(l.metadata) : ''}`).join('\n');
+            content = logs
+                .map(
+                    (l) =>
+                        `${l.timestamp} [${l.level}] (${l.agent}) [${l.scope}] <${l.correlationId}>: ${l.message} ${l.metadata ? JSON.stringify(l.metadata) : ''}`
+                )
+                .join('\n');
             const blob = new Blob([content], { type: 'text/plain' });
             saveAs(blob, `${filename}.txt`);
         }
@@ -75,11 +80,20 @@ const LogsPanel: React.FC<LogsPanelProps> = ({ onClose }) => {
                 </div>
                 <div className="flex-grow p-4 overflow-y-auto font-mono text-xs">
                     {filteredLogs.map((log, i) => (
-                        <div key={i} className="flex items-start gap-3 mb-2">
-                            <span className="text-gray-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                            <span className={`px-1.5 py-0.5 rounded-md text-xs font-semibold ${levelStyles[log.level]}`}>{log.level}</span>
-                            <span className="text-purple-400">[{log.agent}]</span>
-                            <p className="text-gray-300 flex-1 whitespace-pre-wrap">{log.message}</p>
+                        <div key={i} className="flex flex-col gap-1 mb-3 border-b border-gray-700 pb-2">
+                            <div className="flex items-start gap-3">
+                                <span className="text-gray-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                <span className={`px-1.5 py-0.5 rounded-md text-xs font-semibold ${levelStyles[log.level]}`}>{log.level}</span>
+                                <span className="text-purple-400">[{log.agent}]</span>
+                                <span className="text-gray-400 text-xs">Escopo: {log.scope}</span>
+                                <span className="text-blue-400 text-xs">CID: {log.correlationId}</span>
+                            </div>
+                            <p className="text-gray-300 whitespace-pre-wrap">{log.message}</p>
+                            {log.metadata && (
+                                <pre className="bg-gray-900/50 text-gray-400 p-2 rounded text-[10px] overflow-x-auto">
+                                    {JSON.stringify(log.metadata, null, 2)}
+                                </pre>
+                            )}
                         </div>
                     ))}
                 </div>

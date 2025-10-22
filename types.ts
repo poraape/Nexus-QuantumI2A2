@@ -213,14 +213,38 @@ export interface DeterministicDiscrepancy {
   docA: { name: string; internal_path?: string };
   valueB: string | number;
   docB: { name: string; internal_path?: string };
+  ruleCode: string;
+  justification: string;
+}
+
+export interface DeterministicContextSnapshot {
+  ncm: string;
+  cfop: string;
+  emitenteCnpj?: string;
+  destinatarioCnpj?: string;
+  dataEmissao?: string;
+  produtoNome?: string;
 }
 
 export interface DeterministicCrossValidationResult {
-  comparisonKey: string; // e.g., the product name
+  comparisonKey: string; // Identificador principal utilizado no agrupamento
   attribute: string; // e.g., 'Preço Unitário'
   description: string;
   discrepancies: DeterministicDiscrepancy[];
   severity: 'ALERTA' | 'INFO';
+  ruleCode: string;
+  justification: string;
+  context: DeterministicContextSnapshot;
+}
+
+export type DeterministicArtifactFormat = 'json' | 'csv' | 'md';
+
+export interface DeterministicArtifactDescriptor {
+  executionId: string;
+  format: DeterministicArtifactFormat;
+  filename: string;
+  createdAt: string;
+  size: number;
 }
 
 export interface AuditReport {
@@ -232,4 +256,6 @@ export interface AuditReport {
   aiDrivenInsights?: AIDrivenInsight[];
   crossValidationResults?: CrossValidationResult[];
   deterministicCrossValidation?: DeterministicCrossValidationResult[];
+  deterministicArtifacts?: DeterministicArtifactDescriptor[];
+  executionId?: string;
 }

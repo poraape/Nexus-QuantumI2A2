@@ -64,6 +64,6 @@ export const startChat = (dataSample: string, aggregatedMetrics?: Record<string,
   );
 };
 
-export const sendMessageStream = (chat: Chat, message: string): AsyncGenerator<string> => {
-  return streamChatMessage(chat, message);
+export const sendMessageStream = (chat: Chat, message: string, correlationId?: string): AsyncGenerator<string> => {
+  return streamChatMessage(chat, message, correlationId);
 }
