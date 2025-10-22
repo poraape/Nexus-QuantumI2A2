@@ -1,11 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { importFiles } from '../utils/importPipeline';
-import { runAudit } from '../agents/auditorAgent';
-import { runClassification } from '../agents/classifierAgent';
-import { runIntelligenceAnalysis } from '../agents/intelligenceAgent';
-import { runAccountingAnalysis } from '../agents/accountantAgent';
 import { startChat, sendMessageStream } from '../services/chatService';
-import type { ChatMessage, ImportedDoc, AuditReport, ClassificationResult } from '../types';
+import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
 import type { Chat } from '@google/genai';
 import Papa from 'papaparse';
 import { logger } from '../services/logger';
@@ -52,42 +47,31 @@ export const getDetailedErrorMessage = (error: unknown): string => {
     logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
 
     if (error instanceof Error) {
-        // Network/CORS errors in browsers often manifest as TypeErrors
         if (error.name === 'TypeError' && error.message.toLowerCase().includes('failed to fetch')) {
             return 'Falha de conexão. Verifique sua internet ou possíveis problemas de CORS.';
         }
 
         const message = error.message.toLowerCase();
-        if (message.includes('api key not valid')) {
-            return 'Chave de API inválida. Verifique sua configuração.';
-        }
-        if (message.includes('quota')) {
-            return 'Cota da API excedida. Por favor, tente novamente mais tarde.';
-        }
-        // Check for common HTTP status codes that might be in the message from the SDK
+        if (message.includes('api key not valid')) return 'Chave de API inválida. Verifique sua configuração.';
+        if (message.includes('quota')) return 'Cota da API excedida. Por favor, tente novamente mais tarde.';
         if (message.includes('400')) return 'Requisição inválida para a API. Verifique os dados enviados.';
         if (message.includes('401') || message.includes('permission denied')) return 'Não autorizado. Verifique sua chave de API e permissões.';
         if (message.includes('429')) return 'Muitas requisições. Por favor, aguarde e tente novamente.';
         if (message.includes('500') || message.includes('503')) return 'O serviço de IA está indisponível ou com problemas. Tente novamente mais tarde.';
-        
-        return error.message; // Return the original message if no specific pattern is found
+
+        return error.message;
     }
 
     if (typeof error === 'string') {
         return error;
     }
-    
-    // FIX: Rewrote to be a more robust type guard for object-like errors.
-    // This prevents "property does not exist on type 'unknown'" errors by safely checking properties.
+
     if (typeof error === 'object' && error !== null) {
-        // Check for a 'message' property
         if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
             return (error as { message: string }).message;
         }
-        // Check for a 'status' property, which is common in fetch API errors
         if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
             const status = (error as { status: number }).status;
-            // Provide a generic message based on the status code
             return `Ocorreu um erro de rede ou API com o status: ${status}.`;
         }
     }
@@ -95,15 +79,32 @@ export const getDetailedErrorMessage = (error: unknown): string => {
     return 'Ocorreu um erro desconhecido durante a operação.';
 };
 
+const mapAgentStatesFromBackend = (backendStates: Record<string, BackendAgentState>): AgentStates => {
+    const mapped = cloneInitialAgentStates();
+    (Object.keys(mapped) as AgentName[]).forEach(agent => {
+        const backendState = backendStates[agent];
+        if (!backendState) return;
+        mapped[agent] = {
+            status: backendState.status,
+            progress: {
+                step: backendState.progress?.step ?? mapped[agent].progress.step,
+                current: backendState.progress?.current ?? mapped[agent].progress.current ?? 0,
+                total: backendState.progress?.total ?? mapped[agent].progress.total ?? 0,
+            },
+        };
+    });
+    return mapped;
+};
 
 export const useAgentOrchestrator = () => {
-    const [agentStates, setAgentStates] = useState<AgentStates>(initialAgentStates);
+    const [agentStates, setAgentStates] = useState<AgentStates>(cloneInitialAgentStates());
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [pipelineError, setPipelineError] = useState<boolean>(false);
+    const [pipelineError, setPipelineError] = useState(false);
     const [isPipelineComplete, setIsPipelineComplete] = useState(false);
+    const [isPipelineRunning, setIsPipelineRunning] = useState(false);
     const [classificationCorrections, setClassificationCorrections] = useState<ClassificationCorrections>({});
 
     const chatRef = useRef<Chat | null>(null);
@@ -124,9 +125,9 @@ export const useAgentOrchestrator = () => {
             logger.log('Orchestrator', 'ERROR', 'Falha ao carregar correções do localStorage.', { error: e }, { correlationId: telemetry.createCorrelationId('backend'), scope: 'backend' });
         }
     }, []);
-    
+
     const reset = useCallback(() => {
-        setAgentStates(initialAgentStates);
+        setAgentStates(cloneInitialAgentStates());
         setError(null);
         setPipelineError(false);
         setAuditReport(null);
@@ -161,6 +162,10 @@ export const useAgentOrchestrator = () => {
         };
 
         try {
+            const response = await startAnalysis(files);
+            setAgentStates(mapAgentStatesFromBackend(response.agentStates));
+            setPipelineError(false);
+            setIsPipelineComplete(false);
 
             // 1. Agente OCR / NLP
             updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
@@ -300,15 +305,15 @@ export const useAgentOrchestrator = () => {
                 }
             }
 
-        } catch (err: unknown) {
+        } catch (err) {
             const finalMessage = getDetailedErrorMessage(err);
             setError(finalMessage);
-            setMessages(prev => prev.filter(m => m.id !== aiMessageId)); // Remove placeholder
+            setMessages(prev => prev.filter(m => m.id !== aiMessageId));
         } finally {
             setIsStreaming(false);
             streamController.current = null;
         }
-    }, [chatRef, messages]);
+    }, []);
 
     const handleClassificationChange = useCallback((docName: string, newClassification: ClassificationResult['operationType']) => {
         setAuditReport(prevReport => {
@@ -324,8 +329,7 @@ export const useAgentOrchestrator = () => {
             });
             return { ...prevReport, documents: updatedDocs };
         });
-        
-        // Update and save corrections for future runs
+
         const newCorrections = { ...classificationCorrections, [docName]: newClassification };
         setClassificationCorrections(newCorrections);
         try {
@@ -344,8 +348,8 @@ export const useAgentOrchestrator = () => {
         setAuditReport,
         messages,
         isStreaming,
-        error: error,
-        isPipelineRunning: Object.values(agentStates).some(s => s.status === 'running'),
+        error,
+        isPipelineRunning,
         isPipelineComplete,
         pipelineError,
         runPipeline,
