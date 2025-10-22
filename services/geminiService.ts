@@ -1,20 +1,123 @@
-import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { logger } from "./logger";
 import { telemetry } from "./telemetry";
 import { executeWithResilience } from "./resilience";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const DEFAULT_BROWSER_PROXY_PATH = "/api/llm/proxy";
+const DEFAULT_SERVER_PROXY_URL = "http://localhost:8000/api/llm/proxy";
+
+type ProxyChatStream = AsyncGenerator<{ text?: string }>; 
+
+class ProxyChatSession {
+    readonly sessionId: string;
+    private readonly baseUrl: string;
+
+    constructor(sessionId: string, baseUrl: string) {
+        this.sessionId = sessionId;
+        this.baseUrl = baseUrl;
+    }
+
+    async sendMessageStream(payload: { message: string }): Promise<ProxyChatStream> {
+        return streamFromProxy(`${this.baseUrl}/chat/sessions/${this.sessionId}/stream`, payload.message);
+    }
+}
+
+function resolveProxyBaseUrl(): string {
+    if (typeof window !== "undefined") {
+        const env = (import.meta as any)?.env;
+        const configured = env?.VITE_GEMINI_PROXY_URL ?? DEFAULT_BROWSER_PROXY_PATH;
+        return configured.replace(/\/$/, "");
+    }
+    if (typeof process !== "undefined" && process.env?.GEMINI_PROXY_URL) {
+        return process.env.GEMINI_PROXY_URL.replace(/\/$/, "");
+    }
+    if (typeof process !== "undefined" && process.env?.VITE_BACKEND_URL) {
+        return `${process.env.VITE_BACKEND_URL.replace(/\/$/, "")}${DEFAULT_BROWSER_PROXY_PATH}`;
+    }
+    return DEFAULT_SERVER_PROXY_URL;
+}
+
+const PROXY_BASE_URL = resolveProxyBaseUrl();
+
+async function proxyRequest<T>(path: string, payload: unknown, correlationId?: string): Promise<T> {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    if (correlationId) {
+        headers.set("X-Correlation-Id", correlationId);
+    }
+
+    const response = await fetch(`${PROXY_BASE_URL}${path}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        throw new Error(errorBody || "Falha ao comunicar com o proxy Gemini.");
+    }
+
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (contentType.includes("application/json")) {
+        return response.json() as Promise<T>;
+    }
+
+    const text = await response.text();
+    return JSON.parse(text) as T;
+}
+
+async function streamFromProxy(url: string, message: string): Promise<ProxyChatStream> {
+    const response = await fetch(url, {
+        method: "POST",
+        headers: new Headers({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        throw new Error(errorBody || "Falha ao iniciar o streaming com o proxy Gemini.");
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+        throw new Error("Resposta de streaming inválida do proxy Gemini.");
+    }
+
+    const decoder = new TextDecoder();
+
+    async function* iterator(): ProxyChatStream {
+        let buffer = "";
+        try {
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    if (buffer.trim().length > 0) {
+                        yield { text: buffer };
+                    }
+                    break;
+                }
+                buffer += decoder.decode(value, { stream: true });
+                let newlineIndex = buffer.indexOf("\n");
+                while (newlineIndex !== -1) {
+                    const chunk = buffer.slice(0, newlineIndex);
+                    buffer = buffer.slice(newlineIndex + 1);
+                    if (chunk.length > 0) {
+                        yield { text: chunk };
+                    }
+                    newlineIndex = buffer.indexOf("\n");
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+    }
+
+    return iterator();
+}
 
 // A type for the schema definition to avoid using `any`
-export type ResponseSchema = {
-    type: Type;
-    properties?: Record<string, any>;
-    items?: Record<string, any>;
-    required?: string[];
-    description?: string;
-    enum?: string[];
-    nullable?: boolean;
-}
+export type ResponseSchema = Record<string, any>;
+
+export type Chat = ProxyChatSession;
 
 /**
  * Generates content from the Gemini model with a specified JSON schema for the response.
@@ -33,14 +136,11 @@ export async function generateJSON<T = any>(
     const attributes = { model, ...options?.attributes };
     try {
         const response = await executeWithResilience('llm', 'gemini.generateJSON', async () => {
-            return ai.models.generateContent({
-                model: model,
-                contents: prompt,
-                config: {
-                    responseMimeType: 'application/json',
-                    responseSchema: schema as any, // Cast to any to satisfy the SDK's broader type
-                },
-            });
+            return proxyRequest<{ text: string }>(
+                '/generate-json',
+                { model, prompt, schema },
+                correlationId
+            );
         }, {
             correlationId,
             attributes,
@@ -58,7 +158,7 @@ export async function generateJSON<T = any>(
     } catch (e) {
         logger.log('geminiService', 'ERROR', `Falha na geração de JSON com o modelo ${model}.`, { error: e, ...attributes }, { correlationId, scope: 'llm' });
         console.error("Gemini JSON generation failed:", e);
-        if (e instanceof Error && e.message.includes('json')) {
+        if (e instanceof SyntaxError || (e instanceof Error && e.message.toLowerCase().includes('json'))) {
              throw new Error('A resposta da IA não estava em um formato JSON válido.');
         }
         throw new Error('Ocorreu um erro na comunicação com a IA.');
@@ -72,19 +172,27 @@ export async function generateJSON<T = any>(
  * @param schema The JSON schema for all chat responses.
  * @returns A Chat instance.
  */
-export function createChatSession(
+export async function createChatSession(
     model: string,
     systemInstruction: string,
     schema: ResponseSchema
-): Chat {
-    return ai.chats.create({
-        model,
-        config: {
-            systemInstruction,
-            responseMimeType: 'application/json',
-            responseSchema: schema as any, // Cast to any to satisfy the SDK's broader type
-        },
+): Promise<Chat> {
+    const correlationId = telemetry.createCorrelationId('llm');
+    const payload = { model, systemInstruction, schema };
+    const response = await executeWithResilience('llm', 'gemini.createChatSession', async () => {
+        return proxyRequest<{ sessionId: string }>(
+            '/chat/sessions',
+            payload,
+            correlationId
+        );
+    }, {
+        correlationId,
+        attributes: payload,
+        maxAttempts: 3,
     });
+
+    logger.log('geminiService', 'INFO', 'Sessão de chat criada com sucesso.', { model }, { correlationId, scope: 'llm' });
+    return new ProxyChatSession(response.sessionId, PROXY_BASE_URL);
 }
 
 /**
@@ -106,7 +214,9 @@ export async function* streamChatMessage(chat: Chat, message: string, correlatio
             maxAttempts: 3,
         });
         for await (const chunk of stream) {
-            yield chunk.text;
+            if (chunk?.text) {
+                yield chunk.text;
+            }
         }
         logger.log('geminiService', 'INFO', 'Streaming concluído com sucesso.', { messageLength: message.length }, { correlationId: cid, scope: 'llm' });
     } catch (e) {

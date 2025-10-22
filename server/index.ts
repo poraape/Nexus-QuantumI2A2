@@ -2,13 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import type { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import { GoogleGenAI, type Chat } from '@google/genai';
 import { ErpIntegrator } from '../agents/erpIntegrator';
 import { bootstrapPostgres } from '../services/postgresClient';
 import { integrationStateStore } from '../services/integrationStateStore';
 import { enqueueExportJob, registerExportWorker, registerImportWorker } from '../services/queues';
 import type { IntegrationJobPayload, IntegrationExportJobPayload } from '../types';
 
-const app = express();
+export const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -145,6 +147,100 @@ app.post('/api/integrations/:erp/export', async (req: Request, res: Response) =>
 app.post('/api/integrations/webhook', async (req: Request, res: Response) => {
     await integrator.handleWebhook(req.body);
     res.status(202).json({ status: 'accepted' });
+});
+
+let geminiClient: GoogleGenAI | null = null;
+const chatSessions = new Map<string, Chat>();
+
+const ensureGeminiClient = (): GoogleGenAI => {
+    if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured');
+    }
+    if (!geminiClient) {
+        geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    }
+    return geminiClient;
+};
+
+export const resetGeminiProxy = () => {
+    geminiClient = null;
+    chatSessions.clear();
+};
+
+app.post('/api/llm/proxy/generate-json', async (req: Request, res: Response) => {
+    let client: GoogleGenAI;
+    try {
+        client = ensureGeminiClient();
+    } catch (error) {
+        res.status(500).send((error as Error).message);
+        return;
+    }
+
+    const { model, prompt, schema } = req.body ?? {};
+    try {
+        const response = await client.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: schema,
+            },
+        });
+        res.json({ text: response.text });
+    } catch (error) {
+        res.status(502).send((error as Error).message);
+    }
+});
+
+app.post('/api/llm/proxy/chat/sessions', async (req: Request, res: Response) => {
+    let client: GoogleGenAI;
+    try {
+        client = ensureGeminiClient();
+    } catch (error) {
+        res.status(500).send((error as Error).message);
+        return;
+    }
+
+    const { model, systemInstruction, schema } = req.body ?? {};
+    try {
+        const chat = client.chats.create({
+            model,
+            config: {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema: schema,
+            },
+        });
+        const sessionId = randomUUID();
+        chatSessions.set(sessionId, chat);
+        res.json({ sessionId });
+    } catch (error) {
+        res.status(502).send((error as Error).message);
+    }
+});
+
+app.post('/api/llm/proxy/chat/sessions/:sessionId/stream', async (req: Request, res: Response) => {
+    const chat = chatSessions.get(req.params.sessionId);
+    if (!chat) {
+        res.status(404).send('Chat session not found');
+        return;
+    }
+
+    try {
+        const stream = await chat.sendMessageStream({ message: req.body?.message ?? '' });
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
+        for await (const chunk of stream) {
+            if (chunk?.text) {
+                res.write(`${chunk.text}\n`);
+            }
+        }
+        res.end();
+    } catch (error) {
+        if (!res.headersSent) {
+            res.status(502).send((error as Error).message);
+        }
+    }
 });
 
 export const startServer = async () => {

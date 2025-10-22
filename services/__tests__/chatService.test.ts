@@ -16,12 +16,12 @@ const fakeChat: MockChat = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockCreateChatSession.mockReturnValue(fakeChat);
+  mockCreateChatSession.mockResolvedValue(fakeChat);
 });
 
 describe('chatService', () => {
-  it('starts chat sessions embedding aggregated metrics into the prompt', () => {
-    const chat = startChat('sample-data', { total: 123 });
+  it('starts chat sessions embedding aggregated metrics into the prompt', async () => {
+    const chat = await startChat('sample-data', { total: 123 });
     expect(chat).toBe(fakeChat);
     expect(mockCreateChatSession).toHaveBeenCalledTimes(1);
     const [, instruction] = mockCreateChatSession.mock.calls[0];

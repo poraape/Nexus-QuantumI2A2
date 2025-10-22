@@ -14,6 +14,7 @@
     "report:quality": "node scripts/publishQualityReport.mjs"
   },
   "dependencies": {
+    "@google/genai": "^0.7.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "xlsx": "^0.18.5",
