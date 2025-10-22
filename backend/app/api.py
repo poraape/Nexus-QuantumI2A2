@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from .models import AnalysisJob
 from .orchestrator import PipelineOrchestrator, orchestrator
+from .services.session import SpaSessionManager, get_session_manager
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
@@ -27,6 +28,17 @@ async def create_analysis(
 
     job = orchestrator.create_job(files, webhook_url)
     return _serialize_job(job)
+
+
+@router.post("/session", tags=["auth"])
+async def create_session(
+    session_manager: SpaSessionManager = Depends(get_session_manager),
+) -> dict[str, float | str]:
+    state = session_manager.get_session()
+    return {
+        "accessToken": state.access_token,
+        "expiresAt": int(state.expires_at * 1000),
+    }
 
 
 @router.get("/analysis/{job_id}")
