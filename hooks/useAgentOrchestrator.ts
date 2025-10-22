@@ -35,6 +35,13 @@ export const initialAgentStates: AgentStates = {
 
 const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
 
+const generateExecutionId = (): string => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `exec-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+};
+
 /**
  * Analyzes an error object to provide a more specific, user-friendly message,
  * inspired by the nexus_connectivity_validator manifest.
@@ -102,6 +109,7 @@ export const useAgentOrchestrator = () => {
     const chatRef = useRef<Chat | null>(null);
     const chatCorrelationRef = useRef<string | null>(null);
     const streamController = useRef<AbortController | null>(null);
+    const executionIdRef = useRef<string>('');
     
     // Load corrections from localStorage on initial mount
     useEffect(() => {
@@ -125,7 +133,8 @@ export const useAgentOrchestrator = () => {
         setMessages([]);
         chatRef.current = null;
         setIsPipelineComplete(false);
-    }, []);
+        executionIdRef.current = '';
+    }, [executionIdRef]);
 
     const runPipeline = useCallback(async (files: File[]) => {
         const pipelineCorrelationId = telemetry.createCorrelationId('backend');
@@ -191,8 +200,14 @@ export const useAgentOrchestrator = () => {
 
             // 4. Agente Validador Cruzado (Determinístico)
             updateAgentState('crossValidator', 'running', { step: 'Executando validação cruzada...' });
-            const deterministicCrossValidation = await runDeterministicCrossValidation(classifiedReport);
-            const reportWithCrossValidation = { ...classifiedReport, deterministicCrossValidation };
+            const { findings: deterministicCrossValidation, artifacts: deterministicArtifacts } =
+                await runDeterministicCrossValidation(classifiedReport, executionIdRef.current);
+            const reportWithCrossValidation = {
+                ...classifiedReport,
+                deterministicCrossValidation,
+                deterministicArtifacts,
+                executionId: executionIdRef.current,
+            };
             updateAgentState('crossValidator', 'completed');
 
             // 5. Agente de Inteligência (IA)
@@ -236,7 +251,7 @@ export const useAgentOrchestrator = () => {
         } finally {
             setIsPipelineComplete(true);
         }
-    }, [classificationCorrections]); // Added dependency
+    }, [classificationCorrections, reset, executionIdRef]); // Added dependencies for deterministic IDs
 
     const handleStopStreaming = useCallback(() => {
         if (streamController.current) {
