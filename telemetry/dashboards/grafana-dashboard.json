@@ -1,0 +1,58 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Nexus Observability",
+    "timezone": "browser",
+    "panels": [
+      {
+        "type": "graph",
+        "title": "Latência média por integração",
+        "datasource": "OTLP-Metrics",
+        "targets": [
+          {
+            "expr": "latency_ms{scope=\"llm\"}",
+            "legendFormat": "LLM"
+          },
+          {
+            "expr": "latency_ms{scope=\"ocr\"}",
+            "legendFormat": "OCR"
+          },
+          {
+            "expr": "latency_ms{scope=\"erp\"}",
+            "legendFormat": "ERP"
+          }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "Taxa de erro (última hora)",
+        "datasource": "OTLP-Metrics",
+        "targets": [
+          {
+            "expr": "sum(rate(error_rate[1h])) by (scope)",
+            "legendFormat": "{{scope}}"
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "title": "Retries e Throughput",
+        "datasource": "OTLP-Metrics",
+        "targets": [
+          {
+            "expr": "sum(rate(retries[5m])) by (scope)",
+            "legendFormat": "Retries"
+          },
+          {
+            "expr": "sum(rate(throughput[5m])) by (scope)",
+            "legendFormat": "Throughput"
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": []
+    }
+  },
+  "overwrite": true
+}

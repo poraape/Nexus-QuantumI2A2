@@ -5,6 +5,7 @@ import Papa from 'papaparse';
 import { AiIcon, LoadingSpinnerIcon, SendIcon } from './icons';
 import { logger } from '../services/logger';
 import { generateJSON } from '../services/geminiService';
+import { telemetry } from '../services/telemetry';
 
 const searchResponseSchema = {
     type: Type.OBJECT,
@@ -70,20 +71,22 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
                 - Se aplicável, retorne uma tabela de 'data' como um array de arrays. A primeira linha (primeiro array) DEVE ser os cabeçalhos da tabela. Cada array subsequente é uma linha de dados. Todos os valores devem ser retornados como strings.
             `;
 
+            const correlationId = telemetry.createCorrelationId('llm');
             const searchResult = await generateJSON<SmartSearchResult>(
                 'gemini-2.5-flash',
                 prompt,
-                searchResponseSchema
+                searchResponseSchema,
+                { correlationId, attributes: { queryLength: query.length } }
             );
-            
+
             setResult(searchResult);
-            logger.log('SmartSearch', 'INFO', `Busca inteligente concluída com sucesso.`);
+            logger.log('SmartSearch', 'INFO', `Busca inteligente concluída com sucesso.`, undefined, { correlationId, scope: 'llm' });
 
         } catch (err) {
             console.error('Smart Search failed:', err);
             const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
             setError(`Falha na busca: ${errorMessage}`);
-            logger.log('SmartSearch', 'ERROR', `Falha na busca inteligente.`, { error: err });
+            logger.log('SmartSearch', 'ERROR', `Falha na busca inteligente.`, { error: err }, { correlationId: telemetry.createCorrelationId('llm'), scope: 'llm' });
         } finally {
             setIsLoading(false);
         }
