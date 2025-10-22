@@ -3,6 +3,7 @@ import type { AuditReport, AIDrivenInsight, CrossValidationResult } from '../typ
 import Papa from 'papaparse';
 import { logger } from "../services/logger";
 import { generateJSON } from "../services/geminiService";
+import { measureExecution, telemetry } from "../services/telemetry";
 
 const intelligenceSchema = {
   type: Type.OBJECT,
@@ -73,15 +74,19 @@ const sanitizeForAI = (value: any): any => {
  * @returns A promise resolving to the AI-driven insights and cross-validation results.
  */
 export const runIntelligenceAnalysis = async (
-    report: Omit<AuditReport, 'summary' | 'aiDrivenInsights' | 'crossValidationResults'>
+    report: Omit<AuditReport, 'summary' | 'aiDrivenInsights' | 'crossValidationResults'>,
+    correlationId?: string
 ): Promise<Pick<AuditReport, 'aiDrivenInsights' | 'crossValidationResults'>> => {
-    
+    const cid = correlationId || telemetry.createCorrelationId('agent');
+
     const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data);
     if (validDocs.length < 2) {
-        logger.log('IntelligenceAgent', 'INFO', 'Análise de IA pulada: menos de 2 documentos válidos para comparação.');
+        logger.log('IntelligenceAgent', 'INFO', 'Análise de IA pulada: menos de 2 documentos válidos para comparação.', undefined, { correlationId: cid, scope: 'agent' });
         return { aiDrivenInsights: [], crossValidationResults: [] };
     }
-    
+
+    logger.log('IntelligenceAgent', 'INFO', `Iniciando análise inteligente com ${validDocs.length} documentos válidos.`, undefined, { correlationId: cid, scope: 'agent' });
+
     const allItems = validDocs.flatMap(d => {
         const docName = d.doc.name;
         return d.doc.data!.map(item => ({ ...item, doc_source: docName }));
@@ -128,22 +133,25 @@ export const runIntelligenceAnalysis = async (
         Responda em Português do Brasil. Sua resposta DEVE ser um único objeto JSON que adere ao schema fornecido. Não inclua texto fora do objeto JSON.
     `;
     
-    try {
-        const result = await generateJSON<{
+    return measureExecution('agent', 'Intelligence.runAnalysis', async () => {
+        try {
+            const result = await generateJSON<{
             aiDrivenInsights: AIDrivenInsight[],
             crossValidationResults: CrossValidationResult[]
         }>(
             'gemini-2.5-flash',
             prompt,
-            intelligenceSchema
+            intelligenceSchema,
+            { correlationId: cid, attributes: { documents: validDocs.length } }
         );
-        
-        return result;
 
-    } catch (e) {
-        logger.log('IntelligenceAgent', 'ERROR', 'Falha ao executar análise de inteligência com IA.', { error: e });
-        console.error("AI Intelligence Agent failed:", e);
-        // Return empty results on failure to avoid breaking the pipeline
-        return { aiDrivenInsights: [], crossValidationResults: [] };
-    }
+            logger.log('IntelligenceAgent', 'INFO', 'Análise inteligente concluída.', undefined, { correlationId: cid, scope: 'agent' });
+            return result;
+
+        } catch (e) {
+            logger.log('IntelligenceAgent', 'ERROR', 'Falha ao executar análise de inteligência com IA.', { error: e }, { correlationId: cid, scope: 'agent' });
+            console.error("AI Intelligence Agent failed:", e);
+            return { aiDrivenInsights: [], crossValidationResults: [] };
+        }
+    }, { correlationId: cid, attributes: { documents: validDocs.length } });
 };

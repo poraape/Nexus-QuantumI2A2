@@ -1,5 +1,7 @@
 import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { logger } from "./logger";
+import { telemetry } from "./telemetry";
+import { executeWithResilience } from "./resilience";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -24,27 +26,37 @@ export type ResponseSchema = {
 export async function generateJSON<T = any>(
     model: string,
     prompt: string,
-    schema: ResponseSchema
+    schema: ResponseSchema,
+    options?: { correlationId?: string; attributes?: Record<string, any> }
 ): Promise<T> {
+    const correlationId = options?.correlationId || telemetry.createCorrelationId('llm');
+    const attributes = { model, ...options?.attributes };
     try {
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: prompt,
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: schema as any, // Cast to any to satisfy the SDK's broader type
-            },
+        const response = await executeWithResilience('llm', 'gemini.generateJSON', async () => {
+            return ai.models.generateContent({
+                model: model,
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema as any, // Cast to any to satisfy the SDK's broader type
+                },
+            });
+        }, {
+            correlationId,
+            attributes,
+            maxAttempts: 4,
         });
-        
+
         const text = response.text;
         if (!text) {
              throw new Error("A IA retornou uma resposta vazia.");
         }
-        
+
+        logger.log('geminiService', 'INFO', 'Resposta do modelo recebida com sucesso.', attributes, { correlationId, scope: 'llm' });
         return JSON.parse(text) as T;
 
     } catch (e) {
-        logger.log('geminiService', 'ERROR', `Falha na geração de JSON com o modelo ${model}.`, { error: e });
+        logger.log('geminiService', 'ERROR', `Falha na geração de JSON com o modelo ${model}.`, { error: e, ...attributes }, { correlationId, scope: 'llm' });
         console.error("Gemini JSON generation failed:", e);
         if (e instanceof Error && e.message.includes('json')) {
              throw new Error('A resposta da IA não estava em um formato JSON válido.');
@@ -81,18 +93,24 @@ export function createChatSession(
  * @param message The user's message.
  * @returns An async generator that yields text chunks of the response.
  */
-export async function* streamChatMessage(chat: Chat, message: string): AsyncGenerator<string> {
+export async function* streamChatMessage(chat: Chat, message: string, correlationId?: string): AsyncGenerator<string> {
     if (!chat) {
         throw new Error('Chat not initialized.');
     }
 
+    const cid = correlationId || telemetry.createCorrelationId('llm');
     try {
-        const stream = await chat.sendMessageStream({ message });
+        const stream = await executeWithResilience('llm', 'gemini.streamChat', async () => chat.sendMessageStream({ message }), {
+            correlationId: cid,
+            attributes: { messageLength: message.length },
+            maxAttempts: 3,
+        });
         for await (const chunk of stream) {
             yield chunk.text;
         }
+        logger.log('geminiService', 'INFO', 'Streaming concluído com sucesso.', { messageLength: message.length }, { correlationId: cid, scope: 'llm' });
     } catch (e) {
-        logger.log('geminiService', 'ERROR', 'Falha durante o streaming da resposta do chat.', { error: e });
+        logger.log('geminiService', 'ERROR', 'Falha durante o streaming da resposta do chat.', { error: e }, { correlationId: cid, scope: 'llm' });
         console.error('Error during streaming chat:', e);
         throw new Error('Desculpe, ocorreu um erro ao processar sua solicitação de chat.');
     }

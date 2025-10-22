@@ -1,0 +1,30 @@
+{
+  "attributes": {
+    "title": "Nexus QuantumI2A2 - Observabilidade",
+    "description": "Visão consolidada das integrações LLM, OCR e ERP com métricas chave (latência, taxa de erro, retries e throughput).",
+    "panelsJSON": "[\n  {\"panelIndex\":\"1\",\"type\":\"visualization\",\"panelRefName\":\"panel_0\"},\n  {\"panelIndex\":\"2\",\"type\":\"visualization\",\"panelRefName\":\"panel_1\"},\n  {\"panelIndex\":\"3\",\"type\":\"visualization\",\"panelRefName\":\"panel_2\"}\n]",
+    "references": [
+      {
+        "name": "panel_0",
+        "type": "visualization",
+        "id": "latency-trend"
+      },
+      {
+        "name": "panel_1",
+        "type": "visualization",
+        "id": "error-rate-heatmap"
+      },
+      {
+        "name": "panel_2",
+        "type": "visualization",
+        "id": "retries-throughput"
+      }
+    ],
+    "timeRestore": true,
+    "timeTo": "now",
+    "timeFrom": "now-24h"
+  },
+  "coreMigrationVersion": "8.13.0",
+  "id": "nexus-observability",
+  "type": "dashboard"
+}

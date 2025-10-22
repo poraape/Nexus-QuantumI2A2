@@ -3,6 +3,7 @@ import { runOCRFromImage } from '../agents/ocrExtractor';
 import { extractDataFromText } from '../agents/nlpAgent';
 import { logger } from '../services/logger';
 import { parseSafeFloat } from './parsingUtils';
+import { measureExecution, telemetry } from '../services/telemetry';
 
 import JSZip, { type JSZipObject } from 'jszip';
 import Papa from 'papaparse';
@@ -217,16 +218,16 @@ const handleXLSX = async (file: File): Promise<ImportedDoc> => {
     }
 };
 
-const handleImage = async (file: File): Promise<ImportedDoc> => {
+const handleImage = async (file: File, correlationId: string): Promise<ImportedDoc> => {
     try {
         const buffer = await file.arrayBuffer();
-        const text = await runOCRFromImage(buffer);
+        const text = await runOCRFromImage(buffer, 'por', correlationId);
         if (!text.trim()) {
             return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: 'Nenhum texto detectado na imagem (OCR).', raw: file };
         }
-         const data = await extractDataFromText(text);
+         const data = await extractDataFromText(text, correlationId);
         if (data.length === 0) {
-            logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto da imagem ${file.name}`);
+            logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto da imagem ${file.name}`, undefined, { correlationId, scope: 'agent' });
         }
         return { kind: 'IMAGE', name: file.name, size: file.size, status: 'parsed', text, data, raw: file };
     } catch (error: unknown) {
@@ -235,7 +236,7 @@ const handleImage = async (file: File): Promise<ImportedDoc> => {
     }
 };
 
-const handlePDF = async (file: File): Promise<ImportedDoc> => {
+const handlePDF = async (file: File, correlationId: string): Promise<ImportedDoc> => {
     try {
         const buffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument(buffer).promise;
@@ -249,19 +250,19 @@ const handlePDF = async (file: File): Promise<ImportedDoc> => {
         let doc: ImportedDoc = { kind: 'PDF', name: file.name, size: file.size, status: 'parsed', text: fullText, raw: file };
 
         if (fullText.trim().length > 10) { // Check if text was extracted
-             const data = await extractDataFromText(fullText);
+             const data = await extractDataFromText(fullText, correlationId);
              if (data.length === 0) {
-                logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto do PDF ${file.name}`);
+                logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto do PDF ${file.name}`, undefined, { correlationId, scope: 'agent' });
              }
              doc.data = data;
         } else {
             logger.log('ocrExtractor', 'INFO', `PDF ${file.name} sem texto, tentando OCR.`);
-            const ocrText = await runOCRFromImage(buffer);
+            const ocrText = await runOCRFromImage(buffer, 'por', correlationId);
             if (!ocrText.trim()) {
                 throw new Error("Documento PDF parece estar vazio ou não contém texto legível (falha no OCR).");
             }
             doc.text = ocrText;
-            doc.data = await extractDataFromText(ocrText);
+            doc.data = await extractDataFromText(ocrText, correlationId);
         }
         return doc;
 
@@ -282,28 +283,33 @@ const isSupportedExtension = (name: string): boolean => {
     return supportedExtensions.some(ext => name.toLowerCase().endsWith(ext));
 };
 
-const processSingleFile = async (file: File): Promise<ImportedDoc> => {
-    const sanitizedName = sanitizeFilename(file.name);
-    if(sanitizedName !== file.name) {
-        logger.log('ImportPipeline', 'WARN', `Nome de arquivo sanitizado: de '${file.name}' para '${sanitizedName}'`);
-        file = new File([file], sanitizedName, { type: file.type });
-    }
+const processSingleFile = async (file: File, correlationId: string): Promise<ImportedDoc> => {
+    return measureExecution('ocr', 'import.processSingle', async () => {
+        let workingFile = file;
+        const sanitizedName = sanitizeFilename(workingFile.name);
+        if(sanitizedName !== workingFile.name) {
+            logger.log('ImportPipeline', 'WARN', `Nome de arquivo sanitizado: de '${workingFile.name}' para '${sanitizedName}'`, undefined, { correlationId, scope: 'backend' });
+            workingFile = new File([workingFile], sanitizedName, { type: workingFile.type });
+        }
 
-    const extension = getFileExtension(file.name);
-    switch (extension) {
-        case 'xml': return handleXML(file);
-        case 'csv': return handleCSV(file);
-        case 'xlsx': case 'xls': return handleXLSX(file);
-        case 'pdf': return handlePDF(file);
-        case 'png': case 'jpg': case 'jpeg': return handleImage(file);
-        default: return Promise.resolve(handleUnsupported(file, 'Extensão de arquivo não suportada.'));
-    }
+        const extension = getFileExtension(workingFile.name);
+        switch (extension) {
+            case 'xml': return handleXML(workingFile);
+            case 'csv': return handleCSV(workingFile);
+            case 'xlsx': case 'xls': return handleXLSX(workingFile);
+            case 'pdf': return handlePDF(workingFile, correlationId);
+            case 'png': case 'jpg': case 'jpeg': return handleImage(workingFile, correlationId);
+            default: return Promise.resolve(handleUnsupported(workingFile, 'Extensão de arquivo não suportada.'));
+        }
+    }, { correlationId, attributes: { file: file.name } });
 };
 
 export const importFiles = async (
     files: File[],
-    onProgress: (current: number, total: number) => void
+    onProgress: (current: number, total: number) => void,
+    correlationId?: string
 ): Promise<ImportedDoc[]> => {
+    const cid = correlationId || telemetry.createCorrelationId('backend');
     const allDocsPromises: Promise<ImportedDoc | ImportedDoc[]>[] = [];
     let progressCounter = 0;
 
@@ -316,10 +322,10 @@ export const importFiles = async (
 
             if (extension === 'zip') {
                 try {
-                    logger.log('ImportPipeline', 'INFO', `Descompactando arquivo zip: ${file.name}`);
+                    logger.log('ImportPipeline', 'INFO', `Descompactando arquivo zip: ${file.name}`, undefined, { correlationId: cid, scope: 'backend' });
                     const jszip = new JSZip();
                     const zip = await jszip.loadAsync(file);
-                    
+
                     const allFileEntries = Object.values(zip.files).filter(
                         (zipFile: JSZipObject) => !zipFile.dir && !zipFile.name.startsWith('__MACOSX/') && !zipFile.name.endsWith('.DS_Store')
                     );
@@ -335,19 +341,19 @@ export const importFiles = async (
                             reason = `O ZIP não contém arquivos com formato suportado. Arquivos encontrados: ${foundFiles}${allFileEntries.length > 5 ? '...' : ''}.`;
                         }
                         result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: reason };
-            
+
                     } else {
                         const innerDocs = await Promise.all(supportedFileEntries.map(async (zipEntry: JSZipObject) => {
                             const blob = await zipEntry.async('blob');
                             const innerFile = new File([blob], zipEntry.name, { type: blob.type });
-                            const doc = await processSingleFile(innerFile);
+                            const doc = await processSingleFile(innerFile, cid);
                             doc.meta = { source_zip: file.name, internal_path: zipEntry.name };
                             return doc;
                         }));
                         result = innerDocs;
-                        logger.log('ImportPipeline', 'INFO', `Processados ${innerDocs.length} arquivos de dentro de ${file.name}`);
+                        logger.log('ImportPipeline', 'INFO', `Processados ${innerDocs.length} arquivos de dentro de ${file.name}`, undefined, { correlationId: cid, scope: 'backend' });
                     }
-            
+
                 } catch (e: unknown) {
                     let message: string;
                     if (e instanceof Error) {
@@ -356,20 +362,20 @@ export const importFiles = async (
                         message = String(e);
                     }
                     const errorMsg = `Falha ao descompactar ou processar o arquivo ZIP: ${message}`;
-                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name, error: e});
+                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name, error: e}, { correlationId: cid, scope: 'backend' });
                     result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: errorMsg };
                 }
             } else if (isSupportedExtension(file.name)) {
-                result = await processSingleFile(file);
+                result = await processSingleFile(file, cid);
             } else {
                  result = handleUnsupported(file, 'Extensão de arquivo não suportada.');
             }
 
             const logResult = (doc: ImportedDoc) => {
                 if (doc.status === 'error' || doc.status === 'unsupported') {
-                    logger.log('ImportPipeline', 'ERROR', `Falha ao processar ${doc.name}: ${doc.error}`, { status: doc.status });
+                    logger.log('ImportPipeline', 'ERROR', `Falha ao processar ${doc.name}: ${doc.error}`, { status: doc.status }, { correlationId: cid, scope: 'backend' });
                 } else {
-                     logger.log('ImportPipeline', 'INFO', `Arquivo ${doc.name} processado com sucesso.`);
+                     logger.log('ImportPipeline', 'INFO', `Arquivo ${doc.name} processado com sucesso.`, undefined, { correlationId: cid, scope: 'backend' });
                 }
             };
             Array.isArray(result) ? result.forEach(logResult) : logResult(result);
@@ -382,5 +388,6 @@ export const importFiles = async (
     }
 
     const results = await Promise.all(allDocsPromises);
+    telemetry.recordThroughput('ocr', 'import.pipeline', results.length, { files: files.length });
     return results.flat();
 };
