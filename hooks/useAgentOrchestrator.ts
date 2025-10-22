@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+<<<<<<< HEAD
 import { importFiles } from '../utils/importPipeline';
 import { runAudit } from '../agents/auditorAgent';
 import { runClassification } from '../agents/classifierAgent';
@@ -6,8 +7,14 @@ import { runIntelligenceAnalysis } from '../agents/intelligenceAgent';
 import { runAccountingAnalysis } from '../agents/accountantAgent';
 import { startChat, requestChatMessage, ChatSession } from '../services/chatService';
 import type { ChatMessage, ImportedDoc, AuditReport, ClassificationResult } from '../types';
+=======
+import { startChat, sendMessageStream } from '../services/chatService';
+import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
+import type { Chat } from '@google/genai';
+>>>>>>> main
 import Papa from 'papaparse';
 import { logger } from '../services/logger';
+import { telemetry } from '../services/telemetry';
 import { runDeterministicCrossValidation } from '../utils/fiscalCompare';
 
 export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'crossValidator' | 'intelligence' | 'accountant';
@@ -21,7 +28,12 @@ export type AgentState = { status: AgentStatus; progress: AgentProgress; };
 export type AgentStates = Record<AgentName, AgentState>;
 type ClassificationCorrections = Record<string, ClassificationResult['operationType']>;
 
+<<<<<<< HEAD
 const initialAgentStates: AgentStates = {
+=======
+
+export const initialAgentStates: AgentStates = {
+>>>>>>> main
     ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
     auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
@@ -32,7 +44,24 @@ const initialAgentStates: AgentStates = {
 
 const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
 
+<<<<<<< HEAD
 const getDetailedErrorMessage = (error: unknown): string => {
+=======
+const generateExecutionId = (): string => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `exec-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+};
+
+/**
+ * Analyzes an error object to provide a more specific, user-friendly message,
+ * inspired by the nexus_connectivity_validator manifest.
+ * @param error The error object caught.
+ * @returns A detailed, actionable error message string.
+ */
+export const getDetailedErrorMessage = (error: unknown): string => {
+>>>>>>> main
     logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
 
     if (error instanceof Error) {
@@ -41,12 +70,17 @@ const getDetailedErrorMessage = (error: unknown): string => {
         }
 
         const message = error.message.toLowerCase();
+<<<<<<< HEAD
         if (message.includes('api key not valid')) {
             return 'Chave de API inválida. Verifique sua configuração.';
         }
         if (message.includes('quota')) {
             return 'Cota da API excedida. Por favor, tente novamente mais tarde.';
         }
+=======
+        if (message.includes('api key not valid')) return 'Chave de API inválida. Verifique sua configuração.';
+        if (message.includes('quota')) return 'Cota da API excedida. Por favor, tente novamente mais tarde.';
+>>>>>>> main
         if (message.includes('400')) return 'Requisição inválida para a API. Verifique os dados enviados.';
         if (message.includes('401') || message.includes('permission denied')) return 'Não autorizado. Verifique sua chave de API e permissões.';
         if (message.includes('429')) return 'Muitas requisições. Por favor, aguarde e tente novamente.';
@@ -72,58 +106,114 @@ const getDetailedErrorMessage = (error: unknown): string => {
     return 'Ocorreu um erro desconhecido durante a operação.';
 };
 
+<<<<<<< HEAD
+=======
+const mapAgentStatesFromBackend = (backendStates: Record<string, BackendAgentState>): AgentStates => {
+    const mapped = cloneInitialAgentStates();
+    (Object.keys(mapped) as AgentName[]).forEach(agent => {
+        const backendState = backendStates[agent];
+        if (!backendState) return;
+        mapped[agent] = {
+            status: backendState.status,
+            progress: {
+                step: backendState.progress?.step ?? mapped[agent].progress.step,
+                current: backendState.progress?.current ?? mapped[agent].progress.current ?? 0,
+                total: backendState.progress?.total ?? mapped[agent].progress.total ?? 0,
+            },
+        };
+    });
+    return mapped;
+};
+
+>>>>>>> main
 export const useAgentOrchestrator = () => {
-    const [agentStates, setAgentStates] = useState<AgentStates>(initialAgentStates);
+    const [agentStates, setAgentStates] = useState<AgentStates>(cloneInitialAgentStates());
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [pipelineError, setPipelineError] = useState<boolean>(false);
+    const [pipelineError, setPipelineError] = useState(false);
     const [isPipelineComplete, setIsPipelineComplete] = useState(false);
+    const [isPipelineRunning, setIsPipelineRunning] = useState(false);
     const [classificationCorrections, setClassificationCorrections] = useState<ClassificationCorrections>({});
 
+<<<<<<< HEAD
     const chatRef = useRef<ChatSession | null>(null);
 
+=======
+    const chatRef = useRef<Chat | null>(null);
+    const chatCorrelationRef = useRef<string | null>(null);
+    const streamController = useRef<AbortController | null>(null);
+    const executionIdRef = useRef<string>('');
+    
+    // Load corrections from localStorage on initial mount
+>>>>>>> main
     useEffect(() => {
+        const correlationId = telemetry.createCorrelationId('backend');
         try {
             const storedCorrections = localStorage.getItem(CORRECTIONS_STORAGE_KEY);
             if (storedCorrections) {
                 setClassificationCorrections(JSON.parse(storedCorrections));
-                logger.log('Orchestrator', 'INFO', `Carregadas ${Object.keys(JSON.parse(storedCorrections)).length} correções de classificação do localStorage.`);
+                logger.log('Orchestrator', 'INFO', `Carregadas ${Object.keys(JSON.parse(storedCorrections)).length} correções de classificação do localStorage.`, undefined, { correlationId, scope: 'backend' });
             }
         } catch (e) {
-            logger.log('Orchestrator', 'ERROR', 'Falha ao carregar correções do localStorage.', { error: e });
+            logger.log('Orchestrator', 'ERROR', 'Falha ao carregar correções do localStorage.', { error: e }, { correlationId: telemetry.createCorrelationId('backend'), scope: 'backend' });
         }
     }, []);
 
     const reset = useCallback(() => {
-        setAgentStates(initialAgentStates);
+        setAgentStates(cloneInitialAgentStates());
         setError(null);
         setPipelineError(false);
         setAuditReport(null);
         setMessages([]);
         chatRef.current = null;
         setIsPipelineComplete(false);
-    }, []);
+        executionIdRef.current = '';
+    }, [executionIdRef]);
 
     const runPipeline = useCallback(async (files: File[]) => {
+<<<<<<< HEAD
         logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.');
+=======
+        const pipelineCorrelationId = telemetry.createCorrelationId('backend');
+        const agentCorrelations: Record<AgentName, string> = {
+            ocr: telemetry.createCorrelationId('ocr', pipelineCorrelationId),
+            auditor: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            classifier: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            crossValidator: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            intelligence: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            accountant: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+        };
+        logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.', undefined, { correlationId: pipelineCorrelationId, scope: 'backend' });
+        // Don't clear logs on incremental runs, just reset pipeline state
+>>>>>>> main
         reset();
 
         const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
             setAgentStates(prev => {
                 const newState = { ...prev, [agent]: { status, progress: { ...prev[agent].progress, ...progress } } };
-                if(status === 'running') logger.log(agent, 'INFO', `Iniciando - ${progress?.step || ''}`);
-                if(status === 'completed') logger.log(agent, 'INFO', `Concluído.`);
+                const correlationId = agentCorrelations[agent];
+                if(status === 'running') logger.log(agent, 'INFO', `Iniciando - ${progress?.step || ''}`, undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
+                if(status === 'completed') logger.log(agent, 'INFO', `Concluído.`, undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
                 return newState;
             });
         };
+<<<<<<< HEAD
+=======
+
+        try {
+            const response = await startAnalysis(files);
+            setAgentStates(mapAgentStatesFromBackend(response.agentStates));
+            setPipelineError(false);
+            setIsPipelineComplete(false);
+>>>>>>> main
 
         try {
             updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
             const importedDocs = await importFiles(files, (current, total) => {
                 updateAgentState('ocr', 'running', { step: 'Processando arquivos...', current, total });
-            });
+            }, agentCorrelations.ocr);
             updateAgentState('ocr', 'completed');
 
             const isSingleZip = files.length === 1 && (files[0].name.toLowerCase().endsWith('.zip') || files[0].type.includes('zip'));
@@ -142,25 +232,35 @@ export const useAgentOrchestrator = () => {
                 throw new Error(errorMessage);
             }
 
+<<<<<<< HEAD
+=======
+            // 2. Agente Auditor
+>>>>>>> main
             updateAgentState('auditor', 'running', { step: `Validando ${importedDocs.length} documentos...` });
-            const auditedReport = await runAudit(importedDocs);
+            const auditedReport = await runAudit(importedDocs, agentCorrelations.auditor);
             updateAgentState('auditor', 'completed');
 
             updateAgentState('classifier', 'running', { step: 'Classificando operações...' });
-            const classifiedReport = await runClassification(auditedReport, classificationCorrections);
+            const classifiedReport = await runClassification(auditedReport, classificationCorrections, agentCorrelations.classifier);
             updateAgentState('classifier', 'completed');
 
             updateAgentState('crossValidator', 'running', { step: 'Executando validação cruzada...' });
-            const deterministicCrossValidation = await runDeterministicCrossValidation(classifiedReport);
-            const reportWithCrossValidation = { ...classifiedReport, deterministicCrossValidation };
+            const { findings: deterministicCrossValidation, artifacts: deterministicArtifacts } =
+                await runDeterministicCrossValidation(classifiedReport, executionIdRef.current);
+            const reportWithCrossValidation = {
+                ...classifiedReport,
+                deterministicCrossValidation,
+                deterministicArtifacts,
+                executionId: executionIdRef.current,
+            };
             updateAgentState('crossValidator', 'completed');
 
             updateAgentState('intelligence', 'running', { step: 'Analisando padrões com IA...' });
-            const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation);
+            const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation, agentCorrelations.intelligence);
             updateAgentState('intelligence', 'completed');
 
             updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
-            const finalReport = await runAccountingAnalysis({ ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults });
+            const finalReport = await runAccountingAnalysis({ ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults }, agentCorrelations.accountant);
             setAuditReport(finalReport);
             updateAgentState('accountant', 'completed');
 
@@ -169,8 +269,15 @@ export const useAgentOrchestrator = () => {
                 .flatMap(d => d.doc.data!);
             const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
+<<<<<<< HEAD
             logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.');
             chatRef.current = await startChat(dataSampleForAI, finalReport.aggregatedMetrics);
+=======
+            // 7. Preparar para Chat
+            chatCorrelationRef.current = telemetry.createCorrelationId('llm', pipelineCorrelationId);
+            logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.', undefined, { correlationId: chatCorrelationRef.current, scope: 'llm' });
+            chatRef.current = startChat(dataSampleForAI, finalReport.aggregatedMetrics);
+>>>>>>> main
             setMessages([
                 {
                     id: 'initial-ai-message',
@@ -181,6 +288,7 @@ export const useAgentOrchestrator = () => {
 
         } catch (err: unknown) {
             console.error('Pipeline failed:', err);
+            logger.log('Orchestrator', 'ERROR', 'Falha na execução do pipeline.', { error: err }, { correlationId: pipelineCorrelationId, scope: 'backend' });
             const errorMessage = getDetailedErrorMessage(err);
             setError(errorMessage);
             setPipelineError(true);
@@ -191,8 +299,22 @@ export const useAgentOrchestrator = () => {
         } finally {
             setIsPipelineComplete(true);
         }
+<<<<<<< HEAD
     }, [classificationCorrections, agentStates]);
 
+=======
+    }, [classificationCorrections, reset, executionIdRef]); // Added dependencies for deterministic IDs
+
+    const handleStopStreaming = useCallback(() => {
+        if (streamController.current) {
+            streamController.current.abort();
+            setIsStreaming(false);
+            const correlationId = chatCorrelationRef.current || telemetry.createCorrelationId('llm');
+            logger.log('ChatService', 'WARN', 'Geração de resposta do chat interrompida pelo usuário.', undefined, { correlationId, scope: 'llm' });
+        }
+    }, []);
+
+>>>>>>> main
     const handleSendMessage = useCallback(async (message: string) => {
         if (!chatRef.current) {
             setError('O chat não foi inicializado. Por favor, execute uma análise primeiro.');
@@ -207,9 +329,33 @@ export const useAgentOrchestrator = () => {
         setMessages(prev => [...prev, { id: aiMessageId, sender: 'ai', text: '...' }]);
 
         try {
+<<<<<<< HEAD
             const response = await requestChatMessage(chatRef.current, message);
             setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, ...response, text: response.text ?? JSON.stringify(response) } : m));
         } catch (err: unknown) {
+=======
+            const messageCorrelationId = telemetry.createCorrelationId('llm', chatCorrelationRef.current || undefined);
+            const stream = sendMessageStream(chatRef.current, message, messageCorrelationId);
+            for await (const chunk of stream) {
+                if (signal.aborted) break;
+                fullAiResponse += chunk;
+                setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, text: fullAiResponse } : m));
+            }
+
+            if (!signal.aborted) {
+                try {
+                    const finalJson = JSON.parse(fullAiResponse);
+                    setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, ...finalJson } : m));
+                } catch(parseError) {
+                     logger.log('ChatService', 'ERROR', 'Falha ao analisar a resposta JSON final da IA.', { error: parseError, response: fullAiResponse }, { correlationId: messageCorrelationId, scope: 'llm' });
+                     const errorMessage = 'A IA retornou uma resposta em formato inválido. Por favor, tente novamente.';
+                     setError(errorMessage);
+                     setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, text: errorMessage } : m));
+                }
+            }
+
+        } catch (err) {
+>>>>>>> main
             const finalMessage = getDetailedErrorMessage(err);
             setError(finalMessage);
             setMessages(prev => prev.filter(m => m.id !== aiMessageId));
@@ -237,9 +383,9 @@ export const useAgentOrchestrator = () => {
         setClassificationCorrections(newCorrections);
         try {
             localStorage.setItem(CORRECTIONS_STORAGE_KEY, JSON.stringify(newCorrections));
-            logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`);
+            logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`, undefined, { correlationId: telemetry.createCorrelationId('backend'), scope: 'backend' });
         } catch(e) {
-            logger.log('Orchestrator', 'ERROR', `Falha ao salvar correção no localStorage.`, { error: e });
+            logger.log('Orchestrator', 'ERROR', `Falha ao salvar correção no localStorage.`, { error: e }, { correlationId: telemetry.createCorrelationId('backend'), scope: 'backend' });
             setError('Não foi possível salvar a correção de classificação. Ela será perdida ao recarregar a página.');
         }
 
@@ -251,8 +397,8 @@ export const useAgentOrchestrator = () => {
         setAuditReport,
         messages,
         isStreaming,
-        error: error,
-        isPipelineRunning: Object.values(agentStates).some(s => s.status === 'running'),
+        error,
+        isPipelineRunning,
         isPipelineComplete,
         pipelineError,
         runPipeline,

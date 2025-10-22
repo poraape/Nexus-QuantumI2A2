@@ -1,16 +1,49 @@
 # Nexus QuantumI2A2: Análise Fiscal com IA
 
+<<<<<<< HEAD
 **Nexus QuantumI2A2** é uma solução completa para análise fiscal assistida por IA. O projeto agora é composto por uma SPA em React/TypeScript e por um backend em FastAPI que centraliza autenticação, chamadas a LLM/OCR e o armazenamento seguro de segredos e trilhas de auditoria.
+=======
+[![Quality Gate](https://github.com/<owner>/Nexus-QuantumI2A2/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/Nexus-QuantumI2A2/actions/workflows/ci.yml)
+
+**Nexus QuantumI2A2** é uma Single Page Application (SPA) de análise fiscal interativa que processa dados de Notas Fiscais Eletrônicas (NFe) e gera insights acionáveis através de um sistema de IA que simula múltiplos agentes especializados.
+
+Esta aplicação demonstra uma arquitetura frontend completa e robusta, onde todo o processamento, desde o parsing de arquivos até a análise por IA, ocorre diretamente no navegador do cliente, combinando análise determinística com o poder de modelos de linguagem generativa (LLMs) para fornecer uma análise fiscal completa e um assistente de chat inteligente.
+>>>>>>> main
 
 ---
 
 ## ✨ Funcionalidades Principais
 
+<<<<<<< HEAD
 * **Pipeline multiagente:** processamento determinístico e heurístico de documentos fiscais com agentes de OCR/NLP, auditoria, classificação, inteligência e contabilidade.
 * **Upload flexível:** suporte a `XML`, `CSV`, `XLSX`, `PDF`, imagens (`PNG`, `JPG`) e `.ZIP` contendo múltiplos arquivos.
 * **Assistente inteligente:** chat contextualizado com os dados auditados, geração de insights e gráficos sob demanda e busca em linguagem natural.
 * **Persistência segura:** chaves e dados sensíveis protegidos com AES-256 (KMS interno) e registros append-only em `audit_log.jsonl` assinados digitalmente e enviados para bucket S3/MinIO.
 * **Sanitização centralizada:** CPF/CNPJ mascarados exclusivamente no backend antes de qualquer dado ser entregue ao frontend.
+=======
+*   **Pipeline Multiagente Client-Side:** Uma cadeia de agentes especializados (Importação/OCR, Auditor, Classificador, Agente de Inteligência, Contador) processa os arquivos em etapas diretamente no navegador.
+*   **Upload Flexível de Arquivos:** Suporte para múltiplos formatos, incluindo `XML`, `CSV`, `XLSX`, `PDF`, imagens (`PNG`, `JPG`) e arquivos `.ZIP` contendo múltiplos documentos.
+*   **Análise Fiscal Aprofundada por IA:** Geração de um relatório detalhado com:
+    *   **Resumo Executivo e Recomendações Estratégicas** gerados por IA.
+    *   **Detecção de Anomalias por IA** que vai além de regras fixas.
+    *   **Validação Cruzada (Cross-Validation)** entre documentos para encontrar discrepâncias sutis.
+*   **Busca Inteligente (Smart Search):** Interaja com seus dados através de perguntas em linguagem natural diretamente no dashboard.
+*   **Chat Interativo com IA:** Um assistente de IA, contextualizado com os dados do relatório, permite explorar os resultados e gera visualizações de dados sob demanda.
+*   **Dashboards Dinâmicos:** Painéis interativos com KPIs, gráficos e filtros para uma visão aprofundada dos dados fiscais.
+*   **Apuração Contábil e Geração de SPED/EFD:** Geração automática de lançamentos contábeis e de um arquivo de texto no layout simplificado do SPED Fiscal.
+
+## 🧪 Qualidade & Testes
+
+| Comando | Descrição |
+| --- | --- |
+| `npm test` | Executa a suíte de testes unitários com Jest/Testing Library e gera relatório de cobertura (≥90% para agentes, serviços, orchestrator e dashboard). |
+| `npm run e2e` | Sobe o build de preview do Vite e roda os testes E2E de fumaça com Cypress. |
+| `npm run load` | Executa o teste de carga do k6 (configurável via `K6_BASE_URL`, `K6_VUS`, `K6_DURATION`) e exporta métricas em `reports/k6-summary.json`. |
+| `npm run report:quality` | Consolida cobertura + performance, envia para o backend de auditoria (`AUDIT_BACKEND_URL`) e falha caso algum gate esteja abaixo do mínimo. |
+
+> **Importante:** substitua `<owner>` na badge do topo pelo nome da organização/usuário GitHub que hospeda o repositório para ativar o selo de conformidade.
+*   **Exportação de Relatórios:** Exporte a análise completa ou as conversas do chat para formatos como `PDF`, `DOCX`, `HTML` e `Markdown`.
+>>>>>>> main
 
 ---
 

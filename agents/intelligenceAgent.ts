@@ -1,7 +1,12 @@
 import type { AuditReport, AIDrivenInsight, CrossValidationResult } from '../types';
 import Papa from 'papaparse';
 import { logger } from "../services/logger";
+<<<<<<< HEAD
 import { generateJSON, ResponseSchema } from "../services/llmService";
+=======
+import { generateJSON } from "../services/geminiService";
+import { measureExecution, telemetry } from "../services/telemetry";
+>>>>>>> main
 
 const intelligenceSchema: ResponseSchema = {
   type: 'object',
@@ -55,15 +60,25 @@ const sanitizeForAI = (value: any): any => {
 };
 
 export const runIntelligenceAnalysis = async (
-    report: Omit<AuditReport, 'summary' | 'aiDrivenInsights' | 'crossValidationResults'>
+    report: Omit<AuditReport, 'summary' | 'aiDrivenInsights' | 'crossValidationResults'>,
+    correlationId?: string
 ): Promise<Pick<AuditReport, 'aiDrivenInsights' | 'crossValidationResults'>> => {
+<<<<<<< HEAD
+=======
+    const cid = correlationId || telemetry.createCorrelationId('agent');
+>>>>>>> main
 
     const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data);
     if (validDocs.length < 2) {
-        logger.log('IntelligenceAgent', 'INFO', 'Análise de IA pulada: menos de 2 documentos válidos para comparação.');
+        logger.log('IntelligenceAgent', 'INFO', 'Análise de IA pulada: menos de 2 documentos válidos para comparação.', undefined, { correlationId: cid, scope: 'agent' });
         return { aiDrivenInsights: [], crossValidationResults: [] };
     }
 
+<<<<<<< HEAD
+=======
+    logger.log('IntelligenceAgent', 'INFO', `Iniciando análise inteligente com ${validDocs.length} documentos válidos.`, undefined, { correlationId: cid, scope: 'agent' });
+
+>>>>>>> main
     const allItems = validDocs.flatMap(d => {
         const docName = d.doc.name;
         return d.doc.data!.map(item => ({ ...item, doc_source: docName }));
@@ -104,15 +119,23 @@ export const runIntelligenceAnalysis = async (
 
         Responda em Português do Brasil. Sua resposta DEVE ser um único objeto JSON que adere ao schema fornecido. Não inclua texto fora do objeto JSON.
     `;
+<<<<<<< HEAD
 
     try {
         const result = await generateJSON<{
+=======
+    
+    return measureExecution('agent', 'Intelligence.runAnalysis', async () => {
+        try {
+            const result = await generateJSON<{
+>>>>>>> main
             aiDrivenInsights: AIDrivenInsight[],
             crossValidationResults: CrossValidationResult[]
         }>(
             'gemini-2.0-flash',
             prompt,
             intelligenceSchema,
+<<<<<<< HEAD
             'intelligence-analysis'
         );
 
@@ -124,3 +147,18 @@ export const runIntelligenceAnalysis = async (
         return { aiDrivenInsights: [], crossValidationResults: [] };
     }
 };
+=======
+            { correlationId: cid, attributes: { documents: validDocs.length } }
+        );
+
+            logger.log('IntelligenceAgent', 'INFO', 'Análise inteligente concluída.', undefined, { correlationId: cid, scope: 'agent' });
+            return result;
+
+        } catch (e) {
+            logger.log('IntelligenceAgent', 'ERROR', 'Falha ao executar análise de inteligência com IA.', { error: e }, { correlationId: cid, scope: 'agent' });
+            console.error("AI Intelligence Agent failed:", e);
+            return { aiDrivenInsights: [], crossValidationResults: [] };
+        }
+    }, { correlationId: cid, attributes: { documents: validDocs.length } });
+};
+>>>>>>> main

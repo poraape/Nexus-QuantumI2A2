@@ -44,6 +44,7 @@ export async function startChat(
         Métricas agregadas disponíveis:\n${JSON.stringify(aggregatedMetrics ?? {}, null, 2)}\n
         Amostra de dados (CSV):\n${dataSample}\n
     `;
+<<<<<<< HEAD
   return createChatSession('gemini-2.0-flash', systemInstruction, chatResponseSchema);
 }
 
@@ -52,4 +53,16 @@ export async function requestChatMessage(
   message: string,
 ): Promise<Record<string, any>> {
   return sendChatMessage(session, message);
+=======
+
+  return createChatSession(
+    'gemini-2.5-flash',
+    systemInstruction,
+    chatResponseSchema
+  );
+};
+
+export const sendMessageStream = (chat: Chat, message: string, correlationId?: string): AsyncGenerator<string> => {
+  return streamChatMessage(chat, message, correlationId);
+>>>>>>> main
 }

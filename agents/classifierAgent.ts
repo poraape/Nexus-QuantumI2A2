@@ -1,4 +1,6 @@
 import type { AuditReport, AuditedDocument, ClassificationResult } from '../types';
+import { measureExecution, telemetry } from '../services/telemetry';
+import { logger } from '../services/logger';
 
 // Simplified mapping of NCM prefixes to business sectors
 const NCM_SECTOR_MAP: Record<string, string> = {
@@ -31,11 +33,14 @@ type ClassificationCorrections = Record<string, ClassificationResult['operationT
  */
 export const runClassification = async (
     report: Omit<AuditReport, 'summary'>,
-    corrections: ClassificationCorrections
+    corrections: ClassificationCorrections,
+    correlationId?: string
 ): Promise<Omit<AuditReport, 'summary'>> => {
-  console.log(`Classifier Agent: Classifying ${report.documents.length} documents.`);
+  const cid = correlationId || telemetry.createCorrelationId('agent');
+  logger.log('Classifier', 'INFO', `Classificando ${report.documents.length} documentos.`, undefined, { correlationId: cid, scope: 'agent' });
 
-  const classifiedDocuments = report.documents.map((auditedDoc): AuditedDocument => {
+  return measureExecution('agent', 'Classifier.runClassification', async () => {
+    const classifiedDocuments = report.documents.map((auditedDoc): AuditedDocument => {
     if (auditedDoc.status === 'ERRO' || !auditedDoc.doc.data) {
       return auditedDoc; // Skip classification for documents with errors or no data
     }
@@ -123,11 +128,14 @@ export const runClassification = async (
     return { ...auditedDoc, classification };
   });
 
-  // Simulate computation time
-  await new Promise(resolve => setTimeout(resolve, 300));
+    // Simulate computation time
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-  return {
-    ...report,
-    documents: classifiedDocuments,
-  };
+    logger.log('Classifier', 'INFO', 'Classificação concluída.', { documents: report.documents.length }, { correlationId: cid, scope: 'agent' });
+
+    return {
+      ...report,
+      documents: classifiedDocuments,
+    };
+  }, { correlationId: cid, attributes: { documents: report.documents.length } });
 };
