@@ -5,6 +5,7 @@ import CrossValidationPanel from './CrossValidationPanel';
 import SmartSearch from './SmartSearch';
 import { parseSafeFloat } from '../utils/parsingUtils';
 import AnalysisDisplay from './AnalysisDisplay';
+import DeterministicReportDownloads from './DeterministicReportDownloads';
 
 interface DashboardProps {
     report: AuditReport;
@@ -195,6 +196,9 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
                     Comparações baseadas em regras para encontrar discrepâncias objetivas entre os documentos, como variações de preço ou NCMs inconsistentes para o mesmo produto.
                 </p>
                 <AnalysisDisplay results={report.deterministicCrossValidation} />
+                <div className="mt-4">
+                    <DeterministicReportDownloads artifacts={report.deterministicArtifacts} />
+                </div>
             </div>
 
             <div>
