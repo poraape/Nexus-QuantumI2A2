@@ -97,6 +97,92 @@ export interface SpedFile {
     content: string;
 }
 
+export type IntegrationChannel = 'TINY' | 'BLING' | 'CONTA_AZUL';
+
+export interface IntegrationStatus {
+    erp: IntegrationChannel;
+    state: 'idle' | 'running' | 'error';
+    lastRunAt?: string;
+    lastSuccessAt?: string;
+    lastError?: string;
+    pendingJobs: number;
+    lastPayload?: Record<string, unknown>;
+    updatedAt?: string;
+}
+
+export interface IntegrationHistoryEntry {
+    id: string;
+    erp: IntegrationChannel;
+    action: 'import' | 'export';
+    status: 'queued' | 'running' | 'success' | 'error';
+    message?: string | null;
+    payload?: Record<string, unknown> | null;
+    pendingJobs?: number;
+    timestamp: string;
+}
+
+export interface IntegrationJobPayload {
+    erp: IntegrationChannel;
+    companyId: string;
+    since?: string;
+    metadata?: Record<string, unknown>;
+    requestedBy?: string;
+}
+
+export interface IntegrationExportJobPayload extends IntegrationJobPayload {
+    documents: Record<string, unknown>[];
+}
+
+export interface IntegrationWebhookPayload {
+    erp: IntegrationChannel;
+    companyId: string;
+    kind: 'import' | 'export';
+    since?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export interface IntegrationConfig {
+    tiny: {
+        apiKey: string;
+        baseUrl: string;
+        companyId: string;
+        schedule?: string;
+        publicNfeEndpoint: string;
+        publicNfeToken?: string;
+        spedLayout: 'EFD-ICMS' | 'EFD-Contribuições';
+    };
+    bling: {
+        apiKey: string;
+        baseUrl: string;
+        companyId: string;
+        schedule?: string;
+        publicNfeEndpoint: string;
+        publicNfeToken?: string;
+        spedLayout: 'EFD-ICMS' | 'EFD-Contribuições';
+    };
+    contaAzul: {
+        apiKey: string;
+        baseUrl: string;
+        companyId: string;
+        schedule?: string;
+        publicNfeEndpoint: string;
+        publicNfeToken?: string;
+        spedLayout: 'EFD-ICMS' | 'EFD-Contribuições';
+    };
+}
+
+export interface IntegrationDashboardData {
+    statuses: IntegrationStatus[];
+    history: IntegrationHistoryEntry[];
+}
+
+export interface IntegrationQueueEvent {
+    erp: IntegrationChannel;
+    action: 'import' | 'export';
+    state: 'queued' | 'running' | 'completed' | 'failed';
+    details?: Record<string, unknown>;
+}
+
 // --- New Types for AI-Driven Analysis ---
 
 export type AIFindingSeverity = 'INFO' | 'BAIXA' | 'MÉDIA' | 'ALTA';
@@ -127,14 +213,38 @@ export interface DeterministicDiscrepancy {
   docA: { name: string; internal_path?: string };
   valueB: string | number;
   docB: { name: string; internal_path?: string };
+  ruleCode: string;
+  justification: string;
+}
+
+export interface DeterministicContextSnapshot {
+  ncm: string;
+  cfop: string;
+  emitenteCnpj?: string;
+  destinatarioCnpj?: string;
+  dataEmissao?: string;
+  produtoNome?: string;
 }
 
 export interface DeterministicCrossValidationResult {
-  comparisonKey: string; // e.g., the product name
+  comparisonKey: string; // Identificador principal utilizado no agrupamento
   attribute: string; // e.g., 'Preço Unitário'
   description: string;
   discrepancies: DeterministicDiscrepancy[];
   severity: 'ALERTA' | 'INFO';
+  ruleCode: string;
+  justification: string;
+  context: DeterministicContextSnapshot;
+}
+
+export type DeterministicArtifactFormat = 'json' | 'csv' | 'md';
+
+export interface DeterministicArtifactDescriptor {
+  executionId: string;
+  format: DeterministicArtifactFormat;
+  filename: string;
+  createdAt: string;
+  size: number;
 }
 
 export interface AuditReport {
@@ -146,4 +256,6 @@ export interface AuditReport {
   aiDrivenInsights?: AIDrivenInsight[];
   crossValidationResults?: CrossValidationResult[];
   deterministicCrossValidation?: DeterministicCrossValidationResult[];
+  deterministicArtifacts?: DeterministicArtifactDescriptor[];
+  executionId?: string;
 }

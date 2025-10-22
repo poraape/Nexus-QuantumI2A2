@@ -3,6 +3,7 @@ import type { AnalysisResult, AuditReport, AccountingEntry, AuditedDocument, Spe
 import { logger } from "../services/logger";
 import { parseSafeFloat } from "../utils/parsingUtils";
 import { generateJSON } from "../services/geminiService";
+import { measureExecution, telemetry } from "../services/telemetry";
 
 const analysisResponseSchema = {
   type: Type.OBJECT,
@@ -118,7 +119,7 @@ const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Recor
     return metrics;
 }
 
-const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Record<string, any>): Promise<AnalysisResult> => {
+const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Record<string, any>, correlationId: string): Promise<AnalysisResult> => {
   const dataQualityIssue = aggregatedMetrics['Alerta de Qualidade'];
 
   const prompt = `
@@ -144,11 +145,14 @@ const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Rec
         The entire response must be in Brazilian Portuguese and formatted as a single JSON object adhering to the required schema. Do not include any text outside of the JSON object.
     `;
   
-  return generateJSON<AnalysisResult>(
+  const result = await generateJSON<AnalysisResult>(
     'gemini-2.5-flash',
     prompt,
-    analysisResponseSchema
+    analysisResponseSchema,
+    { correlationId, attributes: { sampleRows: dataSample.split('\n').length } }
   );
+  logger.log('AccountantAgent', 'INFO', 'Resumo gerado pela IA com sucesso.', undefined, { correlationId, scope: 'agent' });
+  return result;
 };
 
 const generateAccountingEntries = (documents: AuditedDocument[]): AccountingEntry[] => {
@@ -305,12 +309,16 @@ const generateSpedEfd = (report: Pick<AuditReport, 'documents'>): SpedFile => {
     };
 };
 
-export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>): Promise<AuditReport> => {
-    // 1. Run deterministic calculations first
-    const aggregatedMetrics = runDeterministicAccounting(report);
+export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>, correlationId?: string): Promise<AuditReport> => {
+    const cid = correlationId || telemetry.createCorrelationId('agent');
+    logger.log('AccountantAgent', 'INFO', 'Iniciando análise contábil final.', undefined, { correlationId: cid, scope: 'agent' });
 
-    // 2. Generate Accounting Entries
-    const accountingEntries = generateAccountingEntries(report.documents);
+    return measureExecution('agent', 'Accountant.runAnalysis', async () => {
+        // 1. Run deterministic calculations first
+        const aggregatedMetrics = runDeterministicAccounting(report);
+
+        // 2. Generate Accounting Entries
+        const accountingEntries = generateAccountingEntries(report.documents);
     
     // 3. Generate SPED File
     const spedFile = generateSpedEfd(report);
@@ -328,15 +336,19 @@ export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>
             actionableInsights: ["Verificar a causa dos erros nos documentos importados para permitir uma análise completa."],
             strategicRecommendations: ["Implementar um processo de validação de arquivos na origem para garantir a qualidade dos dados para análise."]
         };
+         logger.log('AccountantAgent', 'WARN', 'Dados insuficientes para gerar resumo analítico.', undefined, { correlationId: cid, scope: 'agent' });
          return { ...report, summary: defaultSummary, aggregatedMetrics, accountingEntries, spedFile };
     }
-    
+
     const { default: Papa } = await import('papaparse');
     const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
     // 4. Run AI analysis with deterministic data as context
-    const summary = await runAIAccountingSummary(dataSampleForAI, aggregatedMetrics);
+    const summary = await runAIAccountingSummary(dataSampleForAI, aggregatedMetrics, cid);
 
     // 5. Combine results
-    return { ...report, summary, aggregatedMetrics, accountingEntries, spedFile };
+    const finalReport = { ...report, summary, aggregatedMetrics, accountingEntries, spedFile };
+    logger.log('AccountantAgent', 'INFO', 'Análise contábil finalizada.', { documents: report.documents.length }, { correlationId: cid, scope: 'agent' });
+    return finalReport;
+    }, { correlationId: cid, attributes: { documents: report.documents.length } });
 };
