@@ -5,8 +5,6 @@ import { parseSafeFloat } from "../utils/parsingUtils";
 import { generateJSON, ResponseSchema } from "../services/llmService";
 =======
 import { generateJSON } from "../services/geminiService";
-import { measureExecution, telemetry } from "../services/telemetry";
->>>>>>> main
 
 const analysisResponseSchema: ResponseSchema = {
   type: 'object',
@@ -44,6 +42,7 @@ const MOCK_ALIQUOTAS = {
     IVA: 0.25, // 25% (simulado)
 };
 
+
 /**
  * Rebuilt deterministic aggregation logic inspired by the "TotalSynth Core" manifest.
  * It is now the single source of truth for calculating aggregated metrics, ensuring consistency and robustness.
@@ -51,7 +50,7 @@ const MOCK_ALIQUOTAS = {
  * @returns A record of aggregated metrics.
  */
 const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Record<string, any> => {
-    const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data && d.doc.data.length > 0);
+    const validDocs = report.documents.filter(doc => doc.status !== 'ERRO' && Array.isArray(doc.doc.data) && doc.doc.data.length > 0);
 
     const defaultMetrics = {
         'Número de Documentos Válidos': 0,
@@ -71,59 +70,68 @@ const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Recor
 
     const allItems = validDocs.flatMap(d => d.doc.data!);
     
-    // [CRITICAL FIX] Use a Map to correctly sum the total values of unique NFes and count them.
-    // This resolves the "0 Documentos Válidos" bug by relying on the now-correctly-extracted `nfe_id`.
-    const uniqueNfes = new Map<string, { totalValue: number }>();
-    for (const item of allItems) {
-        if (item.nfe_id) {
-            // The `valor_total_nfe` is repeated for each item, so we can just set it.
-            // The Map ensures we only store the value once per unique NFe ID.
-            uniqueNfes.set(item.nfe_id, { totalValue: parseSafeFloat(item.valor_total_nfe) });
+    // **BUG FIX:** Correctly aggregate total NFe value by using a Map on unique documents, not all items.
+    const uniqueNfes = new Map<string, number>();
+    validDocs.forEach(doc => {
+        // Assume the first item holds the NFe-level data, which is how normalizeNFeData works.
+        const firstItem = doc.doc.data?.[0];
+        if (firstItem?.nfe_id) {
+            uniqueNfes.set(firstItem.nfe_id, parseSafeFloat(firstItem.valor_total_nfe));
         }
-    }
+    });
     
-    let totalNfeValue = Array.from(uniqueNfes.values()).reduce((sum, nfe) => sum + nfe.totalValue, 0);
+    let totalNfeValue = Array.from(uniqueNfes.values()).reduce((sum, val) => sum + val, 0);
     
     const totals = allItems.reduce((acc, item) => {
-        acc.totalProductValue += parseSafeFloat(item.produto_valor_total);
+        const itemValue = parseSafeFloat(item.produto_valor_total);
+        acc.totalProductValue += itemValue;
         acc.totalICMS += parseSafeFloat(item.produto_valor_icms);
         acc.totalPIS += parseSafeFloat(item.produto_valor_pis);
         acc.totalCOFINS += parseSafeFloat(item.produto_valor_cofins);
-        acc.totalISS += parseSafeFloat(item.produto_valor_iss);
+
+        // Simple check for service items to calculate ISS
+        if (item.produto_cfop?.toString().endsWith('933')) {
+            acc.totalISS += itemValue * MOCK_ALIQUOTAS.ISS;
+        }
+
         return acc;
     }, { totalProductValue: 0, totalICMS: 0, totalPIS: 0, totalCOFINS: 0, totalISS: 0 });
 
-    // --- [TotalSynth] Fallback Logic ---
-    // If the official total NFe value is still zero but there are product values,
-    // reconstruct the total as a fail-safe.
+    let qualityWarning = null;
+    // Fallback: If NFe ID aggregation failed but there are products, use product sum as an approximation.
     if (totalNfeValue === 0 && totals.totalProductValue > 0) {
-        logger.log('AccountantAgent', 'WARN', '[TotalSynth] Valor total da NFe é zero. Reconstruindo a partir da soma dos componentes como fallback.');
-        totalNfeValue = totals.totalProductValue + totals.totalICMS + totals.totalPIS + totals.totalCOFINS + totals.totalISS;
+        logger.log('AccountantAgent', 'WARN', 'A agregação por NFe ID resultou em zero. Usando a soma dos valores de produtos como fallback para o valor total. O valor pode ser impreciso se houver NFes duplicadas.');
+        totalNfeValue = totals.totalProductValue + totals.totalICMS; // Simplified sum
+        qualityWarning = 'Atenção: Valor total das NFes foi inferido a partir da soma dos produtos. Verifique se os campos de ID e valor total da NFe estão presentes e corretos nos documentos originais.';
     }
 
-    const totalIVA = (totals.totalPIS + totals.totalCOFINS) * MOCK_ALIQUOTAS.IVA;
+    const totalIVA = (totalPIS + totalCOFINS) * MOCK_ALIQUOTAS.IVA;
 
     const metrics: Record<string, string | number> = {
         'Número de Documentos Válidos': uniqueNfes.size, // Correctly counts unique NFes
         'Valor Total das NFes': formatCurrency(totalNfeValue),
-        'Valor Total dos Produtos': formatCurrency(totals.totalProductValue),
+        'Valor Total dos Produtos': formatCurrency(totalProductValue),
         'Total de Itens Processados': allItems.length,
-        'Valor Total de ICMS': formatCurrency(totals.totalICMS),
-        'Valor Total de PIS': formatCurrency(totals.totalPIS),
-        'Valor Total de COFINS': formatCurrency(totals.totalCOFINS),
-        'Valor Total de ISS': formatCurrency(totals.totalISS),
+        'Valor Total de ICMS': formatCurrency(totalICMS),
+        'Valor Total de PIS': formatCurrency(totalPIS),
+        'Valor Total de COFINS': formatCurrency(totalCOFINS),
+        'Valor Total de ISS': formatCurrency(totalISS),
         'Estimativa de IVA (Simulado)': formatCurrency(totalIVA),
     };
     
+    if (qualityWarning) {
+        metrics['Qualidade dos Dados'] = qualityWarning;
+    }
+    
     if (totalNfeValue === 0 && allItems.length > 0) {
-        metrics['Alerta de Qualidade'] = 'O valor total das NFes processadas é zero, mesmo após as tentativas de reconstrução. Isso indica problemas graves nos dados de origem.';
+        metrics['Alerta de Qualidade'] = 'O valor total das NFes processadas é zero. Isso é altamente incomum e pode indicar problemas nos dados de origem. Verifique os valores `vNF` nos arquivos XML.';
     }
 
     return metrics;
 }
 
-const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Record<string, any>, correlationId: string): Promise<AnalysisResult> => {
-  const dataQualityIssue = aggregatedMetrics['Alerta de Qualidade'];
+const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Record<string, any>): Promise<AnalysisResult> => {
+  const dataQualityIssue = aggregatedMetrics['Alerta de Qualidade'] || aggregatedMetrics['Qualidade dos Dados'];
 
   const prompt = `
         You are an expert financial analyst. I have performed a preliminary, deterministic analysis on a batch of fiscal documents and derived the following key aggregated metrics:
@@ -320,13 +328,9 @@ const generateSpedEfd = (report: Pick<AuditReport, 'documents'>): SpedFile => {
     };
 };
 
-export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>, correlationId?: string): Promise<AuditReport> => {
-    const cid = correlationId || telemetry.createCorrelationId('agent');
-    logger.log('AccountantAgent', 'INFO', 'Iniciando análise contábil final.', undefined, { correlationId: cid, scope: 'agent' });
-
-    return measureExecution('agent', 'Accountant.runAnalysis', async () => {
-        // 1. Run deterministic calculations first
-        const aggregatedMetrics = runDeterministicAccounting(report);
+export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>): Promise<AuditReport> => {
+    // 1. Run deterministic calculations first
+    const aggregatedMetrics = runDeterministicAccounting(report);
 
         // 2. Generate Accounting Entries
         const accountingEntries = generateAccountingEntries(report.documents);
@@ -355,7 +359,7 @@ export const runAccountingAnalysis = async (report: Omit<AuditReport, 'summary'>
     const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
     // 4. Run AI analysis with deterministic data as context
-    const summary = await runAIAccountingSummary(dataSampleForAI, aggregatedMetrics, cid);
+    const summary = await runAIAccountingSummary(dataSampleForAI, aggregatedMetrics);
 
     // 5. Combine results
     const finalReport = { ...report, summary, aggregatedMetrics, accountingEntries, spedFile };

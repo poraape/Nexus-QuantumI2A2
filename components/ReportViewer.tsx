@@ -9,6 +9,7 @@ import {
     FileIcon,
     AiIcon
 } from './icons';
+import TotalSummary from './Insights/TotalSummary';
 
 const statusStyles: { [key in AuditStatus]: { badge: string; icon: React.ReactNode; text: string; } } = {
     OK: {
@@ -172,7 +173,7 @@ const AccountingEntriesViewer: React.FC<{ entries: AccountingEntry[] }> = ({ ent
 
 
 const ReportViewer: React.FC<{ report: AuditReport, onClassificationChange: (docName: string, newClassification: ClassificationResult['operationType']) => void }> = ({ report, onClassificationChange }) => {
-  const { summary, documents, accountingEntries, aiDrivenInsights } = report;
+  const { summary, documents, accountingEntries, aiDrivenInsights, aggregatedMetrics } = report;
 
   const docStats = documents.reduce((acc, item) => {
       acc[item.status] = (acc[item.status] || 0) + 1;
@@ -184,6 +185,7 @@ const ReportViewer: React.FC<{ report: AuditReport, onClassificationChange: (doc
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg shadow-lg animate-fade-in space-y-8">
+      <TotalSummary metrics={aggregatedMetrics} />
       {/* Executive Summary Section */}
       <div>
         <h2 className="text-xl font-bold text-gray-200 mb-4">Análise Executiva</h2>
