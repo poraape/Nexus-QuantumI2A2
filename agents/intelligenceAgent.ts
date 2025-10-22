@@ -1,12 +1,8 @@
 import type { AuditReport, AIDrivenInsight, CrossValidationResult } from '../types';
 import Papa from 'papaparse';
-import { logger } from "../services/logger";
-<<<<<<< HEAD
-import { generateJSON, ResponseSchema } from "../services/llmService";
-=======
-import { generateJSON } from "../services/geminiService";
-import { measureExecution, telemetry } from "../services/telemetry";
->>>>>>> main
+import { logger } from '../services/logger';
+import { generateJSON, ResponseSchema } from '../services/llmService';
+import { measureExecution, telemetry } from '../services/telemetry';
 
 const intelligenceSchema: ResponseSchema = {
   type: 'object',
@@ -53,52 +49,52 @@ const intelligenceSchema: ResponseSchema = {
 };
 
 const sanitizeForAI = (value: any): any => {
-    if (typeof value === 'string') {
-        return JSON.stringify(value).slice(1, -1);
-    }
-    return value;
+  if (typeof value === 'string') {
+    return JSON.stringify(value).slice(1, -1);
+  }
+  return value;
 };
 
 export const runIntelligenceAnalysis = async (
-    report: Omit<AuditReport, 'summary' | 'aiDrivenInsights' | 'crossValidationResults'>,
-    correlationId?: string
+  report: Omit<AuditReport, 'summary' | 'aiDrivenInsights' | 'crossValidationResults'>,
+  correlationId?: string,
 ): Promise<Pick<AuditReport, 'aiDrivenInsights' | 'crossValidationResults'>> => {
-<<<<<<< HEAD
-=======
-    const cid = correlationId || telemetry.createCorrelationId('agent');
->>>>>>> main
+  const cid = correlationId || telemetry.createCorrelationId('agent');
 
-    const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data);
-    if (validDocs.length < 2) {
-        logger.log('IntelligenceAgent', 'INFO', 'Análise de IA pulada: menos de 2 documentos válidos para comparação.', undefined, { correlationId: cid, scope: 'agent' });
-        return { aiDrivenInsights: [], crossValidationResults: [] };
+  const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data);
+  if (validDocs.length < 2) {
+    logger.log('IntelligenceAgent', 'INFO', 'Análise de IA pulada: menos de 2 documentos válidos para comparação.', undefined, {
+      correlationId: cid,
+      scope: 'agent',
+    });
+    return { aiDrivenInsights: [], crossValidationResults: [] };
+  }
+
+  logger.log('IntelligenceAgent', 'INFO', `Iniciando análise inteligente com ${validDocs.length} documentos válidos.`, undefined, {
+    correlationId: cid,
+    scope: 'agent',
+  });
+
+  const allItems = validDocs.flatMap(d => {
+    const docName = d.doc.name;
+    return d.doc.data!.map(item => ({ ...item, doc_source: docName }));
+  });
+
+  const sanitizedItems = allItems.map(item => {
+    const newItem: Record<string, any> = {};
+    for (const key in item) {
+      newItem[key] = sanitizeForAI((item as any)[key]);
     }
+    return newItem;
+  });
 
-<<<<<<< HEAD
-=======
-    logger.log('IntelligenceAgent', 'INFO', `Iniciando análise inteligente com ${validDocs.length} documentos válidos.`, undefined, { correlationId: cid, scope: 'agent' });
+  const dataSampleForAI = Papa.unparse(sanitizedItems.slice(0, 500));
 
->>>>>>> main
-    const allItems = validDocs.flatMap(d => {
-        const docName = d.doc.name;
-        return d.doc.data!.map(item => ({ ...item, doc_source: docName }));
-    });
+  const deterministicFindings = report.documents
+    .flatMap(d => d.inconsistencies.map(inc => ({ document: d.doc.name, message: inc.message, severity: inc.severity })))
+    .slice(0, 30);
 
-    const sanitizedItems = allItems.map(item => {
-        const newItem: Record<string, any> = {};
-        for (const key in item) {
-            newItem[key] = sanitizeForAI((item as any)[key]);
-        }
-        return newItem;
-    });
-
-    const dataSampleForAI = Papa.unparse(sanitizedItems.slice(0, 500));
-
-    const deterministicFindings = report.documents
-        .flatMap(d => d.inconsistencies.map(inc => ({ document: d.doc.name, message: inc.message, severity: inc.severity })))
-        .slice(0, 30);
-
-    const prompt = `
+  const prompt = `
         Você é um auditor fiscal sênior com IA. Sua tarefa é realizar uma análise profunda em um conjunto de dados fiscais extraídos de várias notas fiscais.
 
         Já realizei uma auditoria baseada em regras e encontrei estas inconsistências de ALTA PRIORIDADE:
@@ -119,46 +115,31 @@ export const runIntelligenceAnalysis = async (
 
         Responda em Português do Brasil. Sua resposta DEVE ser um único objeto JSON que adere ao schema fornecido. Não inclua texto fora do objeto JSON.
     `;
-<<<<<<< HEAD
 
+  return measureExecution('agent', 'Intelligence.runAnalysis', async () => {
     try {
-        const result = await generateJSON<{
-=======
-    
-    return measureExecution('agent', 'Intelligence.runAnalysis', async () => {
-        try {
-            const result = await generateJSON<{
->>>>>>> main
-            aiDrivenInsights: AIDrivenInsight[],
-            crossValidationResults: CrossValidationResult[]
-        }>(
-            'gemini-2.0-flash',
-            prompt,
-            intelligenceSchema,
-<<<<<<< HEAD
-            'intelligence-analysis'
-        );
+      const result = await generateJSON<{
+        aiDrivenInsights: AIDrivenInsight[],
+        crossValidationResults: CrossValidationResult[]
+      }>(
+        'gemini-2.0-flash',
+        prompt,
+        intelligenceSchema,
+        'intelligence-analysis',
+      );
 
-        return result;
-
+      logger.log('IntelligenceAgent', 'INFO', 'Análise inteligente concluída.', undefined, {
+        correlationId: cid,
+        scope: 'agent',
+      });
+      return result;
     } catch (e) {
-        logger.log('IntelligenceAgent', 'ERROR', 'Falha ao executar análise de inteligência com IA.', { error: e });
-        console.error("AI Intelligence Agent failed:", e);
-        return { aiDrivenInsights: [], crossValidationResults: [] };
+      logger.log('IntelligenceAgent', 'ERROR', 'Falha ao executar análise de inteligência com IA.', { error: e }, {
+        correlationId: cid,
+        scope: 'agent',
+      });
+      console.error('AI Intelligence Agent failed:', e);
+      return { aiDrivenInsights: [], crossValidationResults: [] };
     }
+  }, { correlationId: cid, attributes: { documents: validDocs.length } });
 };
-=======
-            { correlationId: cid, attributes: { documents: validDocs.length } }
-        );
-
-            logger.log('IntelligenceAgent', 'INFO', 'Análise inteligente concluída.', undefined, { correlationId: cid, scope: 'agent' });
-            return result;
-
-        } catch (e) {
-            logger.log('IntelligenceAgent', 'ERROR', 'Falha ao executar análise de inteligência com IA.', { error: e }, { correlationId: cid, scope: 'agent' });
-            console.error("AI Intelligence Agent failed:", e);
-            return { aiDrivenInsights: [], crossValidationResults: [] };
-        }
-    }, { correlationId: cid, attributes: { documents: validDocs.length } });
-};
->>>>>>> main
