@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from __future__ import annotations
 
 import hashlib
@@ -50,7 +49,7 @@ class LLMGenerationRequest(BaseModel):
     model: Optional[str] = None
     context_key: Optional[str] = Field(
         default=None,
-        description='Identificador opcional para persistir o resultado de forma segura.'
+        description='Identificador opcional para persistir o resultado de forma segura.',
     )
 
 
@@ -199,7 +198,7 @@ async def send_chat_message(
     )
     history.append({'role': 'user', 'content': request.message})
     history.append({'role': 'assistant', 'content': json.dumps(response)})
-    audit_logger.log('chat', 'message.exchange', {'session_id': session_id})
+    audit_logger.log('chat', 'message.processed', {'session_id': session_id, 'username': username})
     return {'response': response}
 
 
@@ -234,40 +233,3 @@ async def sanitize_records(
 @app.get('/health')
 async def health() -> Dict[str, str]:
     return {'status': 'ok'}
-=======
-"""FastAPI application entrypoint."""
-from __future__ import annotations
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from strawberry.fastapi import GraphQLRouter
-
-from .api import router as api_router
-from .config import settings
-from .database import Base, engine
-from .graphql_schema import schema
-
-
-def create_app() -> FastAPI:
-    Base.metadata.create_all(bind=engine)
-
-    app = FastAPI(title=settings.app_name)
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.allowed_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["*"],
-    )
-
-    app.include_router(api_router)
-
-    graphql_app = GraphQLRouter(schema, path="/graphql")
-    app.include_router(graphql_app, prefix="")
-
-    return app
-
-
-app = create_app()
->>>>>>> main
