@@ -24,7 +24,7 @@ export type AgentStates = Record<AgentName, AgentState>;
 type ClassificationCorrections = Record<string, ClassificationResult['operationType']>;
 
 
-const initialAgentStates: AgentStates = {
+export const initialAgentStates: AgentStates = {
     ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
     auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
@@ -41,9 +41,8 @@ const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
  * @param error The error object caught.
  * @returns A detailed, actionable error message string.
  */
-const getDetailedErrorMessage = (error: unknown): string => {
-    const correlationId = telemetry.createCorrelationId('backend');
-    logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error }, { correlationId, scope: 'backend' });
+export const getDetailedErrorMessage = (error: unknown): string => {
+    logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
 
     if (error instanceof Error) {
         // Network/CORS errors in browsers often manifest as TypeErrors
