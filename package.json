@@ -16,12 +16,10 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@google/genai": "^1.25.0",
     "xlsx": "^0.18.5",
     "papaparse": "^5.4.1",
     "fast-xml-parser": "^4.4.0",
     "pdfjs-dist": "^5.4.296",
-    "tesseract.js": "^5.0.5",
     "docx": "^8.5.0",
     "pdfmake": "^0.2.20",
     "dayjs": "^1.11.13",

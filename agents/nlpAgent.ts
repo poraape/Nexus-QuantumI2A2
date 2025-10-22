@@ -1,30 +1,33 @@
 // nlpAgent.ts
-import { Type } from "@google/genai";
 import { logger } from "../services/logger";
+<<<<<<< HEAD
+import { generateJSON, ResponseSchema } from "../services/llmService";
+=======
 import { generateJSON } from "../services/geminiService";
 import { measureExecution, telemetry } from "../services/telemetry";
+>>>>>>> main
 
-const nlpExtractionSchema = {
-  type: Type.OBJECT,
+const nlpExtractionSchema: ResponseSchema = {
+  type: 'object',
   properties: {
-    data_emissao: { type: Type.STRING, description: "Data de emissão no formato DD/MM/AAAA.", nullable: true },
-    valor_total_nfe: { type: Type.NUMBER, description: "Valor monetário total da nota.", nullable: true },
-    emitente_nome: { type: Type.STRING, nullable: true },
-    emitente_cnpj: { type: Type.STRING, nullable: true },
-    destinatario_nome: { type: Type.STRING, nullable: true },
-    destinatario_cnpj: { type: Type.STRING, nullable: true },
+    data_emissao: { type: 'string', description: 'Data de emissão no formato DD/MM/AAAA.', nullable: true },
+    valor_total_nfe: { type: 'number', description: 'Valor monetário total da nota.', nullable: true },
+    emitente_nome: { type: 'string', nullable: true },
+    emitente_cnpj: { type: 'string', nullable: true },
+    destinatario_nome: { type: 'string', nullable: true },
+    destinatario_cnpj: { type: 'string', nullable: true },
     items: {
-      type: Type.ARRAY,
-      description: "Lista de todos os produtos ou serviços na nota.",
+      type: 'array',
+      description: 'Lista de todos os produtos ou serviços na nota.',
       items: {
-        type: Type.OBJECT,
+        type: 'object',
         properties: {
-          produto_nome: { type: Type.STRING },
-          produto_ncm: { type: Type.STRING, nullable: true },
-          produto_cfop: { type: Type.STRING, nullable: true },
-          produto_qtd: { type: Type.NUMBER, nullable: true },
-          produto_valor_unit: { type: Type.NUMBER, nullable: true },
-          produto_valor_total: { type: Type.NUMBER, nullable: true },
+          produto_nome: { type: 'string' },
+          produto_ncm: { type: 'string', nullable: true },
+          produto_cfop: { type: 'string', nullable: true },
+          produto_qtd: { type: 'number', nullable: true },
+          produto_valor_unit: { type: 'number', nullable: true },
+          produto_valor_total: { type: 'number', nullable: true },
         },
         required: ['produto_nome'],
       },
@@ -32,6 +35,9 @@ const nlpExtractionSchema = {
   },
 };
 
+<<<<<<< HEAD
+export const extractDataFromText = async (text: string): Promise<Record<string, any>[]> => {
+=======
 /**
  * Tenta extrair dados fiscais estruturados de um bloco de texto usando a IA do Gemini.
  * @param text O texto bruto extraído de um PDF ou imagem.
@@ -39,6 +45,7 @@ const nlpExtractionSchema = {
  */
 export const extractDataFromText = async (text: string, correlationId?: string): Promise<Record<string, any>[]> => {
     const cid = correlationId || telemetry.createCorrelationId('agent');
+>>>>>>> main
     if (!text || text.trim().length < 20) {
         logger.log('nlpAgent', 'WARN', 'Texto muito curto para extração com IA, pulando.', undefined, { correlationId: cid, scope: 'agent' });
         return [];
@@ -60,6 +67,14 @@ export const extractDataFromText = async (text: string, correlationId?: string):
       ---
     `;
     try {
+<<<<<<< HEAD
+        const extracted = await generateJSON<{ items?: any[] } & Record<string, any>>(
+            'gemini-2.0-flash',
+            prompt,
+            nlpExtractionSchema,
+            'ocr-nlp-extraction'
+        );
+=======
         const extracted = await measureExecution('agent', 'NLP.extractData', async () => {
             return generateJSON<{ items?: any[] } & Record<string, any>>(
                 'gemini-2.5-flash',
@@ -68,13 +83,13 @@ export const extractDataFromText = async (text: string, correlationId?: string):
                 { correlationId: cid, attributes: { textLength: truncatedText.length } }
             );
         }, { correlationId: cid, attributes: { textLength: truncatedText.length } });
+>>>>>>> main
 
         if (!extracted.items || extracted.items.length === 0) {
             logger.log('nlpAgent', 'WARN', 'IA não extraiu itens do texto.', undefined, { correlationId: cid, scope: 'agent' });
             return [];
         }
 
-        // Achata a estrutura para corresponder ao formato esperado pelo resto do pipeline.
         const { items, ...headerData } = extracted;
         const result = items.map(item => ({
             ...headerData,
@@ -85,7 +100,12 @@ export const extractDataFromText = async (text: string, correlationId?: string):
         return result;
 
     } catch (e) {
+<<<<<<< HEAD
+        logger.log('nlpAgent', 'ERROR', 'Falha na extração de dados com IA.', { error: e });
+        return [];
+=======
         logger.log('nlpAgent', 'ERROR', 'Falha na extração de dados com IA.', { error: e }, { correlationId: cid, scope: 'agent' });
         return []; // Retorna vazio em caso de falha para não quebrar o pipeline.
+>>>>>>> main
     }
 };

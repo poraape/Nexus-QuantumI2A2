@@ -1,7 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+<<<<<<< HEAD
+import { importFiles } from '../utils/importPipeline';
+import { runAudit } from '../agents/auditorAgent';
+import { runClassification } from '../agents/classifierAgent';
+import { runIntelligenceAnalysis } from '../agents/intelligenceAgent';
+import { runAccountingAnalysis } from '../agents/accountantAgent';
+import { startChat, requestChatMessage, ChatSession } from '../services/chatService';
+import type { ChatMessage, ImportedDoc, AuditReport, ClassificationResult } from '../types';
+=======
 import { startChat, sendMessageStream } from '../services/chatService';
 import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
 import type { Chat } from '@google/genai';
+>>>>>>> main
 import Papa from 'papaparse';
 import { logger } from '../services/logger';
 import { telemetry } from '../services/telemetry';
@@ -18,8 +28,12 @@ export type AgentState = { status: AgentStatus; progress: AgentProgress; };
 export type AgentStates = Record<AgentName, AgentState>;
 type ClassificationCorrections = Record<string, ClassificationResult['operationType']>;
 
+<<<<<<< HEAD
+const initialAgentStates: AgentStates = {
+=======
 
 export const initialAgentStates: AgentStates = {
+>>>>>>> main
     ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
     auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
@@ -30,6 +44,9 @@ export const initialAgentStates: AgentStates = {
 
 const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
 
+<<<<<<< HEAD
+const getDetailedErrorMessage = (error: unknown): string => {
+=======
 const generateExecutionId = (): string => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
         return crypto.randomUUID();
@@ -44,6 +61,7 @@ const generateExecutionId = (): string => {
  * @returns A detailed, actionable error message string.
  */
 export const getDetailedErrorMessage = (error: unknown): string => {
+>>>>>>> main
     logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
 
     if (error instanceof Error) {
@@ -52,8 +70,17 @@ export const getDetailedErrorMessage = (error: unknown): string => {
         }
 
         const message = error.message.toLowerCase();
+<<<<<<< HEAD
+        if (message.includes('api key not valid')) {
+            return 'Chave de API inválida. Verifique sua configuração.';
+        }
+        if (message.includes('quota')) {
+            return 'Cota da API excedida. Por favor, tente novamente mais tarde.';
+        }
+=======
         if (message.includes('api key not valid')) return 'Chave de API inválida. Verifique sua configuração.';
         if (message.includes('quota')) return 'Cota da API excedida. Por favor, tente novamente mais tarde.';
+>>>>>>> main
         if (message.includes('400')) return 'Requisição inválida para a API. Verifique os dados enviados.';
         if (message.includes('401') || message.includes('permission denied')) return 'Não autorizado. Verifique sua chave de API e permissões.';
         if (message.includes('429')) return 'Muitas requisições. Por favor, aguarde e tente novamente.';
@@ -79,6 +106,8 @@ export const getDetailedErrorMessage = (error: unknown): string => {
     return 'Ocorreu um erro desconhecido durante a operação.';
 };
 
+<<<<<<< HEAD
+=======
 const mapAgentStatesFromBackend = (backendStates: Record<string, BackendAgentState>): AgentStates => {
     const mapped = cloneInitialAgentStates();
     (Object.keys(mapped) as AgentName[]).forEach(agent => {
@@ -96,6 +125,7 @@ const mapAgentStatesFromBackend = (backendStates: Record<string, BackendAgentSta
     return mapped;
 };
 
+>>>>>>> main
 export const useAgentOrchestrator = () => {
     const [agentStates, setAgentStates] = useState<AgentStates>(cloneInitialAgentStates());
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
@@ -107,12 +137,17 @@ export const useAgentOrchestrator = () => {
     const [isPipelineRunning, setIsPipelineRunning] = useState(false);
     const [classificationCorrections, setClassificationCorrections] = useState<ClassificationCorrections>({});
 
+<<<<<<< HEAD
+    const chatRef = useRef<ChatSession | null>(null);
+
+=======
     const chatRef = useRef<Chat | null>(null);
     const chatCorrelationRef = useRef<string | null>(null);
     const streamController = useRef<AbortController | null>(null);
     const executionIdRef = useRef<string>('');
     
     // Load corrections from localStorage on initial mount
+>>>>>>> main
     useEffect(() => {
         const correlationId = telemetry.createCorrelationId('backend');
         try {
@@ -138,6 +173,9 @@ export const useAgentOrchestrator = () => {
     }, [executionIdRef]);
 
     const runPipeline = useCallback(async (files: File[]) => {
+<<<<<<< HEAD
+        logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.');
+=======
         const pipelineCorrelationId = telemetry.createCorrelationId('backend');
         const agentCorrelations: Record<AgentName, string> = {
             ocr: telemetry.createCorrelationId('ocr', pipelineCorrelationId),
@@ -149,6 +187,7 @@ export const useAgentOrchestrator = () => {
         };
         logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.', undefined, { correlationId: pipelineCorrelationId, scope: 'backend' });
         // Don't clear logs on incremental runs, just reset pipeline state
+>>>>>>> main
         reset();
 
         const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
@@ -160,14 +199,17 @@ export const useAgentOrchestrator = () => {
                 return newState;
             });
         };
+<<<<<<< HEAD
+=======
 
         try {
             const response = await startAnalysis(files);
             setAgentStates(mapAgentStatesFromBackend(response.agentStates));
             setPipelineError(false);
             setIsPipelineComplete(false);
+>>>>>>> main
 
-            // 1. Agente OCR / NLP
+        try {
             updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
             const importedDocs = await importFiles(files, (current, total) => {
                 updateAgentState('ocr', 'running', { step: 'Processando arquivos...', current, total });
@@ -179,31 +221,29 @@ export const useAgentOrchestrator = () => {
 
             if (!hasValidDocs) {
                 let errorMessage = "Nenhum arquivo válido foi processado. Verifique os formatos.";
-            
-                // If there's only one processed document (from a single file upload or a zip with one file)
-                // and it has an error, use its specific error message for better feedback.
+
                 if (importedDocs.length === 1 && importedDocs[0].error) {
                     errorMessage = importedDocs[0].error;
-                } 
-                // Fallback for a single zip that might have produced multiple error docs or an empty result.
+                }
                 else if (isSingleZip) {
                     errorMessage = "O arquivo ZIP está vazio ou não contém arquivos com formato suportado.";
                 }
-            
+
                 throw new Error(errorMessage);
             }
 
+<<<<<<< HEAD
+=======
             // 2. Agente Auditor
+>>>>>>> main
             updateAgentState('auditor', 'running', { step: `Validando ${importedDocs.length} documentos...` });
             const auditedReport = await runAudit(importedDocs, agentCorrelations.auditor);
             updateAgentState('auditor', 'completed');
 
-            // 3. Agente Classificador
             updateAgentState('classifier', 'running', { step: 'Classificando operações...' });
             const classifiedReport = await runClassification(auditedReport, classificationCorrections, agentCorrelations.classifier);
             updateAgentState('classifier', 'completed');
 
-            // 4. Agente Validador Cruzado (Determinístico)
             updateAgentState('crossValidator', 'running', { step: 'Executando validação cruzada...' });
             const { findings: deterministicCrossValidation, artifacts: deterministicArtifacts } =
                 await runDeterministicCrossValidation(classifiedReport, executionIdRef.current);
@@ -215,26 +255,29 @@ export const useAgentOrchestrator = () => {
             };
             updateAgentState('crossValidator', 'completed');
 
-            // 5. Agente de Inteligência (IA)
             updateAgentState('intelligence', 'running', { step: 'Analisando padrões com IA...' });
             const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation, agentCorrelations.intelligence);
             updateAgentState('intelligence', 'completed');
 
-            // 6. Agente Contador
             updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
             const finalReport = await runAccountingAnalysis({ ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults }, agentCorrelations.accountant);
             setAuditReport(finalReport);
             updateAgentState('accountant', 'completed');
-            
+
             const validDocsData = finalReport.documents
                 .filter(d => d.status !== 'ERRO' && d.doc.data)
                 .flatMap(d => d.doc.data!);
             const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
+<<<<<<< HEAD
+            logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.');
+            chatRef.current = await startChat(dataSampleForAI, finalReport.aggregatedMetrics);
+=======
             // 7. Preparar para Chat
             chatCorrelationRef.current = telemetry.createCorrelationId('llm', pipelineCorrelationId);
             logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.', undefined, { correlationId: chatCorrelationRef.current, scope: 'llm' });
             chatRef.current = startChat(dataSampleForAI, finalReport.aggregatedMetrics);
+>>>>>>> main
             setMessages([
                 {
                     id: 'initial-ai-message',
@@ -256,6 +299,10 @@ export const useAgentOrchestrator = () => {
         } finally {
             setIsPipelineComplete(true);
         }
+<<<<<<< HEAD
+    }, [classificationCorrections, agentStates]);
+
+=======
     }, [classificationCorrections, reset, executionIdRef]); // Added dependencies for deterministic IDs
 
     const handleStopStreaming = useCallback(() => {
@@ -267,6 +314,7 @@ export const useAgentOrchestrator = () => {
         }
     }, []);
 
+>>>>>>> main
     const handleSendMessage = useCallback(async (message: string) => {
         if (!chatRef.current) {
             setError('O chat não foi inicializado. Por favor, execute uma análise primeiro.');
@@ -278,13 +326,14 @@ export const useAgentOrchestrator = () => {
         setIsStreaming(true);
 
         const aiMessageId = (Date.now() + 1).toString();
-        let fullAiResponse = '';
         setMessages(prev => [...prev, { id: aiMessageId, sender: 'ai', text: '...' }]);
 
-        streamController.current = new AbortController();
-        const signal = streamController.current.signal;
-
         try {
+<<<<<<< HEAD
+            const response = await requestChatMessage(chatRef.current, message);
+            setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, ...response, text: response.text ?? JSON.stringify(response) } : m));
+        } catch (err: unknown) {
+=======
             const messageCorrelationId = telemetry.createCorrelationId('llm', chatCorrelationRef.current || undefined);
             const stream = sendMessageStream(chatRef.current, message, messageCorrelationId);
             for await (const chunk of stream) {
@@ -306,12 +355,12 @@ export const useAgentOrchestrator = () => {
             }
 
         } catch (err) {
+>>>>>>> main
             const finalMessage = getDetailedErrorMessage(err);
             setError(finalMessage);
             setMessages(prev => prev.filter(m => m.id !== aiMessageId));
         } finally {
             setIsStreaming(false);
-            streamController.current = null;
         }
     }, []);
 
@@ -354,7 +403,7 @@ export const useAgentOrchestrator = () => {
         pipelineError,
         runPipeline,
         handleSendMessage,
-        handleStopStreaming,
+        handleStopStreaming: () => {},
         setError,
         handleClassificationChange,
         reset,
