@@ -12,6 +12,7 @@ import LogsPanel from './components/LogsPanel';
 import Dashboard from './components/Dashboard';
 import type { AuditReport } from './types';
 import IncrementalInsights from './components/IncrementalInsights';
+import IntegrationStatusPanel from './components/IntegrationStatusPanel';
 
 export type ExportType = 'md' | 'html' | 'pdf' | 'docx' | 'sped' | 'xlsx' | 'json';
 type PipelineStep = 'UPLOAD' | 'PROCESSING' | 'COMPLETE' | 'ERROR';
@@ -226,7 +227,10 @@ const App: React.FC = () => {
                 onTogglePanel={() => setIsPanelCollapsed(!isPanelCollapsed)}
             />
             <main className="container mx-auto p-4 md:p-6 lg:p-8">
-                {renderContent()}
+                <div className="space-y-6">
+                    {renderContent()}
+                    <IntegrationStatusPanel />
+                </div>
             </main>
             {error && pipelineStep !== 'ERROR' && <Toast message={error} onClose={() => { setError(null); }} />}
             {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
