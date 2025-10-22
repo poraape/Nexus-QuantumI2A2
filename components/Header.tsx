@@ -4,6 +4,7 @@ import type { ExportType } from '../App';
 import LogoIcon from './LogoIcon'; // Importa o novo ícone
 
 interface HeaderProps {
+    onReset: () => void;
     showExports: boolean;
     showSpedExport: boolean;
     isExporting: ExportType | null;
@@ -11,7 +12,7 @@ interface HeaderProps {
     onToggleLogs: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ showExports, showSpedExport, isExporting, onExport, onToggleLogs }) => {
+const Header: React.FC<HeaderProps> = ({ onReset, showExports, showSpedExport, isExporting, onExport, onToggleLogs }) => {
   const exportOptions: { type: ExportType, label: string, icon: React.ReactNode }[] = [
       { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
       { type: 'html', label: 'HTML', icon: <span className="font-bold text-sm">H</span> },
@@ -23,10 +24,14 @@ const Header: React.FC<HeaderProps> = ({ showExports, showSpedExport, isExportin
     <header className="bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-10">
       <div className="container mx-auto px-4 md:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div 
+                className="flex items-center gap-3 cursor-pointer group"
+                onClick={onReset}
+                title="Iniciar Nova Análise"
+            >
                 <LogoIcon className="w-9 h-9" />
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">
+                    <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300 group-hover:from-blue-300 group-hover:to-teal-200 transition-colors">
                         Nexus QuantumI2A2
                     </h1>
                     <p className="text-xs md:text-sm text-gray-400 -mt-1">

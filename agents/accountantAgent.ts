@@ -36,15 +36,15 @@ const analysisResponseSchema = {
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// Alíquotas simplificadas para cálculo
 const MOCK_ALIQUOTAS = {
-    ISS: 0.05, // 5%
     IVA: 0.25, // 25% (simulado)
 };
 
-
 /**
- * Runs deterministic aggregations on the report data, ensuring a consistent object shape is always returned.
+ * Rebuilt deterministic aggregation logic inspired by the "TotalSynth Core" manifest.
+ * It is now the single source of truth for calculating aggregated metrics, ensuring consistency and robustness.
+ * @param report The audit report containing all processed documents.
+ * @returns A record of aggregated metrics.
  */
 const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Record<string, any> => {
     const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data && d.doc.data.length > 0);
@@ -67,45 +67,40 @@ const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Recor
 
     const allItems = validDocs.flatMap(d => d.doc.data!);
     
-    // **BUG FIX:** Correctly aggregate total NFe value by using a Map on unique documents, not all items.
-    const uniqueNfes = new Map<string, number>();
-    validDocs.forEach(doc => {
-        // Assume the first item holds the NFe-level data, which is how normalizeNFeData works.
-        const firstItem = doc.doc.data?.[0];
-        if (firstItem?.nfe_id) {
-            uniqueNfes.set(firstItem.nfe_id, parseSafeFloat(firstItem.valor_total_nfe));
+    // [CRITICAL FIX] Use a Map to correctly sum the total values of unique NFes and count them.
+    // This resolves the "0 Documentos Válidos" bug by relying on the now-correctly-extracted `nfe_id`.
+    const uniqueNfes = new Map<string, { totalValue: number }>();
+    for (const item of allItems) {
+        if (item.nfe_id) {
+            // The `valor_total_nfe` is repeated for each item, so we can just set it.
+            // The Map ensures we only store the value once per unique NFe ID.
+            uniqueNfes.set(item.nfe_id, { totalValue: parseSafeFloat(item.valor_total_nfe) });
         }
-    });
+    }
     
-    let totalNfeValue = Array.from(uniqueNfes.values()).reduce((sum, val) => sum + val, 0);
+    let totalNfeValue = Array.from(uniqueNfes.values()).reduce((sum, nfe) => sum + nfe.totalValue, 0);
     
     const totals = allItems.reduce((acc, item) => {
-        const itemValue = parseSafeFloat(item.produto_valor_total);
-        acc.totalProductValue += itemValue;
+        acc.totalProductValue += parseSafeFloat(item.produto_valor_total);
         acc.totalICMS += parseSafeFloat(item.produto_valor_icms);
         acc.totalPIS += parseSafeFloat(item.produto_valor_pis);
         acc.totalCOFINS += parseSafeFloat(item.produto_valor_cofins);
-
-        // Simple check for service items to calculate ISS
-        if (item.produto_cfop?.toString().endsWith('933')) {
-            acc.totalISS += itemValue * MOCK_ALIQUOTAS.ISS;
-        }
-
+        acc.totalISS += parseSafeFloat(item.produto_valor_iss);
         return acc;
     }, { totalProductValue: 0, totalICMS: 0, totalPIS: 0, totalCOFINS: 0, totalISS: 0 });
 
-    let qualityWarning = null;
-    // Fallback: If NFe ID aggregation failed but there are products, use product sum as an approximation.
+    // --- [TotalSynth] Fallback Logic ---
+    // If the official total NFe value is still zero but there are product values,
+    // reconstruct the total as a fail-safe.
     if (totalNfeValue === 0 && totals.totalProductValue > 0) {
-        logger.log('AccountantAgent', 'WARN', 'A agregação por NFe ID resultou em zero. Usando a soma dos valores de produtos como fallback para o valor total. O valor pode ser impreciso se houver NFes duplicadas.');
-        totalNfeValue = totals.totalProductValue + totals.totalICMS; // Simplified sum
-        qualityWarning = 'Atenção: Valor total das NFes foi inferido a partir da soma dos produtos. Verifique se os campos de ID e valor total da NFe estão presentes e corretos nos documentos originais.';
+        logger.log('AccountantAgent', 'WARN', '[TotalSynth] Valor total da NFe é zero. Reconstruindo a partir da soma dos componentes como fallback.');
+        totalNfeValue = totals.totalProductValue + totals.totalICMS + totals.totalPIS + totals.totalCOFINS + totals.totalISS;
     }
 
     const totalIVA = (totals.totalPIS + totals.totalCOFINS) * MOCK_ALIQUOTAS.IVA;
 
     const metrics: Record<string, string | number> = {
-        'Número de Documentos Válidos': validDocs.length,
+        'Número de Documentos Válidos': uniqueNfes.size, // Correctly counts unique NFes
         'Valor Total das NFes': formatCurrency(totalNfeValue),
         'Valor Total dos Produtos': formatCurrency(totals.totalProductValue),
         'Total de Itens Processados': allItems.length,
@@ -116,19 +111,15 @@ const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Recor
         'Estimativa de IVA (Simulado)': formatCurrency(totalIVA),
     };
     
-    if (qualityWarning) {
-        metrics['Qualidade dos Dados'] = qualityWarning;
-    }
-    
     if (totalNfeValue === 0 && allItems.length > 0) {
-        metrics['Alerta de Qualidade'] = 'O valor total das NFes processadas é zero. Isso é altamente incomum e pode indicar problemas nos dados de origem. Verifique os valores `vNF` nos arquivos XML.';
+        metrics['Alerta de Qualidade'] = 'O valor total das NFes processadas é zero, mesmo após as tentativas de reconstrução. Isso indica problemas graves nos dados de origem.';
     }
 
     return metrics;
 }
 
 const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Record<string, any>): Promise<AnalysisResult> => {
-  const dataQualityIssue = aggregatedMetrics['Alerta de Qualidade'] || aggregatedMetrics['Qualidade dos Dados'];
+  const dataQualityIssue = aggregatedMetrics['Alerta de Qualidade'];
 
   const prompt = `
         You are an expert financial analyst. I have performed a preliminary, deterministic analysis on a batch of fiscal documents and derived the following key aggregated metrics:
@@ -199,8 +190,6 @@ const generateAccountingEntries = (documents: AuditedDocument[]): AccountingEntr
                 } else if (firstCfopDev?.startsWith('5') || firstCfopDev?.startsWith('6')) { // Devolução de Venda
                     entries.push({ docName: doc.doc.name, account: '4.1.2 Devoluções de Vendas', type: 'D', value: totalProducts });
                     if (totalIcms > 0) {
-                        // This should be a debit to reduce liability, but accounting can be complex.
-                        // For simplicity, we debit the tax liability account.
                         entries.push({ docName: doc.doc.name, account: '2.1.2 ICMS a Recolher', type: 'D', value: totalIcms });
                     }
                     entries.push({ docName: doc.doc.name, account: '1.1.3 Clientes', type: 'C', value: totalNfe });

@@ -203,6 +203,7 @@ const App: React.FC = () => {
     return (
         <div className="bg-gray-900 text-white min-h-screen font-sans">
             <Header
+                onReset={handleReset}
                 showExports={pipelineStep === 'COMPLETE' && !!auditReport && activeView === 'report'}
                 showSpedExport={pipelineStep === 'COMPLETE' && !!auditReport?.spedFile}
                 onExport={handleExport}

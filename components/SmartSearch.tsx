@@ -16,11 +16,12 @@ const searchResponseSchema = {
         data: {
             type: Type.ARRAY,
             nullable: true,
-            description: "Opcional: Dados estruturados se a resposta puder ser representada em uma tabela.",
+            description: "Opcional: Dados estruturados se a resposta puder ser representada em uma tabela. A primeira linha (primeiro array) DEVE ser o cabeçalho.",
             items: {
-                type: Type.OBJECT,
-                description: "As chaves do objeto serão os cabeçalhos da tabela.",
-                properties: {} // Permite chaves dinâmicas
+                type: Type.ARRAY,
+                items: {
+                    type: Type.STRING, // Each cell is a string
+                },
             }
         }
     },
@@ -66,7 +67,7 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
 
                 Sua resposta DEVE ser um único objeto JSON aderindo ao schema.
                 - Forneça um 'summary' textual.
-                - Se aplicável, retorne uma tabela de 'data'. As chaves do objeto se tornarão os cabeçalhos.
+                - Se aplicável, retorne uma tabela de 'data' como um array de arrays. A primeira linha (primeiro array) DEVE ser os cabeçalhos da tabela. Cada array subsequente é uma linha de dados. Todos os valores devem ser retornados como strings.
             `;
 
             const searchResult = await generateJSON<SmartSearchResult>(
@@ -88,7 +89,8 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
         }
     }, [query, report]);
 
-    const tableHeaders = result?.data && result.data.length > 0 ? Object.keys(result.data[0]) : [];
+    const tableHeaders = result?.data && result.data.length > 0 ? result.data[0] : [];
+    const tableRows = result?.data && result.data.length > 1 ? result.data.slice(1) : [];
 
     return (
         <div className="space-y-4">
@@ -121,7 +123,7 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
                         <p className="text-gray-300 flex-1 mt-1">{result.summary}</p>
                     </div>
 
-                    {result.data && result.data.length > 0 && (
+                    {tableRows.length > 0 && tableHeaders.length > 0 && (
                         <div className="max-h-80 overflow-y-auto pr-2">
                             <table className="w-full text-sm text-left">
                                 <thead className="text-xs text-gray-400 uppercase bg-gray-800/50 sticky top-0">
@@ -130,10 +132,10 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-700/50">
-                                    {result.data.map((row, rowIndex) => (
+                                    {tableRows.map((row, rowIndex) => (
                                         <tr key={rowIndex} className="hover:bg-gray-600/20">
-                                            {tableHeaders.map(header => (
-                                                <td key={header} className="px-4 py-2 text-gray-300 font-mono">{String(row[header])}</td>
+                                            {row.map((cell, cellIndex) => (
+                                                 <td key={tableHeaders[cellIndex] || cellIndex} className="px-4 py-2 text-gray-300 font-mono">{cell}</td>
                                             ))}
                                         </tr>
                                     ))}

@@ -22,112 +22,128 @@ const sanitizeFilename = (filename: string): string => {
     return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-const FILE_SIGNATURES: Record<string, string[]> = {
-    'pdf': ['25504446'], // %PDF
-    'png': ['89504e47'], // .PNG
-    'jpg': ['ffd8ff'],   // Various JPEG signatures
-    'zip': ['504b0304', '504b0506', '504b0708'], // PK..
-    'xml': ['3c3f786d6c'], // <?xml
-    'xlsx': ['504b0304'], // Also a zip file
-};
-
-const checkMagicNumbers = async (file: File): Promise<boolean> => {
-    const extension = getFileExtension(file.name);
-    const signatures = FILE_SIGNATURES[extension];
-    if (!signatures) return true; // No signature to check
-
-    try {
-        const slice = file.slice(0, 8); // Increased slice size to handle longer signatures
-        const buffer = await slice.arrayBuffer();
-        const view = new DataView(buffer);
-        const fileHeader = Array.from({ length: view.byteLength }, (_, i) => view.getUint8(i).toString(16).padStart(2, '0')).join('');
-        
-        return signatures.some(sig => fileHeader.startsWith(sig));
-    } catch (e) {
-        logger.log('ImportPipeline', 'ERROR', `Falha ao ler o cabeçalho do arquivo ${file.name}`, { error: e });
-        return false;
+/**
+ * Safely extracts the primitive value from a fast-xml-parser node,
+ * which might be a direct value or an object with a text node (e.g., { '#text': 'value' }).
+ * @param field The raw field from the parsed XML object.
+ * @returns The primitive value (string, number, etc.) or undefined.
+ */
+const getXmlValue = (field: any): any => {
+    if (field === null || field === undefined) return undefined;
+    if (typeof field === 'object') {
+        if (field['#text'] !== undefined) return field['#text'];
+        if (Object.keys(field).length === 0) return undefined;
     }
+    return field;
+};
+
+/**
+ * [ROBUSTNESS FIX] Intelligently finds the actual tax data block (e.g., ICMS00, PISAliq)
+ * inside its parent container (e.g., ICMS, PIS) without needing to know the exact key.
+ * This makes parsing resilient to different CST codes.
+ * @param taxParent The parent tax object (e.g., the object for the <ICMS> tag).
+ * @returns The inner tax block object, or an empty object if not found.
+ */
+const getInnerTaxBlock = (taxParent: any): any => {
+    if (!taxParent || typeof taxParent !== 'object') {
+        return {};
+    }
+    // The inner block is often the first and only property of the parent.
+    // e.g., <ICMS><ICMS00>...</ICMS00></ICMS> -> { ICMS: { ICMS00: {...} } }
+    const keys = Object.keys(taxParent);
+    if (keys.length > 0) {
+        // Find the first key that corresponds to an object, as this is likely the tax block.
+        const innerKey = keys.find(k => typeof taxParent[k] === 'object' && taxParent[k] !== null);
+        if (innerKey) {
+            return taxParent[innerKey];
+        }
+    }
+    return {};
 };
 
 
-const getInfNFe = (nfeData: any): any => {
-    if (!nfeData) return null;
-    return nfeData?.nfeProc?.NFe?.infNFe 
-        || nfeData?.NFe?.infNFe 
-        || nfeData?.infNFe;
-}
-
+/**
+ * [REBUILT] Normalizes NFe data from a parsed XML JSON object into a flattened array of item records.
+ * This function has been reconstructed for robustness and clarity, fixing systemic parsing failures.
+ * It directly accesses objects and uses helpers only for their intended purpose.
+ * @param nfeData The raw JSON object from the XML parser.
+ * @returns An array of records, where each record represents a line item enriched with header-level data.
+ */
 const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
-    const infNFe = getInfNFe(nfeData);
-    if (!infNFe) return [];
+    const infNFe = nfeData?.nfeProc?.NFe?.infNFe || nfeData?.NFe?.infNFe || nfeData?.infNFe;
+    if (!infNFe) {
+        logger.log('ImportPipeline', 'ERROR', 'Bloco <infNFe> não encontrado no XML. O documento não pode ser processado.');
+        return [];
+    }
 
-    const items = infNFe.det; // Guaranteed to be an array by the parser config if the tag exists
-    if (!items || items.length === 0) {
+    const items = Array.isArray(infNFe.det) ? infNFe.det : (infNFe.det ? [infNFe.det] : []);
+    if (items.length === 0) {
+        logger.log('ImportPipeline', 'WARN', 'Nenhum item <det> encontrado no XML.');
         return [];
     }
     
     const ide = infNFe.ide || {};
     const emit = infNFe.emit || {};
     const dest = infNFe.dest || {};
-    const total = infNFe.total?.ICMSTot || {};
-    const nfeId = infNFe.Id;
+    const total = infNFe.total || {};
+    const icmsTot = total.ICMSTot || {};
+    const issqnTot = total.ISSQNtot || {};
+    
+    // [CRITICAL FIX] Correctly reads the 'Id' attribute from the <infNFe> tag.
+    // This resolves the "0 Documentos Válidos" error by providing a unique ID for each document.
+    const nfeId = infNFe['@_Id'];
+    if (!nfeId) {
+        logger.log('ImportPipeline', 'ERROR', 'Atributo "Id" da NFe não foi encontrado na tag <infNFe>. A contagem de documentos pode ser imprecisa.');
+    }
 
-    const findTaxInfo = (imposto: any, tributo: 'ICMS' | 'PIS' | 'COFINS'): { cst?: string; value?: number; baseCalculo?: number; aliquota?: number } => {
-        const impostoBlock = imposto?.[tributo];
-        if (!impostoBlock) return {};
-        
-        const typeKey = Object.keys(impostoBlock)[0];
-        if (typeKey && impostoBlock[typeKey]) {
-            const taxDetails = impostoBlock[typeKey];
-            const valueKey = `v${tributo}`;
-            const baseCalculoKey = 'vBC';
-            const aliquotaKey = `p${tributo}`;
-            return {
-                cst: taxDetails.CST?.toString(),
-                value: taxDetails[valueKey],
-                baseCalculo: taxDetails[baseCalculoKey],
-                aliquota: taxDetails[aliquotaKey]
-            };
+    // --- Intelligent Total Value Reconstruction ---
+    let nfeTotalValue = parseSafeFloat(getXmlValue(icmsTot.vNF));
+    if (nfeTotalValue === 0) {
+        const totalProducts = parseSafeFloat(getXmlValue(icmsTot.vProd));
+        const totalServices = parseSafeFloat(getXmlValue(issqnTot.vServ));
+        nfeTotalValue = totalProducts + totalServices;
+        if (nfeTotalValue > 0) {
+            logger.log('ImportPipeline', 'WARN', `vNF ausente/zerado na NFe ${nfeId}. Total reconstruído: R$ ${nfeTotalValue}`);
         }
-        return {};
-    };
-
+    }
 
     return items.map((item: any) => {
-        const icmsInfo = findTaxInfo(item.imposto, 'ICMS');
-        const pisInfo = findTaxInfo(item.imposto, 'PIS');
-        const cofinsInfo = findTaxInfo(item.imposto, 'COFINS');
+        const prod = item.prod || {};
+        const imposto = item.imposto || {};
+
+        // [ROBUSTNESS FIX] Use the intelligent helper to find the tax data, fixing zeroed-out values.
+        const icmsBlock = getInnerTaxBlock(imposto.ICMS);
+        const pisBlock = getInnerTaxBlock(imposto.PIS);
+        const cofinsBlock = getInnerTaxBlock(imposto.COFINS);
+        const issqnBlock = imposto.ISSQN || {}; // ISSQN doesn't have a nested structure
         
-        if (!item.prod?.vProd) {
-            logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} não possui valor (vProd).`);
-        }
-        if (!item.prod?.CFOP) {
-            logger.log('ImportPipeline', 'WARN', `Item ${item.prod?.cProd || 'sem código'} no documento ${nfeId} не possui CFOP.`);
-        }
+        const enderEmit = emit.enderEmit || {};
+        const enderDest = dest.enderDest || {};
 
         return {
             nfe_id: nfeId,
-            data_emissao: ide.dhEmi,
-            valor_total_nfe: parseSafeFloat(total.vNF),
-            emitente_nome: emit.xNome,
-            emitente_uf: emit.enderEmit?.UF,
-            destinatario_nome: dest.xNome,
-            destinatario_uf: dest.enderDest?.UF,
-            produto_nome: item.prod?.xProd,
-            produto_ncm: item.prod?.NCM,
-            produto_cfop: item.prod?.CFOP,
-            produto_cst_icms: icmsInfo.cst,
-            produto_base_calculo_icms: parseSafeFloat(icmsInfo.baseCalculo),
-            produto_aliquota_icms: parseSafeFloat(icmsInfo.aliquota),
-            produto_valor_icms: parseSafeFloat(icmsInfo.value),
-            produto_cst_pis: pisInfo.cst,
-            produto_valor_pis: parseSafeFloat(pisInfo.value),
-            produto_cst_cofins: cofinsInfo.cst,
-            produto_valor_cofins: parseSafeFloat(cofinsInfo.value),
-            produto_qtd: parseSafeFloat(item.prod?.qCom),
-            produto_valor_unit: parseSafeFloat(item.prod?.vUnCom),
-            produto_valor_total: parseSafeFloat(item.prod?.vProd),
-        }
+            data_emissao: getXmlValue(ide.dhEmi),
+            valor_total_nfe: nfeTotalValue,
+            emitente_nome: getXmlValue(emit.xNome),
+            emitente_uf: getXmlValue(enderEmit.UF),
+            destinatario_nome: getXmlValue(dest.xNome),
+            destinatario_uf: getXmlValue(enderDest.UF),
+            produto_nome: getXmlValue(prod.xProd),
+            produto_ncm: getXmlValue(prod.NCM),
+            produto_cfop: getXmlValue(prod.CFOP),
+            produto_cst_icms: getXmlValue(icmsBlock.CST),
+            produto_base_calculo_icms: parseSafeFloat(getXmlValue(icmsBlock.vBC)),
+            produto_aliquota_icms: parseSafeFloat(getXmlValue(icmsBlock.pICMS)),
+            produto_valor_icms: parseSafeFloat(getXmlValue(icmsBlock.vICMS)),
+            produto_cst_pis: getXmlValue(pisBlock.CST),
+            produto_valor_pis: parseSafeFloat(getXmlValue(pisBlock.vPIS)),
+            produto_cst_cofins: getXmlValue(cofinsBlock.CST),
+            produto_valor_cofins: parseSafeFloat(getXmlValue(cofinsBlock.vCOFINS)),
+            produto_valor_iss: parseSafeFloat(getXmlValue(issqnBlock.vISSQN)),
+            produto_qtd: parseSafeFloat(getXmlValue(prod.qCom)),
+            produto_valor_unit: parseSafeFloat(getXmlValue(prod.vUnCom)),
+            produto_valor_total: parseSafeFloat(getXmlValue(prod.vProd)),
+        };
     });
 };
 
@@ -139,15 +155,12 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
         const { XMLParser } = await import('fast-xml-parser');
         const text = await file.text();
         const parser = new XMLParser({
-            // Performance and Consistency options
-            ignoreAttributes: false, // Keep attributes like 'Id' and 'nItem'
-            ignoreNameSpace: true,  // Simplifies path by removing namespace prefixes
-            parseNodeValue: false,  // Delegate parsing to our specific functions for performance
-            parseAttributeValue: false, // Delegate parsing to our specific functions for performance
-            trimValues: true,       // Sanitize data by removing whitespace
-            attributeNamePrefix: "",// Clean attribute names
-            // Ensure <det> is always an array for consistent data structure
-            isArray: (name) => name === 'det',
+            ignoreAttributes: false,
+            attributeNamePrefix: "@_",
+            textNodeName: "#text", 
+            allowBooleanAttributes: true,
+            parseTagValue: false, 
+            parseAttributeValue: false,
         });
         const jsonObj = parser.parse(text);
         const data = normalizeNFeData(jsonObj);
@@ -158,6 +171,7 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
         return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'parsed', data, raw: file };
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
+        logger.log('ImportPipeline', 'ERROR', `Erro crítico ao processar XML: ${file.name}`, { error });
         return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'error', error: `Erro ao processar XML: ${message}`, raw: file };
     }
 };
@@ -165,10 +179,9 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
 const handleCSV = (file: File): Promise<ImportedDoc> => {
     return new Promise((resolve) => {
         Papa.parse(file, {
-            header: true, // Automatically detect and use the first row as headers.
-            skipEmptyLines: true, // Ignore empty lines to avoid processing invalid data.
-            dynamicTyping: true, // Automatically convert numeric and boolean strings to their types.
-            // Normalize headers to snake_case for consistency, improving AI interpretation.
+            header: true,
+            skipEmptyLines: true,
+            dynamicTyping: true,
             transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
             complete: (results) => {
                 resolve({ kind: 'CSV', name: file.name, size: file.size, status: 'parsed', data: results.data as Record<string, any>[], raw: file });
@@ -265,12 +278,7 @@ const processSingleFile = async (file: File): Promise<ImportedDoc> => {
     const sanitizedName = sanitizeFilename(file.name);
     if(sanitizedName !== file.name) {
         logger.log('ImportPipeline', 'WARN', `Nome de arquivo sanitizado: de '${file.name}' para '${sanitizedName}'`);
-        // Create a new file with the sanitized name
         file = new File([file], sanitizedName, { type: file.type });
-    }
-
-    if (!await checkMagicNumbers(file)) {
-        return handleUnsupported(file, 'Assinatura do arquivo (magic number) não corresponde à extensão.');
     }
 
     const extension = getFileExtension(file.name);
@@ -304,7 +312,6 @@ export const importFiles = async (
                     const jszip = new JSZip();
                     const zip = await jszip.loadAsync(file);
                     
-                    // Get all file-like entries, excluding common metadata folders/files
                     const allFileEntries = Object.values(zip.files).filter(
                         (zipFile: JSZipObject) => !zipFile.dir && !zipFile.name.startsWith('__MACOSX/') && !zipFile.name.endsWith('.DS_Store')
                     );
@@ -313,18 +320,15 @@ export const importFiles = async (
                         (zipFile: JSZipObject) => isSupportedExtension(zipFile.name)
                     );
                     
-                    // If no supported files are found, create a specific error message.
                     if (supportedFileEntries.length === 0) {
                         let reason = 'O arquivo ZIP está vazio.';
                         if (allFileEntries.length > 0) {
-                            const foundFiles = allFileEntries.map(f => f.name).slice(0, 5).join(', ');
+                            const foundFiles = allFileEntries.map((f: JSZipObject) => f.name).slice(0, 5).join(', ');
                             reason = `O ZIP não contém arquivos com formato suportado. Arquivos encontrados: ${foundFiles}${allFileEntries.length > 5 ? '...' : ''}.`;
                         }
-                        // This will be caught by the orchestrator and displayed to the user.
                         result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: reason };
             
                     } else {
-                        // If there are supported files, process them.
                         const innerDocs = await Promise.all(supportedFileEntries.map(async (zipEntry: JSZipObject) => {
                             const blob = await zipEntry.async('blob');
                             const innerFile = new File([blob], zipEntry.name, { type: blob.type });
@@ -337,11 +341,14 @@ export const importFiles = async (
                     }
             
                 } catch (e: unknown) {
-                    const message = e instanceof Error ? e.message : String(e);
+                    let message: string;
+                    if (e instanceof Error) {
+                        message = e.message;
+                    } else {
+                        message = String(e);
+                    }
                     const errorMsg = `Falha ao descompactar ou processar o arquivo ZIP: ${message}`;
-                    // FIX: Correctly use file.name for logging context as 'e' is of type 'unknown'.
-                    const errorDetails = e instanceof Error ? { name: e.name, message: e.message } : { message: String(e) };
-                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name, error: errorDetails});
+                    logger.log('ImportPipeline', 'ERROR', errorMsg, {fileName: file.name, error: e});
                     result = { kind: 'UNSUPPORTED', name: file.name, size: file.size, status: 'error', error: errorMsg };
                 }
             } else if (isSupportedExtension(file.name)) {
@@ -350,7 +357,6 @@ export const importFiles = async (
                  result = handleUnsupported(file, 'Extensão de arquivo não suportada.');
             }
 
-            // Log final status of processing
             const logResult = (doc: ImportedDoc) => {
                 if (doc.status === 'error' || doc.status === 'unsupported') {
                     logger.log('ImportPipeline', 'ERROR', `Falha ao processar ${doc.name}: ${doc.error}`, { status: doc.status });

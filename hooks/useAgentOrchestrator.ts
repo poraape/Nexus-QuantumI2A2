@@ -32,6 +32,49 @@ const initialAgentStates: AgentStates = {
 
 const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
 
+/**
+ * Analyzes an error object to provide a more specific, user-friendly message,
+ * inspired by the nexus_connectivity_validator manifest.
+ * @param error The error object caught.
+ * @returns A detailed, actionable error message string.
+ */
+const getDetailedErrorMessage = (error: unknown): string => {
+    logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
+
+    if (error instanceof Error) {
+        // Network/CORS errors in browsers often manifest as TypeErrors
+        if (error.name === 'TypeError' && error.message.toLowerCase().includes('failed to fetch')) {
+            return 'Falha de conexão. Verifique sua internet ou possíveis problemas de CORS.';
+        }
+
+        const message = error.message.toLowerCase();
+        if (message.includes('api key not valid')) {
+            return 'Chave de API inválida. Verifique sua configuração.';
+        }
+        if (message.includes('quota')) {
+            return 'Cota da API excedida. Por favor, tente novamente mais tarde.';
+        }
+        // Check for common HTTP status codes that might be in the message from the SDK
+        if (message.includes('400')) return 'Requisição inválida para a API. Verifique os dados enviados.';
+        if (message.includes('401') || message.includes('permission denied')) return 'Não autorizado. Verifique sua chave de API e permissões.';
+        if (message.includes('429')) return 'Muitas requisições. Por favor, aguarde e tente novamente.';
+        if (message.includes('500') || message.includes('503')) return 'O serviço de IA está indisponível ou com problemas. Tente novamente mais tarde.';
+        
+        return error.message; // Return the original message if no specific pattern is found
+    }
+
+    if (typeof error === 'string') {
+        return error;
+    }
+    
+    if (error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string') {
+        return (error as { message: string }).message;
+    }
+
+    return 'Ocorreu um erro desconhecido durante a operação.';
+};
+
+
 export const useAgentOrchestrator = () => {
     const [agentStates, setAgentStates] = useState<AgentStates>(initialAgentStates);
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
@@ -97,8 +140,9 @@ export const useAgentOrchestrator = () => {
             if (!hasValidDocs) {
                 let errorMessage = "Nenhum arquivo válido foi processado. Verifique os formatos.";
             
-                // If a single zip was uploaded and resulted in exactly one error document, use its specific error message.
-                if (isSingleZip && importedDocs.length === 1 && importedDocs[0].error) {
+                // If there's only one processed document (from a single file upload or a zip with one file)
+                // and it has an error, use its specific error message for better feedback.
+                if (importedDocs.length === 1 && importedDocs[0].error) {
                     errorMessage = importedDocs[0].error;
                 } 
                 // Fallback for a single zip that might have produced multiple error docs or an empty result.
@@ -148,14 +192,7 @@ export const useAgentOrchestrator = () => {
 
         } catch (err: unknown) {
             console.error('Pipeline failed:', err);
-            let errorMessage = 'Ocorreu um erro desconhecido.';
-            if (err instanceof Error) {
-                errorMessage = err.message;
-            } else if (typeof err === 'string') {
-                errorMessage = err;
-            } else if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
-                errorMessage = (err as { message: string }).message;
-            }
+            const errorMessage = getDetailedErrorMessage(err);
             setError(errorMessage);
             setPipelineError(true);
              const runningAgent = (Object.keys(agentStates) as AgentName[]).find(a => agentStates[a].status === 'running');
@@ -213,17 +250,7 @@ export const useAgentOrchestrator = () => {
             }
 
         } catch (err: unknown) {
-             let finalMessage = 'Ocorreu um erro na comunicação com a IA.';
-            // FIX: Safely check for properties on an unknown error type, prioritizing specific checks.
-            if (err instanceof Error) {
-                finalMessage = err.message;
-            } else if (err && typeof err === 'object') {
-                if ('status' in err && typeof (err as { status: unknown }).status === 'number' && (err as { status: number }).status === 401) {
-                    finalMessage = 'Chave de API inválida. Verifique sua configuração.';
-                } else if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
-                    finalMessage = (err as { message: string }).message;
-                }
-            }
+            const finalMessage = getDetailedErrorMessage(err);
             setError(finalMessage);
             setMessages(prev => prev.filter(m => m.id !== aiMessageId)); // Remove placeholder
         } finally {
