@@ -7,8 +7,9 @@ const ProgressTracker: React.FC<{ agentStates: AgentStates }> = ({ agentStates }
         { id: 'ocr', label: '1. Ag. OCR' },
         { id: 'auditor', label: '2. Ag. Auditor' },
         { id: 'classifier', label: '3. Ag. Classificador' },
-        { id: 'intelligence', label: '4. Ag. Inteligência' },
-        { id: 'accountant', label: '5. Ag. Contador' },
+        { id: 'crossValidator', label: '4. Ag. Validador' },
+        { id: 'intelligence', label: '5. Ag. Inteligência' },
+        { id: 'accountant', label: '6. Ag. Contador' },
     ];
 
     const runningAgent = (Object.keys(agentStates) as (keyof AgentStates)[]).find(key => agentStates[key].status === 'running');

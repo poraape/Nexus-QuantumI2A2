@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, SmartSearchResult } from '../types';
 import type { ExportType } from '../App';
 import Chart from './Chart';
 import { SendIcon, UserIcon, AiIcon, LoadingSpinnerIcon, StopIcon, DownloadIcon, DocumentTextIcon, PaperClipIcon } from './icons';
@@ -22,6 +22,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,6 +100,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
     return <div dangerouslySetInnerHTML={{ __html: html.replace(/\n/g, '<br />') }} />;
   };
 
+  const suggestedQuestions = [
+    "Qual foi o produto com o maior valor total?",
+    "Resuma as principais inconsistências encontradas.",
+    "Liste os 5 principais produtos por quantidade.",
+    "Existe alguma oportunidade de otimização fiscal nos dados?",
+  ];
+
+  const handleSuggestionClick = (question: string) => {
+      setInput(question);
+      chatInputRef.current?.focus();
+  };
+
+
   return (
     <div className="bg-gray-800 rounded-lg shadow-lg flex flex-col h-full max-h-[calc(100vh-12rem)] animate-fade-in">
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
@@ -162,6 +176,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
         <div ref={messagesEndRef} />
       </div>
       <div className="p-4 border-t border-gray-700">
+        {messages.length > 1 && !isStreaming && (
+            <div className="mb-3 text-center animate-fade-in">
+                <p className="text-xs text-gray-500 mb-2">Sugestões de Análise:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                    {suggestedQuestions.map((q, i) => (
+                        <button
+                            key={i}
+                            onClick={() => handleSuggestionClick(q)}
+                            className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1 rounded-full transition-colors"
+                        >
+                            {q}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        )}
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
             type="file"
@@ -182,6 +212,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isStream
             <PaperClipIcon className="w-5 h-5" />
           </button>
           <input
+            ref={chatInputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}

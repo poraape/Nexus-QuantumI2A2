@@ -1,5 +1,5 @@
 import React from 'react';
-import { DownloadIcon, LoadingSpinnerIcon, DocumentTextIcon, FileInfoIcon } from './icons';
+import { DownloadIcon, LoadingSpinnerIcon, DocumentTextIcon, FileInfoIcon, PanelLayoutIcon } from './icons';
 import type { ExportType } from '../App';
 import LogoIcon from './LogoIcon'; // Importa o novo ícone
 
@@ -10,13 +10,17 @@ interface HeaderProps {
     isExporting: ExportType | null;
     onExport: (type: ExportType) => void;
     onToggleLogs: () => void;
+    isPanelCollapsed?: boolean;
+    onTogglePanel?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onReset, showExports, showSpedExport, isExporting, onExport, onToggleLogs }) => {
+const Header: React.FC<HeaderProps> = ({ onReset, showExports, showSpedExport, isExporting, onExport, onToggleLogs, isPanelCollapsed, onTogglePanel }) => {
   const exportOptions: { type: ExportType, label: string, icon: React.ReactNode }[] = [
+      { type: 'pdf', label: 'PDF', icon: <span className="font-bold text-sm">P</span> },
       { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
       { type: 'html', label: 'HTML', icon: <span className="font-bold text-sm">H</span> },
-      { type: 'pdf', label: 'PDF', icon: <span className="font-bold text-sm">P</span> },
+      { type: 'xlsx', label: 'XLSX', icon: <span className="font-bold text-sm">X</span> },
+      { type: 'json', label: 'JSON', icon: <span className="font-bold text-sm">J</span> },
       { type: 'md', label: 'MD', icon: <span className="font-bold text-sm">M</span> },
   ];
 
@@ -43,6 +47,13 @@ const Header: React.FC<HeaderProps> = ({ onReset, showExports, showSpedExport, i
             <div className="flex items-center gap-2">
                  {showExports && (
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={onTogglePanel}
+                            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors w-9 h-9 flex items-center justify-center"
+                            title={isPanelCollapsed ? "Mostrar Painel de Análise" : "Ocultar Painel de Análise"}
+                        >
+                            <PanelLayoutIcon className="w-5 h-5"/>
+                        </button>
                         <span className="text-sm text-gray-400 hidden sm:block">Exportar Relatório:</span>
                         {exportOptions.map(({ type, label, icon }) => (
                             <button

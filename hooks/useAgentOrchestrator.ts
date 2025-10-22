@@ -9,8 +9,9 @@ import type { ChatMessage, ImportedDoc, AuditReport, ClassificationResult } from
 import type { Chat } from '@google/genai';
 import Papa from 'papaparse';
 import { logger } from '../services/logger';
+import { runDeterministicCrossValidation } from '../utils/fiscalCompare';
 
-export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'intelligence' | 'accountant';
+export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'crossValidator' | 'intelligence' | 'accountant';
 export type AgentStatus = 'pending' | 'running' | 'completed' | 'error';
 export interface AgentProgress {
   step: string;
@@ -26,6 +27,7 @@ const initialAgentStates: AgentStates = {
     ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
     auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+    crossValidator: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     intelligence: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     accountant: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
 };
@@ -67,8 +69,19 @@ const getDetailedErrorMessage = (error: unknown): string => {
         return error;
     }
     
-    if (error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string') {
-        return (error as { message: string }).message;
+    // FIX: Rewrote to be a more robust type guard for object-like errors.
+    // This prevents "property does not exist on type 'unknown'" errors by safely checking properties.
+    if (typeof error === 'object' && error !== null) {
+        // Check for a 'message' property
+        if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
+            return (error as { message: string }).message;
+        }
+        // Check for a 'status' property, which is common in fetch API errors
+        if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
+            const status = (error as { status: number }).status;
+            // Provide a generic message based on the status code
+            return `Ocorreu um erro de rede ou API com o status: ${status}.`;
+        }
     }
 
     return 'Ocorreu um erro desconhecido durante a operação.';
@@ -163,14 +176,20 @@ export const useAgentOrchestrator = () => {
             const classifiedReport = await runClassification(auditedReport, classificationCorrections);
             updateAgentState('classifier', 'completed');
 
-            // 4. Agente de Inteligência (IA)
+            // 4. Agente Validador Cruzado (Determinístico)
+            updateAgentState('crossValidator', 'running', { step: 'Executando validação cruzada...' });
+            const deterministicCrossValidation = await runDeterministicCrossValidation(classifiedReport);
+            const reportWithCrossValidation = { ...classifiedReport, deterministicCrossValidation };
+            updateAgentState('crossValidator', 'completed');
+
+            // 5. Agente de Inteligência (IA)
             updateAgentState('intelligence', 'running', { step: 'Analisando padrões com IA...' });
-            const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(classifiedReport);
+            const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation);
             updateAgentState('intelligence', 'completed');
 
-            // 5. Agente Contador
+            // 6. Agente Contador
             updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
-            const finalReport = await runAccountingAnalysis({ ...classifiedReport, aiDrivenInsights, crossValidationResults });
+            const finalReport = await runAccountingAnalysis({ ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults });
             setAuditReport(finalReport);
             updateAgentState('accountant', 'completed');
             
@@ -179,7 +198,7 @@ export const useAgentOrchestrator = () => {
                 .flatMap(d => d.doc.data!);
             const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
-            // 6. Preparar para Chat
+            // 7. Preparar para Chat
             logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.');
             chatRef.current = startChat(dataSampleForAI, finalReport.aggregatedMetrics);
             setMessages([

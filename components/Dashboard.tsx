@@ -4,6 +4,7 @@ import Chart from './Chart';
 import CrossValidationPanel from './CrossValidationPanel';
 import SmartSearch from './SmartSearch';
 import { parseSafeFloat } from '../utils/parsingUtils';
+import AnalysisDisplay from './AnalysisDisplay';
 
 interface DashboardProps {
     report: AuditReport;
@@ -105,13 +106,14 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
             ncmData[ncm] = (ncmData[ncm] || 0) + value;
         }
 
-        const ufDestData = validDocs.reduce((acc: Record<string, number>, auditedDoc) => {
+        // FIX: Replaced reduce with forEach to ensure correct type inference for ufDestData.
+        const ufDestData: Record<string, number> = {};
+        validDocs.forEach((auditedDoc) => {
             if (auditedDoc.doc.data && auditedDoc.doc.data.length > 0) {
                 const uf = auditedDoc.doc.data[0].destinatario_uf || 'N/A';
-                acc[uf] = (acc[uf] || 0) + 1;
+                ufDestData[uf] = (ufDestData[uf] || 0) + 1;
             }
-            return acc;
-        }, {});
+        });
 
 
         return {
@@ -188,7 +190,15 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
             </div>
 
             <div>
-                <h2 className="text-xl font-bold text-gray-200 mb-4 border-t border-gray-700 pt-8">Validação Cruzada Interdocumental (IA)</h2>
+                <h2 className="text-xl font-bold text-gray-200 mb-4 border-t border-gray-700 pt-8">Validação Cruzada Determinística</h2>
+                <p className="text-xs text-gray-500 mb-4">
+                    Comparações baseadas em regras para encontrar discrepâncias objetivas entre os documentos, como variações de preço ou NCMs inconsistentes para o mesmo produto.
+                </p>
+                <AnalysisDisplay results={report.deterministicCrossValidation} />
+            </div>
+
+            <div>
+                <h2 className="text-xl font-bold text-gray-200 mb-4 border-t border-gray-700 pt-8">Validação Cruzada por IA</h2>
                 <p className="text-xs text-gray-500 mb-4">
                     A IA compara atributos fiscais e valores entre todos os itens para encontrar inconsistências sutis ou padrões que merecem atenção.
                 </p>

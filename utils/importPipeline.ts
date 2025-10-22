@@ -76,6 +76,12 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
         return [];
     }
 
+    const maskCnpj = (cnpj: string | undefined): string | undefined => {
+        if (!cnpj || cnpj.length < 14) return cnpj; // Only mask valid full CNPJs
+        // Returns XX.XXX.XXX/****-XX format by masking the middle part
+        return `${cnpj.substring(0, 8)}****${cnpj.substring(12)}`;
+    };
+
     const items = Array.isArray(infNFe.det) ? infNFe.det : (infNFe.det ? [infNFe.det] : []);
     if (items.length === 0) {
         logger.log('ImportPipeline', 'WARN', 'Nenhum item <det> encontrado no XML.');
@@ -125,8 +131,10 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
             data_emissao: getXmlValue(ide.dhEmi),
             valor_total_nfe: nfeTotalValue,
             emitente_nome: getXmlValue(emit.xNome),
+            emitente_cnpj: maskCnpj(getXmlValue(emit.CNPJ)),
             emitente_uf: getXmlValue(enderEmit.UF),
             destinatario_nome: getXmlValue(dest.xNome),
+            destinatario_cnpj: maskCnpj(getXmlValue(dest.CNPJ)),
             destinatario_uf: getXmlValue(enderDest.UF),
             produto_nome: getXmlValue(prod.xProd),
             produto_ncm: getXmlValue(prod.NCM),

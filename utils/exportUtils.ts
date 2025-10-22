@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import type { AuditReport, AuditedDocument } from '../types';
 
 // --- Helper Functions ---
 
@@ -34,6 +35,75 @@ const getChartImages = async (element: HTMLElement): Promise<Map<HTMLElement, st
 };
 
 // --- Export Functions ---
+
+export const exportToJson = async (report: AuditReport, filename: string) => {
+    const jsonContent = JSON.stringify(report, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' });
+    saveAs(blob, `${filename}.json`);
+};
+
+export const exportToXlsx = async (report: AuditReport, filename: string) => {
+    const { utils, writeFile } = await import('xlsx');
+    const wb = utils.book_new();
+
+    // Summary Sheet
+    const summaryData = [
+        ['Título', report.summary.title],
+        ['Resumo', report.summary.summary],
+        [],
+        ['Métricas Chave'],
+        ['Métrica', 'Valor', 'Insight'],
+        ...report.summary.keyMetrics.map(m => [m.metric, m.value, m.insight]),
+        [],
+        ['Insights Acionáveis'],
+        ...report.summary.actionableInsights.map(i => [i]),
+        [],
+        ['Recomendações Estratégicas'],
+        ...(report.summary.strategicRecommendations || []).map(r => [r])
+    ];
+    const wsSummary = utils.aoa_to_sheet(summaryData);
+    utils.book_append_sheet(wb, wsSummary, 'Resumo Executivo');
+
+    // Document Details Sheet
+    const docDetailsData = report.documents.flatMap(d => {
+        if (!d.doc.data || d.doc.data.length === 0) {
+            // FIX: Added 'Classificação' to ensure a consistent object shape, resolving the type error.
+            return [{ 
+                Documento: d.doc.name, 
+                Status: d.status, 
+                Classificação: d.classification?.operationType || 'N/A',
+                "Nome Produto": "N/A - Sem itens" 
+            }];
+        }
+        return d.doc.data.map(item => ({
+            Documento: d.doc.name,
+            Status: d.status,
+            Classificação: d.classification?.operationType,
+            ...item
+        }));
+    });
+    if(docDetailsData.length > 0) {
+        const wsDocs = utils.json_to_sheet(docDetailsData);
+        utils.book_append_sheet(wb, wsDocs, 'Detalhes dos Itens');
+    }
+
+    // Inconsistencies Sheet
+    const inconsistenciesData = report.documents.flatMap(d =>
+        d.inconsistencies.map(inc => ({
+            Documento: d.doc.name,
+            Severidade: inc.severity,
+            Código: inc.code,
+            Mensagem: inc.message,
+            Explicação: inc.explanation,
+        }))
+    );
+    if(inconsistenciesData.length > 0) {
+        const wsInconsistencies = utils.json_to_sheet(inconsistenciesData);
+        utils.book_append_sheet(wb, wsInconsistencies, 'Inconsistências');
+    }
+
+    writeFile(wb, `${filename}.xlsx`);
+};
 
 export const exportToMarkdown = async (element: HTMLElement, filename: string) => {
     let markdown = '';

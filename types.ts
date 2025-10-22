@@ -119,7 +119,22 @@ export interface CrossValidationResult {
 
 export interface SmartSearchResult {
     summary: string;
-    data?: Record<string, any>[]; // Optional structured data for a table
+    data?: string[][]; // Optional structured data for a table
+}
+
+export interface DeterministicDiscrepancy {
+  valueA: string | number;
+  docA: { name: string; internal_path?: string };
+  valueB: string | number;
+  docB: { name: string; internal_path?: string };
+}
+
+export interface DeterministicCrossValidationResult {
+  comparisonKey: string; // e.g., the product name
+  attribute: string; // e.g., 'Preço Unitário'
+  description: string;
+  discrepancies: DeterministicDiscrepancy[];
+  severity: 'ALERTA' | 'INFO';
 }
 
 export interface AuditReport {
@@ -130,4 +145,5 @@ export interface AuditReport {
   spedFile?: SpedFile;
   aiDrivenInsights?: AIDrivenInsight[];
   crossValidationResults?: CrossValidationResult[];
+  deterministicCrossValidation?: DeterministicCrossValidationResult[];
 }

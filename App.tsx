@@ -7,13 +7,13 @@ import Toast from './components/Toast';
 import ProgressTracker from './components/ProgressTracker';
 import PipelineErrorDisplay from './components/PipelineErrorDisplay';
 import { useAgentOrchestrator } from './hooks/useAgentOrchestrator';
-import { exportToMarkdown, exportToHtml, exportToPdf, exportToDocx } from './utils/exportUtils';
+import { exportToMarkdown, exportToHtml, exportToPdf, exportToDocx, exportToJson, exportToXlsx } from './utils/exportUtils';
 import LogsPanel from './components/LogsPanel';
 import Dashboard from './components/Dashboard';
 import type { AuditReport } from './types';
 import IncrementalInsights from './components/IncrementalInsights';
 
-export type ExportType = 'md' | 'html' | 'pdf' | 'docx' | 'sped';
+export type ExportType = 'md' | 'html' | 'pdf' | 'docx' | 'sped' | 'xlsx' | 'json';
 type PipelineStep = 'UPLOAD' | 'PROCESSING' | 'COMPLETE' | 'ERROR';
 type ActiveView = 'report' | 'dashboard' | 'comparative';
 
@@ -24,6 +24,7 @@ const App: React.FC = () => {
     const [activeView, setActiveView] = useState<ActiveView>('report');
     const [analysisHistory, setAnalysisHistory] = useState<AuditReport[]>([]);
     const [processedFiles, setProcessedFiles] = useState<File[]>([]);
+    const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
 
 
     const {
@@ -67,6 +68,7 @@ const App: React.FC = () => {
     }, [isPipelineComplete, pipelineError]);
 
     const handleStartAnalysis = (files: File[]) => {
+        setIsPanelCollapsed(false);
         setProcessedFiles(files);
         runPipeline(files);
     };
@@ -89,6 +91,7 @@ const App: React.FC = () => {
     };
 
     const handleReset = () => {
+        setIsPanelCollapsed(false);
         setPipelineStep('UPLOAD');
         setError(null);
         setAnalysisHistory([]);
@@ -117,6 +120,16 @@ const App: React.FC = () => {
                     throw new Error("Arquivo SPED não foi gerado.");
                  }
                  return;
+            }
+
+            if (type === 'json') {
+                await exportToJson(auditReport, filename);
+                return;
+            }
+    
+            if (type === 'xlsx') {
+                await exportToXlsx(auditReport, filename);
+                return;
             }
             
             if (!exportableContentRef.current) return;
@@ -152,7 +165,7 @@ const App: React.FC = () => {
                 if (!auditReport) return null;
                 return (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-                        <div className="flex flex-col gap-6 lg:gap-8">
+                        <div className={`flex-col gap-6 lg:gap-8 ${isPanelCollapsed ? 'hidden' : 'flex'}`}>
                             {/* View Switcher */}
                              <div className="flex items-center gap-2 bg-gray-800 p-1.5 rounded-lg">
                                 <button onClick={() => setActiveView('report')} className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-colors ${activeView === 'report' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}>
@@ -180,7 +193,7 @@ const App: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                        <div className="lg:sticky lg:top-24">
+                        <div className={`lg:sticky lg:top-24 transition-all duration-300 ${isPanelCollapsed ? 'lg:col-span-2 max-w-4xl mx-auto w-full' : ''}`}>
                             <ChatPanel
                                 messages={messages}
                                 onSendMessage={handleSendMessage}
@@ -204,11 +217,13 @@ const App: React.FC = () => {
         <div className="bg-gray-900 text-white min-h-screen font-sans">
             <Header
                 onReset={handleReset}
-                showExports={pipelineStep === 'COMPLETE' && !!auditReport && activeView === 'report'}
+                showExports={pipelineStep === 'COMPLETE' && !!auditReport}
                 showSpedExport={pipelineStep === 'COMPLETE' && !!auditReport?.spedFile}
                 onExport={handleExport}
                 isExporting={isExporting}
                 onToggleLogs={() => setShowLogs(!showLogs)}
+                isPanelCollapsed={isPanelCollapsed}
+                onTogglePanel={() => setIsPanelCollapsed(!isPanelCollapsed)}
             />
             <main className="container mx-auto p-4 md:p-6 lg:p-8">
                 {renderContent()}

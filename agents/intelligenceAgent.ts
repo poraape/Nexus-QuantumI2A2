@@ -31,7 +31,6 @@ const intelligenceSchema = {
           observation: { type: Type.STRING, description: "Breve explicação da IA sobre a inconsistência." },
           documents: {
             type: Type.ARRAY,
-            minItems: 2,
             items: {
               type: Type.OBJECT,
               properties: {
