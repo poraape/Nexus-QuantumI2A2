@@ -9,6 +9,7 @@ import type { ChatMessage, ImportedDoc, AuditReport, ClassificationResult } from
 import type { Chat } from '@google/genai';
 import Papa from 'papaparse';
 import { logger } from '../services/logger';
+import { telemetry } from '../services/telemetry';
 import { runDeterministicCrossValidation } from '../utils/fiscalCompare';
 
 export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'crossValidator' | 'intelligence' | 'accountant';
@@ -23,7 +24,7 @@ export type AgentStates = Record<AgentName, AgentState>;
 type ClassificationCorrections = Record<string, ClassificationResult['operationType']>;
 
 
-const initialAgentStates: AgentStates = {
+export const initialAgentStates: AgentStates = {
     ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
     auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
     classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
@@ -47,7 +48,7 @@ const generateExecutionId = (): string => {
  * @param error The error object caught.
  * @returns A detailed, actionable error message string.
  */
-const getDetailedErrorMessage = (error: unknown): string => {
+export const getDetailedErrorMessage = (error: unknown): string => {
     logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
 
     if (error instanceof Error) {
@@ -106,19 +107,21 @@ export const useAgentOrchestrator = () => {
     const [classificationCorrections, setClassificationCorrections] = useState<ClassificationCorrections>({});
 
     const chatRef = useRef<Chat | null>(null);
+    const chatCorrelationRef = useRef<string | null>(null);
     const streamController = useRef<AbortController | null>(null);
     const executionIdRef = useRef<string>('');
     
     // Load corrections from localStorage on initial mount
     useEffect(() => {
+        const correlationId = telemetry.createCorrelationId('backend');
         try {
             const storedCorrections = localStorage.getItem(CORRECTIONS_STORAGE_KEY);
             if (storedCorrections) {
                 setClassificationCorrections(JSON.parse(storedCorrections));
-                logger.log('Orchestrator', 'INFO', `Carregadas ${Object.keys(JSON.parse(storedCorrections)).length} correções de classificação do localStorage.`);
+                logger.log('Orchestrator', 'INFO', `Carregadas ${Object.keys(JSON.parse(storedCorrections)).length} correções de classificação do localStorage.`, undefined, { correlationId, scope: 'backend' });
             }
         } catch (e) {
-            logger.log('Orchestrator', 'ERROR', 'Falha ao carregar correções do localStorage.', { error: e });
+            logger.log('Orchestrator', 'ERROR', 'Falha ao carregar correções do localStorage.', { error: e }, { correlationId: telemetry.createCorrelationId('backend'), scope: 'backend' });
         }
     }, []);
     
@@ -134,32 +137,38 @@ export const useAgentOrchestrator = () => {
     }, [executionIdRef]);
 
     const runPipeline = useCallback(async (files: File[]) => {
-        logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.');
+        const pipelineCorrelationId = telemetry.createCorrelationId('backend');
+        const agentCorrelations: Record<AgentName, string> = {
+            ocr: telemetry.createCorrelationId('ocr', pipelineCorrelationId),
+            auditor: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            classifier: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            crossValidator: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            intelligence: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+            accountant: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+        };
+        logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.', undefined, { correlationId: pipelineCorrelationId, scope: 'backend' });
         // Don't clear logs on incremental runs, just reset pipeline state
         reset();
-
-        const executionId = generateExecutionId();
-        executionIdRef.current = executionId;
-        logger.log('Orchestrator', 'INFO', `ID de execução atribuído: ${executionId}`);
 
         const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
             setAgentStates(prev => {
                 const newState = { ...prev, [agent]: { status, progress: { ...prev[agent].progress, ...progress } } };
-                if(status === 'running') logger.log(agent, 'INFO', `Iniciando - ${progress?.step || ''}`);
-                if(status === 'completed') logger.log(agent, 'INFO', `Concluído.`);
+                const correlationId = agentCorrelations[agent];
+                if(status === 'running') logger.log(agent, 'INFO', `Iniciando - ${progress?.step || ''}`, undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
+                if(status === 'completed') logger.log(agent, 'INFO', `Concluído.`, undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
                 return newState;
             });
         };
-        
+
         try {
 
             // 1. Agente OCR / NLP
             updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
             const importedDocs = await importFiles(files, (current, total) => {
                 updateAgentState('ocr', 'running', { step: 'Processando arquivos...', current, total });
-            });
+            }, agentCorrelations.ocr);
             updateAgentState('ocr', 'completed');
-            
+
             const isSingleZip = files.length === 1 && (files[0].name.toLowerCase().endsWith('.zip') || files[0].type.includes('zip'));
             const hasValidDocs = importedDocs.some(d => d.status !== 'unsupported' && d.status !== 'error');
 
@@ -178,15 +187,15 @@ export const useAgentOrchestrator = () => {
             
                 throw new Error(errorMessage);
             }
-            
+
             // 2. Agente Auditor
             updateAgentState('auditor', 'running', { step: `Validando ${importedDocs.length} documentos...` });
-            const auditedReport = await runAudit(importedDocs);
+            const auditedReport = await runAudit(importedDocs, agentCorrelations.auditor);
             updateAgentState('auditor', 'completed');
 
             // 3. Agente Classificador
             updateAgentState('classifier', 'running', { step: 'Classificando operações...' });
-            const classifiedReport = await runClassification(auditedReport, classificationCorrections);
+            const classifiedReport = await runClassification(auditedReport, classificationCorrections, agentCorrelations.classifier);
             updateAgentState('classifier', 'completed');
 
             // 4. Agente Validador Cruzado (Determinístico)
@@ -203,12 +212,12 @@ export const useAgentOrchestrator = () => {
 
             // 5. Agente de Inteligência (IA)
             updateAgentState('intelligence', 'running', { step: 'Analisando padrões com IA...' });
-            const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation);
+            const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation, agentCorrelations.intelligence);
             updateAgentState('intelligence', 'completed');
 
             // 6. Agente Contador
             updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
-            const finalReport = await runAccountingAnalysis({ ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults });
+            const finalReport = await runAccountingAnalysis({ ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults }, agentCorrelations.accountant);
             setAuditReport(finalReport);
             updateAgentState('accountant', 'completed');
             
@@ -218,7 +227,8 @@ export const useAgentOrchestrator = () => {
             const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
 
             // 7. Preparar para Chat
-            logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.');
+            chatCorrelationRef.current = telemetry.createCorrelationId('llm', pipelineCorrelationId);
+            logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.', undefined, { correlationId: chatCorrelationRef.current, scope: 'llm' });
             chatRef.current = startChat(dataSampleForAI, finalReport.aggregatedMetrics);
             setMessages([
                 {
@@ -230,6 +240,7 @@ export const useAgentOrchestrator = () => {
 
         } catch (err: unknown) {
             console.error('Pipeline failed:', err);
+            logger.log('Orchestrator', 'ERROR', 'Falha na execução do pipeline.', { error: err }, { correlationId: pipelineCorrelationId, scope: 'backend' });
             const errorMessage = getDetailedErrorMessage(err);
             setError(errorMessage);
             setPipelineError(true);
@@ -246,10 +257,11 @@ export const useAgentOrchestrator = () => {
         if (streamController.current) {
             streamController.current.abort();
             setIsStreaming(false);
-            logger.log('ChatService', 'WARN', 'Geração de resposta do chat interrompida pelo usuário.');
+            const correlationId = chatCorrelationRef.current || telemetry.createCorrelationId('llm');
+            logger.log('ChatService', 'WARN', 'Geração de resposta do chat interrompida pelo usuário.', undefined, { correlationId, scope: 'llm' });
         }
     }, []);
-    
+
     const handleSendMessage = useCallback(async (message: string) => {
         if (!chatRef.current) {
             setError('O chat não foi inicializado. Por favor, execute uma análise primeiro.');
@@ -268,7 +280,8 @@ export const useAgentOrchestrator = () => {
         const signal = streamController.current.signal;
 
         try {
-            const stream = sendMessageStream(chatRef.current, message);
+            const messageCorrelationId = telemetry.createCorrelationId('llm', chatCorrelationRef.current || undefined);
+            const stream = sendMessageStream(chatRef.current, message, messageCorrelationId);
             for await (const chunk of stream) {
                 if (signal.aborted) break;
                 fullAiResponse += chunk;
@@ -280,7 +293,7 @@ export const useAgentOrchestrator = () => {
                     const finalJson = JSON.parse(fullAiResponse);
                     setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, ...finalJson } : m));
                 } catch(parseError) {
-                     logger.log('ChatService', 'ERROR', 'Falha ao analisar a resposta JSON final da IA.', { error: parseError, response: fullAiResponse });
+                     logger.log('ChatService', 'ERROR', 'Falha ao analisar a resposta JSON final da IA.', { error: parseError, response: fullAiResponse }, { correlationId: messageCorrelationId, scope: 'llm' });
                      const errorMessage = 'A IA retornou uma resposta em formato inválido. Por favor, tente novamente.';
                      setError(errorMessage);
                      setMessages(prev => prev.map(m => m.id === aiMessageId ? { ...m, text: errorMessage } : m));
@@ -317,9 +330,9 @@ export const useAgentOrchestrator = () => {
         setClassificationCorrections(newCorrections);
         try {
             localStorage.setItem(CORRECTIONS_STORAGE_KEY, JSON.stringify(newCorrections));
-            logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`);
+            logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`, undefined, { correlationId: telemetry.createCorrelationId('backend'), scope: 'backend' });
         } catch(e) {
-            logger.log('Orchestrator', 'ERROR', `Falha ao salvar correção no localStorage.`, { error: e });
+            logger.log('Orchestrator', 'ERROR', `Falha ao salvar correção no localStorage.`, { error: e }, { correlationId: telemetry.createCorrelationId('backend'), scope: 'backend' });
             setError('Não foi possível salvar a correção de classificação. Ela será perdida ao recarregar a página.');
         }
 
