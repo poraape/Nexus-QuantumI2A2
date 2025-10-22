@@ -1,35 +1,34 @@
-import { Type } from "@google/genai";
 import type { AnalysisResult, AuditReport, AccountingEntry, AuditedDocument, SpedFile } from '../types';
 import { logger } from "../services/logger";
 import { parseSafeFloat } from "../utils/parsingUtils";
-import { generateJSON } from "../services/geminiService";
+import { generateJSON, ResponseSchema } from "../services/llmService";
 
-const analysisResponseSchema = {
-  type: Type.OBJECT,
+const analysisResponseSchema: ResponseSchema = {
+  type: 'object',
   properties: {
-    title: { type: Type.STRING },
-    summary: { type: Type.STRING },
+    title: { type: 'string' },
+    summary: { type: 'string' },
     keyMetrics: {
-      type: Type.ARRAY,
+      type: 'array',
       items: {
-        type: Type.OBJECT,
+        type: 'object',
         properties: {
-          metric: { type: Type.STRING },
-          value: { type: Type.STRING },
-          insight: { type: Type.STRING },
+          metric: { type: 'string' },
+          value: { type: 'string' },
+          insight: { type: 'string' },
         },
         required: ['metric', 'value', 'insight'],
       },
     },
     actionableInsights: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: 'array',
+      items: { type: 'string' },
     },
     strategicRecommendations: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-        description: 'Recomendações estratégicas de alto nível para o negócio.'
-    }
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Recomendações estratégicas de alto nível para o negócio.',
+    },
   },
   required: ['title', 'summary', 'keyMetrics', 'actionableInsights', 'strategicRecommendations'],
 };
@@ -145,9 +144,10 @@ const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Rec
     `;
   
   return generateJSON<AnalysisResult>(
-    'gemini-2.5-flash',
+    'gemini-2.0-flash',
     prompt,
-    analysisResponseSchema
+    analysisResponseSchema,
+    'accounting-analysis'
   );
 };
 

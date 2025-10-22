@@ -1,8 +1,9 @@
 import type { ImportedDoc } from '../types';
-import { runOCRFromImage } from '../agents/ocrExtractor';
 import { extractDataFromText } from '../agents/nlpAgent';
 import { logger } from '../services/logger';
 import { parseSafeFloat } from './parsingUtils';
+import { runOCR } from '../services/ocrService';
+import { sanitizeRecords } from '../services/sanitizationService';
 
 import JSZip, { type JSZipObject } from 'jszip';
 import Papa from 'papaparse';
@@ -76,12 +77,6 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
         return [];
     }
 
-    const maskCnpj = (cnpj: string | undefined): string | undefined => {
-        if (!cnpj || cnpj.length < 14) return cnpj; // Only mask valid full CNPJs
-        // Returns XX.XXX.XXX/****-XX format by masking the middle part
-        return `${cnpj.substring(0, 8)}****${cnpj.substring(12)}`;
-    };
-
     const items = Array.isArray(infNFe.det) ? infNFe.det : (infNFe.det ? [infNFe.det] : []);
     if (items.length === 0) {
         logger.log('ImportPipeline', 'WARN', 'Nenhum item <det> encontrado no XML.');
@@ -131,10 +126,10 @@ const normalizeNFeData = (nfeData: any): Record<string, any>[] => {
             data_emissao: getXmlValue(ide.dhEmi),
             valor_total_nfe: nfeTotalValue,
             emitente_nome: getXmlValue(emit.xNome),
-            emitente_cnpj: maskCnpj(getXmlValue(emit.CNPJ)),
+            emitente_cnpj: getXmlValue(emit.CNPJ),
             emitente_uf: getXmlValue(enderEmit.UF),
             destinatario_nome: getXmlValue(dest.xNome),
-            destinatario_cnpj: maskCnpj(getXmlValue(dest.CNPJ)),
+            destinatario_cnpj: getXmlValue(dest.CNPJ),
             destinatario_uf: getXmlValue(enderDest.UF),
             produto_nome: getXmlValue(prod.xProd),
             produto_ncm: getXmlValue(prod.NCM),
@@ -171,7 +166,8 @@ const handleXML = async (file: File): Promise<ImportedDoc> => {
             parseAttributeValue: false,
         });
         const jsonObj = parser.parse(text);
-        const data = normalizeNFeData(jsonObj);
+        const rawData = normalizeNFeData(jsonObj);
+        const data = await sanitizeRecords(rawData);
 
         if (data.length === 0) {
             return { kind: 'NFE_XML', name: file.name, size: file.size, status: 'error', error: 'Nenhum item de produto encontrado no XML ou XML malformado.', raw: file };
@@ -191,8 +187,9 @@ const handleCSV = (file: File): Promise<ImportedDoc> => {
             skipEmptyLines: true,
             dynamicTyping: true,
             transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_'),
-            complete: (results) => {
-                resolve({ kind: 'CSV', name: file.name, size: file.size, status: 'parsed', data: results.data as Record<string, any>[], raw: file });
+            complete: async (results) => {
+                const sanitized = await sanitizeRecords(results.data as Record<string, any>[]);
+                resolve({ kind: 'CSV', name: file.name, size: file.size, status: 'parsed', data: sanitized, raw: file });
             },
             error: (error: unknown) => {
                 const message = error instanceof Error ? error.message : String(error);
@@ -210,7 +207,8 @@ const handleXLSX = async (file: File): Promise<ImportedDoc> => {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const data = utils.sheet_to_json(worksheet) as Record<string, any>[];
-        return { kind: 'XLSX', name: file.name, size: file.size, status: 'parsed', data, raw: file };
+        const sanitized = await sanitizeRecords(data);
+        return { kind: 'XLSX', name: file.name, size: file.size, status: 'parsed', data: sanitized, raw: file };
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         return { kind: 'XLSX', name: file.name, size: file.size, status: 'error', error: `Erro ao processar XLSX: ${message}`, raw: file };
@@ -220,15 +218,16 @@ const handleXLSX = async (file: File): Promise<ImportedDoc> => {
 const handleImage = async (file: File): Promise<ImportedDoc> => {
     try {
         const buffer = await file.arrayBuffer();
-        const text = await runOCRFromImage(buffer);
+        const text = await runOCR(buffer, file.name);
         if (!text.trim()) {
             return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: 'Nenhum texto detectado na imagem (OCR).', raw: file };
         }
          const data = await extractDataFromText(text);
-        if (data.length === 0) {
+        const sanitizedData = data.length > 0 ? await sanitizeRecords(data) : data;
+        if (sanitizedData.length === 0) {
             logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto da imagem ${file.name}`);
         }
-        return { kind: 'IMAGE', name: file.name, size: file.size, status: 'parsed', text, data, raw: file };
+        return { kind: 'IMAGE', name: file.name, size: file.size, status: 'parsed', text, data: sanitizedData, raw: file };
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         return { kind: 'IMAGE', name: file.name, size: file.size, status: 'error', error: message, raw: file };
@@ -248,20 +247,22 @@ const handlePDF = async (file: File): Promise<ImportedDoc> => {
         
         let doc: ImportedDoc = { kind: 'PDF', name: file.name, size: file.size, status: 'parsed', text: fullText, raw: file };
 
-        if (fullText.trim().length > 10) { // Check if text was extracted
+        if (fullText.trim().length > 10) {
              const data = await extractDataFromText(fullText);
-             if (data.length === 0) {
+             const sanitizedData = data.length > 0 ? await sanitizeRecords(data) : data;
+             if (sanitizedData.length === 0) {
                 logger.log('nlpAgent', 'WARN', `Nenhum dado estruturado extraído do texto do PDF ${file.name}`);
              }
-             doc.data = data;
+             doc.data = sanitizedData;
         } else {
             logger.log('ocrExtractor', 'INFO', `PDF ${file.name} sem texto, tentando OCR.`);
-            const ocrText = await runOCRFromImage(buffer);
+            const ocrText = await runOCR(buffer, file.name);
             if (!ocrText.trim()) {
                 throw new Error("Documento PDF parece estar vazio ou não contém texto legível (falha no OCR).");
             }
             doc.text = ocrText;
-            doc.data = await extractDataFromText(ocrText);
+            const extracted = await extractDataFromText(ocrText);
+            doc.data = extracted.length > 0 ? await sanitizeRecords(extracted) : extracted;
         }
         return doc;
 

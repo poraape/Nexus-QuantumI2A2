@@ -1,31 +1,30 @@
 import React, { useState, useCallback } from 'react';
-import { Type } from "@google/genai";
 import type { AuditReport, SmartSearchResult } from '../types';
 import Papa from 'papaparse';
 import { AiIcon, LoadingSpinnerIcon, SendIcon } from './icons';
 import { logger } from '../services/logger';
-import { generateJSON } from '../services/geminiService';
+import { generateJSON, ResponseSchema } from '../services/llmService';
 
-const searchResponseSchema = {
-    type: Type.OBJECT,
+const searchResponseSchema: ResponseSchema = {
+    type: 'object',
     properties: {
         summary: {
-            type: Type.STRING,
-            description: "Uma resposta textual concisa e direta para a pergunta do usuário."
+            type: 'string',
+            description: 'Uma resposta textual concisa e direta para a pergunta do usuário.'
         },
         data: {
-            type: Type.ARRAY,
+            type: ['array', 'null'],
             nullable: true,
-            description: "Opcional: Dados estruturados se a resposta puder ser representada em uma tabela. A primeira linha (primeiro array) DEVE ser o cabeçalho.",
+            description: 'Opcional: Dados estruturados se a resposta puder ser representada em uma tabela.',
             items: {
-                type: Type.ARRAY,
+                type: 'array',
                 items: {
-                    type: Type.STRING, // Each cell is a string
+                    type: 'string',
                 },
             }
         }
     },
-    required: ['summary']
+    required: ['summary'],
 };
 
 interface SmartSearchProps {
@@ -51,12 +50,12 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
             const validDocsData = report.documents
                 .filter(d => d.status !== 'ERRO' && d.doc.data)
                 .flatMap(d => d.doc.data!);
-            
+
             const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 500));
-            
+
             const prompt = `
                 Você é um assistente de análise de dados fiscais. Responda à pergunta do usuário com base EXCLUSIVAMENTE nos dados fornecidos.
-                
+
                 Métricas Agregadas (Fonte de verdade para totais):
                 ${JSON.stringify(report.aggregatedMetrics, null, 2)}
 
@@ -71,11 +70,12 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
             `;
 
             const searchResult = await generateJSON<SmartSearchResult>(
-                'gemini-2.5-flash',
+                'gemini-2.0-flash',
                 prompt,
-                searchResponseSchema
+                searchResponseSchema,
+                'smart-search'
             );
-            
+
             setResult(searchResult);
             logger.log('SmartSearch', 'INFO', `Busca inteligente concluída com sucesso.`);
 
@@ -111,7 +111,7 @@ const SmartSearch: React.FC<SmartSearchProps> = ({ report }) => {
                     {isLoading ? <LoadingSpinnerIcon className="w-5 h-5 animate-spin" /> : <SendIcon className="w-5 h-5" />}
                 </button>
             </form>
-            
+
             {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
             {result && (
