@@ -42,3 +42,16 @@ def test_recompute_totals(monkeypatch) -> None:
     assert repaired.totals.grand_total == pytest.approx(180.0)
     assert repaired.totals.items_total == pytest.approx(180.0)
     assert repaired.totals.taxes_total == pytest.approx(0.0)
+
+
+def test_apply_icms_adjustment(monkeypatch) -> None:
+    document = build_document_with_zero_totals()
+    document.metadata.update({"origem_uf": "SP", "destino_uf": "RJ"})
+    repaired = AccountantAgent.recompute_totals(document)
+    assert isinstance(repaired, Document)
+
+    adjusted = AccountantAgent.apply_icms_adjustment(repaired)
+    assert adjusted.totals.taxes_total == pytest.approx(21.6)
+    assert adjusted.totals.grand_total == pytest.approx(adjusted.totals.items_total + adjusted.totals.taxes_total)
+    assert "what_if_icms" in adjusted.metadata
+    assert adjusted.metadata["what_if_icms"]["RJ"]["icms_estimado"] == pytest.approx(21.6)

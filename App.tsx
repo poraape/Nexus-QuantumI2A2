@@ -208,6 +208,7 @@ const App: React.FC = () => {
                 onExport={handleExport}
                 isExporting={isExporting}
                 onToggleLogs={() => setShowLogs(!showLogs)}
+                onHomeClick={handleReset}
             />
             <main className="container mx-auto p-4 md:p-6 lg:p-8">
                 {renderContent()}

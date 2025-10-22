@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import logging
-import time
-from typing import Any, Iterable, Union
+from typing import Any, Dict, Union
 
 from app.agents.base import Agent, retryable
-from app.schemas import AccountingOutput, ClassificationResult, Document, DocumentTotals
+from app.core.totals import ensure_document_totals, to_float, totals_as_dict
+from app.core.tax_rules import adjust_icms_by_uf
+from app.core.tax_simulation import simulate_icms_scenarios
+from app.schemas import AccountingOutput, ClassificationResult, Document
 from app.services import accounting_service
 from app.services.diagnostic_logger import append_fix_report, log_totals_event
 
@@ -17,115 +19,102 @@ class AccountantAgent(Agent):
     name = "accountant"
 
     @staticmethod
-    def _iter_items(items: Iterable[Any]) -> Iterable[Any]:
-        return items or []
-
-    @staticmethod
-    def _item_total(item: Any) -> float:
-        if hasattr(item, "total_value"):
-            return float(getattr(item, "total_value") or 0)
-        if isinstance(item, dict):
-            try:
-                return float(item.get("total_value", 0) or 0)
-            except (TypeError, ValueError):
-                return 0.0
-        return 0.0
-
-    @staticmethod
-    def _item_taxes(item: Any) -> float:
-        taxes = None
-        if hasattr(item, "taxes"):
-            taxes = getattr(item, "taxes")
-        elif isinstance(item, dict):
-            taxes = item.get("taxes")
-
-        if isinstance(taxes, dict):
-            amount = 0.0
-            for value in taxes.values():
-                if isinstance(value, dict):
-                    amount += float(value.get("value", 0) or 0)
-                else:
-                    try:
-                        amount += float(value or 0)
-                    except (TypeError, ValueError):
-                        continue
-            return amount
-        return 0.0
-
-    @staticmethod
-    def _current_totals(document: Union[Document, dict[str, Any]]) -> dict[str, float]:
-        if isinstance(document, Document) and document.totals:
-            return document.totals.model_dump()
-        if isinstance(document, dict):
-            totals = document.get("totals", {})
-            if isinstance(totals, dict):
-                return dict(totals)
-        return {}
-
-    @staticmethod
-    def recompute_totals(document: Union[Document, dict[str, Any]]) -> Union[Document, dict[str, Any]]:
-        start = time.perf_counter()
-        current_totals = AccountantAgent._current_totals(document)
-        needs_recompute = not current_totals or any(
-            value is None or float(value) == 0 for value in current_totals.values()
+    def apply_icms_adjustment(document: Document) -> Document:
+        metadata = document.metadata or {}
+        origem = (
+            metadata.get("origem_uf")
+            or metadata.get("emitente_uf")
+            or metadata.get("uf_origem")
+            or "SP"
+        )
+        destino = (
+            metadata.get("destino_uf")
+            or metadata.get("destinatario_uf")
+            or metadata.get("uf_destino")
+            or "SP"
         )
 
-        items_total = 0.0
-        taxes_total = 0.0
+        override_config = metadata.get("icms_overrides") if isinstance(metadata, dict) else {}
+        destination_overrides: Dict[str, float] = {}
+        pair_overrides: Dict[tuple[str, str], float] = {}
 
-        if isinstance(document, Document):
-            items_iterable = AccountantAgent._iter_items(document.items)
-        elif isinstance(document, dict):
-            items_iterable = AccountantAgent._iter_items(document.get("items", []))
-        else:
-            items_iterable = []
+        if isinstance(override_config, dict):
+            for key, value in override_config.items():
+                try:
+                    rate = float(value)
+                except (TypeError, ValueError):
+                    continue
+                if rate > 1:
+                    rate = rate / 100.0
 
-        for item in items_iterable:
-            items_total += AccountantAgent._item_total(item)
-            taxes_total += AccountantAgent._item_taxes(item)
+                if isinstance(key, (tuple, list)) and len(key) == 2:
+                    pair_overrides[(str(key[0]).upper(), str(key[1]).upper())] = rate
+                elif isinstance(key, str) and "->" in key:
+                    parts = key.split("->")
+                    if len(parts) == 2:
+                        pair_overrides[(parts[0].strip().upper(), parts[1].strip().upper())] = rate
+                elif isinstance(key, str):
+                    destination_overrides[key.strip().upper()] = rate
 
-        grand_total = items_total + taxes_total
-        doc_id = (
-            document.document_id
-            if isinstance(document, Document)
-            else str(document.get("document_id", "unknown"))
+        icms_breakdown = []
+        icms_total = 0.0
+        for item in document.items:
+            base = to_float(getattr(item, "total_value", 0.0))
+            icms_value = adjust_icms_by_uf(
+                str(origem),
+                str(destino),
+                base,
+                overrides=pair_overrides,
+                default_overrides=destination_overrides,
+            )
+            icms_total += icms_value
+            icms_breakdown.append(
+                {
+                    "sku": getattr(item, "sku", None),
+                    "icms": icms_value,
+                }
+            )
+
+        document.metadata["icms_adjustments"] = icms_breakdown
+        document.totals.taxes_total = max(icms_total, document.totals.taxes_total)
+        document.totals.grand_total = document.totals.items_total + document.totals.taxes_total
+
+        simulate_icms_scenarios(document, overrides=destination_overrides)
+
+        logger.info(
+            "[ICMS Adjusted] UF %s->%s, Total ICMS: %.2f",
+            origem,
+            destino,
+            document.totals.taxes_total,
+        )
+        return document
+
+    @staticmethod
+    def recompute_totals(document: Union[Document, dict[str, Any]], *, document_id: str | None = None) -> Union[Document, dict[str, Any]]:
+        before = totals_as_dict(
+            document.totals if isinstance(document, Document) else (document.get("totals") if isinstance(document, dict) else {})
+        )
+        ensure_document_totals(document)
+        after = totals_as_dict(
+            document.totals if isinstance(document, Document) else (document.get("totals") if isinstance(document, dict) else {})
+        )
+
+        doc_id = document_id or (
+            document.document_id if isinstance(document, Document) else str(document.get("document_id", "unknown"))
         )
 
         status = "no_change"
-        if needs_recompute or grand_total <= 0:
+        if any(to_float(before.get(key)) != to_float(after.get(key)) for key in after.keys()):
             status = "recomputed"
-            new_totals = DocumentTotals(
-                items_total=max(items_total, 0.0),
-                taxes_total=max(taxes_total, 0.0),
-                grand_total=max(grand_total, 0.0),
-            )
-
-            if isinstance(document, Document):
-                document.totals = new_totals
-            else:
-                totals_dict = new_totals.model_dump()
-                document.setdefault("totals", {})
-                if isinstance(document["totals"], dict):
-                    document["totals"].update(totals_dict)
-                else:
-                    document["totals"] = totals_dict
-            append_fix_report(
-                document_id=doc_id,
-                old_totals=current_totals or None,
-                new_totals=new_totals,
-                duration_ms=(time.perf_counter() - start) * 1000,
-                status=status,
-            )
             logger.info("[FIX] Totals recomputed successfully for Document %s", doc_id)
-        else:
-            append_fix_report(
-                document_id=doc_id,
-                old_totals=current_totals or None,
-                new_totals=current_totals or None,
-                duration_ms=(time.perf_counter() - start) * 1000,
-                status=status,
-            )
 
+        append_fix_report(
+            document_id=doc_id,
+            old_totals=before,
+            new_totals=after,
+            duration_ms=0.0,
+            status=status,
+        )
         return document
 
     @retryable
@@ -146,7 +135,9 @@ class AccountantAgent(Agent):
                 extra={"items": len(classification.document.items)},
             )
 
-            repaired_document = AccountantAgent.recompute_totals(classification.document)
+            repaired_document = AccountantAgent.recompute_totals(
+                classification.document, document_id=classification.document_id
+            )
             assert isinstance(repaired_document, Document)
 
             audited_docs = [
@@ -178,6 +169,10 @@ class AccountantAgent(Agent):
                 classification.document_id,
                 totals.grand_total,
             )
+
+            repaired_document = AccountantAgent.apply_icms_adjustment(repaired_document)
+            totals = repaired_document.totals
+
             output = accounting_service.generate_sped_stub(audited_docs)
             output.document = repaired_document
             output.totals = totals

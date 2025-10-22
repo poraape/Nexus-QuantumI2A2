@@ -4,6 +4,7 @@ import Chart from './Chart';
 import CrossValidationPanel from './CrossValidationPanel';
 import SmartSearch from './SmartSearch';
 import { parseSafeFloat } from '../utils/parsingUtils';
+import WhatIfICMS from './Insights/WhatIfICMS';
 
 interface DashboardProps {
     report: AuditReport;
@@ -123,6 +124,10 @@ const Dashboard: React.FC<DashboardProps> = ({ report }) => {
                     Nota: A simulação é uma estimativa baseada no valor total dos documentos e não considera isenções, reduções ou substituição tributária.
                 </p>
             </div>
+
+            <section className="mt-8">
+                <WhatIfICMS report={report} />
+            </section>
             
             <div>
                 <h2 className="text-xl font-bold text-gray-200 mb-4 border-t border-gray-700 pt-8">Busca Inteligente com IA</h2>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { DownloadIcon, LoadingSpinnerIcon, DocumentTextIcon, FileInfoIcon } from './icons';
 import type { ExportType } from '../App';
-import LogoIcon from './LogoIcon'; // Importa o novo ícone
+import LogoIcon from './LogoIcon';
 
 interface HeaderProps {
     showExports: boolean;
@@ -9,75 +9,96 @@ interface HeaderProps {
     isExporting: ExportType | null;
     onExport: (type: ExportType) => void;
     onToggleLogs: () => void;
+    onHomeClick?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ showExports, showSpedExport, isExporting, onExport, onToggleLogs }) => {
-  const exportOptions: { type: ExportType, label: string, icon: React.ReactNode }[] = [
-      { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
-      { type: 'html', label: 'HTML', icon: <span className="font-bold text-sm">H</span> },
-      { type: 'pdf', label: 'PDF', icon: <span className="font-bold text-sm">P</span> },
-      { type: 'md', label: 'MD', icon: <span className="font-bold text-sm">M</span> },
-  ];
+const Header: React.FC<HeaderProps> = ({
+    showExports,
+    showSpedExport,
+    isExporting,
+    onExport,
+    onToggleLogs,
+    onHomeClick,
+}) => {
+    const exportOptions: { type: ExportType; label: string; icon: React.ReactNode }[] = [
+        { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
+        { type: 'html', label: 'HTML', icon: <span className="font-bold text-sm">H</span> },
+        { type: 'pdf', label: 'PDF', icon: <span className="font-bold text-sm">P</span> },
+        { type: 'md', label: 'MD', icon: <span className="font-bold text-sm">M</span> },
+    ];
 
-  return (
-    <header className="bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-10">
-      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-4">
-        <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <LogoIcon className="w-9 h-9" />
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">
-                        Nexus QuantumI2A2
-                    </h1>
-                    <p className="text-xs md:text-sm text-gray-400 -mt-1">
-                        Interactive Insight & Intelligence from Fiscal Analysis
-                    </p>
+    return (
+        <header className="bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-10">
+            <div className="container mx-auto px-4 md:px-6 lg:px-8 py-4">
+                <div className="flex items-center justify-between">
+                    <button
+                        type="button"
+                        onClick={onHomeClick}
+                        className="flex items-center gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-md transition"
+                        style={{ cursor: onHomeClick ? 'pointer' : 'default' }}
+                        aria-label="Voltar para a tela inicial"
+                    >
+                        <LogoIcon className="w-9 h-9" />
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-300">
+                                Nexus QuantumI2A2
+                            </h1>
+                            <p className="text-xs md:text-sm text-gray-400 -mt-1">
+                                Interactive Insight &amp; Intelligence from Fiscal Analysis
+                            </p>
+                        </div>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                        {showExports && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-400 hidden sm:block">Exportar Relatório:</span>
+                                {exportOptions.map(({ type, label, icon }) => (
+                                    <button
+                                        key={type}
+                                        onClick={() => onExport(type)}
+                                        disabled={!!isExporting}
+                                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait w-9 h-9 flex items-center justify-center"
+                                        title={`Exportar para ${label}`}
+                                    >
+                                        {isExporting === type ? (
+                                            <LoadingSpinnerIcon className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            icon
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {showSpedExport && (
+                            <button
+                                onClick={() => onExport('sped')}
+                                disabled={!!isExporting}
+                                className="px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait h-9 flex items-center justify-center gap-2 text-sm"
+                                title="Exportar SPED/EFD"
+                            >
+                                {isExporting === 'sped' ? (
+                                    <LoadingSpinnerIcon className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <DownloadIcon className="w-4 h-4" />
+                                )}
+                                <span className="hidden sm:inline">SPED</span>
+                            </button>
+                        )}
+
+                        <button
+                            onClick={onToggleLogs}
+                            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors w-9 h-9 flex items-center justify-center"
+                            title="Ver Logs de Execução"
+                        >
+                            <FileInfoIcon className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
-
-            <div className="flex items-center gap-2">
-                 {showExports && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-400 hidden sm:block">Exportar Relatório:</span>
-                        {exportOptions.map(({ type, label, icon }) => (
-                            <button
-                                key={type}
-                                onClick={() => onExport(type)}
-                                disabled={!!isExporting}
-                                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait w-9 h-9 flex items-center justify-center"
-                                title={`Exportar para ${label}`}
-                            >
-                                {isExporting === type ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : icon}
-                            </button>
-                        ))}
-                    </div>
-                )}
-                
-                {showSpedExport && (
-                    <button
-                        onClick={() => onExport('sped')}
-                        disabled={!!isExporting}
-                        className="px-3 py-2 bg-teal-600 hover:bg-teal-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-wait h-9 flex items-center justify-center gap-2 text-sm"
-                        title="Exportar SPED/EFD"
-                    >
-                        {isExporting === 'sped' ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : <DownloadIcon className="w-4 h-4"/>}
-                        <span className="hidden sm:inline">SPED</span>
-                    </button>
-                )}
-
-
-                 <button
-                    onClick={onToggleLogs}
-                    className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors w-9 h-9 flex items-center justify-center"
-                    title="Ver Logs de Execução"
-                >
-                    <FileInfoIcon className="w-5 h-5"/>
-                </button>
-            </div>
-        </div>
-      </div>
-    </header>
-  );
+        </header>
+    );
 };
 
 export default Header;

@@ -19,7 +19,7 @@ const computeMetrics = (docs: AuditedDocument[]): Metrics => {
   };
   for (const doc of docs) {
     const itens = doc.doc.data || [];
-    const totalDocumento = itens.reduce((sum, item) => sum + parseSafeFloat(item.produto_valor_total), 0);
+    const totalDocumento = itens.reduce((sum, item) => sum + pickNumericValue(item, ITEM_TOTAL_PATHS), 0);
     acc.valorTotal += totalDocumento;
     acc.totalProdutos += itens.length;
     acc.totalNotas += 1;
@@ -66,12 +66,102 @@ const MOCK_ALIQUOTAS = {
     IVA: 0.25, // 25% (simulado)
 };
 
+const ITEM_TOTAL_PATHS = [
+    'produto_valor_total',
+    'valorTotalProduto',
+    'total_value',
+    'valor_total',
+    'valorTotal',
+    'vProd',
+    'total',
+];
+
+const ITEM_ICMS_PATHS = [
+    'produto_valor_icms',
+    'valorICMS',
+    'icms_corrigido',
+    'icms',
+    'icmsTotal',
+    'impostos.ICMS.valor',
+    'impostos.ICMS.value',
+    'impostos.icms.valor',
+];
+
+const ITEM_PIS_PATHS = ['produto_valor_pis', 'valorPIS', 'pis', 'impostos.PIS.valor'];
+const ITEM_COFINS_PATHS = ['produto_valor_cofins', 'valorCOFINS', 'cofins', 'impostos.COFINS.valor'];
+const ITEM_ISS_PATHS = ['produto_valor_iss', 'valorISS', 'iss'];
+const DOC_TOTAL_PATHS = [
+    'valor_total_nfe',
+    'valorTotalNFe',
+    'valor_total_nota',
+    'valorTotalNota',
+    'totalNota',
+    'totals.grand_total',
+    'totals.total',
+];
+
+const getValueByPath = (source: any, path: string): unknown => {
+    if (!path) return source;
+    return path.split('.').reduce<unknown>((acc, key) => {
+        if (acc === null || acc === undefined) {
+            return undefined;
+        }
+        if (Array.isArray(acc)) {
+            const index = Number(key);
+            return Number.isNaN(index) ? undefined : acc[index];
+        }
+        if (typeof acc === 'object') {
+            return (acc as Record<string, unknown>)[key];
+        }
+        return undefined;
+    }, source);
+};
+
+const coerceNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    let sanitized = trimmed.replace(/[^0-9,.\-]/g, '');
+    if (!sanitized) return null;
+
+    const commaCount = (sanitized.match(/,/g) || []).length;
+    const dotCount = (sanitized.match(/\./g) || []).length;
+    if (commaCount === 1 && dotCount > 0) {
+        sanitized = sanitized.replace(/\./g, '').replace(',', '.');
+    } else if (commaCount >= 2) {
+        const parts = sanitized.split(',');
+        const decimals = parts.pop();
+        sanitized = parts.join('') + '.' + (decimals ?? '');
+    } else if (commaCount === 1) {
+        sanitized = sanitized.replace(',', '.');
+    }
+
+    const num = Number(sanitized);
+    if (Number.isNaN(num) || !Number.isFinite(num)) return null;
+    return num;
+};
+
+const pickNumericValue = (source: any, paths: string[], fallback = 0): number => {
+    for (const path of paths) {
+        const candidate = getValueByPath(source, path);
+        const numeric = coerceNumber(candidate);
+        if (numeric !== null) {
+            return numeric;
+        }
+    }
+    return fallback;
+};
+
 
 /**
  * Runs deterministic aggregations on the report data, ensuring a consistent object shape is always returned.
  */
 const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Record<string, any> => {
-    const validDocs = report.documents.filter(d => d.status !== 'ERRO' && d.doc.data && d.doc.data.length > 0);
+    const validDocs = report.documents.filter(doc => doc.status !== 'ERRO' && Array.isArray(doc.doc.data) && doc.doc.data.length > 0);
 
     const defaultMetrics = {
         'Número de Documentos Válidos': 0,
@@ -89,68 +179,96 @@ const runDeterministicAccounting = (report: Omit<AuditReport, 'summary'>): Recor
         return defaultMetrics;
     }
 
-    const allItems = validDocs.flatMap(d => d.doc.data!);
-    
-    // **BUG FIX:** Correctly aggregate total NFe value by using a Map on unique documents, not all items.
+    const allItems = validDocs.flatMap(doc => doc.doc.data!);
     const uniqueNfes = new Map<string, number>();
+
+    let totalProductValue = 0;
+    let totalICMS = 0;
+    let totalPIS = 0;
+    let totalCOFINS = 0;
+    let totalISS = 0;
+
     validDocs.forEach(doc => {
-        // Assume the first item holds the NFe-level data, which is how normalizeNFeData works.
-        const firstItem = doc.doc.data?.[0];
-        if (firstItem?.nfe_id) {
-            uniqueNfes.set(firstItem.nfe_id, parseSafeFloat(firstItem.valor_total_nfe));
+        const items = doc.doc.data!;
+        const meta = (doc.doc.meta ?? (doc.doc as any).metadata ?? {}) as Record<string, any>;
+
+        if (items.length) {
+            const firstItem = items[0];
+            const nfeId = (firstItem.nfe_id ?? firstItem.NFe_id ?? firstItem.chave_acesso ?? firstItem.chaveAcesso ?? firstItem.id)?.toString();
+            const nfeTotal = pickNumericValue(firstItem, DOC_TOTAL_PATHS)
+                || pickNumericValue(meta, ['totals_snapshot.grand_total', 'totals.grand_total', 'totals.total']);
+            if (nfeId) {
+                const current = uniqueNfes.get(nfeId) ?? 0;
+                if (nfeTotal > current) {
+                    uniqueNfes.set(nfeId, nfeTotal);
+                }
+            }
+        }
+
+        items.forEach(item => {
+            const itemValue = pickNumericValue(item, ITEM_TOTAL_PATHS);
+            totalProductValue += itemValue;
+            totalICMS += pickNumericValue(item, ITEM_ICMS_PATHS);
+            totalPIS += pickNumericValue(item, ITEM_PIS_PATHS);
+            totalCOFINS += pickNumericValue(item, ITEM_COFINS_PATHS);
+
+            const cfopCode = (item.produto_cfop ?? item.cfop ?? '').toString();
+            if (cfopCode.endsWith('933')) {
+                totalISS += itemValue * MOCK_ALIQUOTAS.ISS;
+            } else {
+                totalISS += pickNumericValue(item, ITEM_ISS_PATHS);
+            }
+        });
+
+        const adjustments = Array.isArray(meta.icms_adjustments) ? meta.icms_adjustments : [];
+        if (adjustments.length) {
+            const sum = adjustments.reduce((acc: number, entry: any) => acc + pickNumericValue(entry, ['icms', 'valor', 'value']), 0);
+            totalICMS = Math.max(totalICMS, sum);
+        }
+
+        const whatIfMap = meta.what_if_icms;
+        if (whatIfMap && typeof whatIfMap === 'object') {
+            Object.values(whatIfMap).forEach((entry: any) => {
+                totalICMS = Math.max(totalICMS, pickNumericValue(entry, ['icms_estimado', 'valor', 'value']));
+            });
         }
     });
-    
-    let totalNfeValue = Array.from(uniqueNfes.values()).reduce((sum, val) => sum + val, 0);
-    
-    const totals = allItems.reduce((acc, item) => {
-        const itemValue = parseSafeFloat(item.produto_valor_total);
-        acc.totalProductValue += itemValue;
-        acc.totalICMS += parseSafeFloat(item.produto_valor_icms);
-        acc.totalPIS += parseSafeFloat(item.produto_valor_pis);
-        acc.totalCOFINS += parseSafeFloat(item.produto_valor_cofins);
 
-        // Simple check for service items to calculate ISS
-        if (item.produto_cfop?.toString().endsWith('933')) {
-            acc.totalISS += itemValue * MOCK_ALIQUOTAS.ISS;
-        }
+    let totalNfeValue = Array.from(uniqueNfes.values()).reduce((sum, value) => sum + value, 0);
+    const qualityWarnings: string[] = [];
 
-        return acc;
-    }, { totalProductValue: 0, totalICMS: 0, totalPIS: 0, totalCOFINS: 0, totalISS: 0 });
-
-    let qualityWarning = null;
-    // Fallback: If NFe ID aggregation failed but there are products, use product sum as an approximation.
-    if (totalNfeValue === 0 && totals.totalProductValue > 0) {
-        logger.log('AccountantAgent', 'WARN', 'A agregação por NFe ID resultou em zero. Usando a soma dos valores de produtos como fallback para o valor total. O valor pode ser impreciso se houver NFes duplicadas.');
-        totalNfeValue = totals.totalProductValue + totals.totalICMS; // Simplified sum
-        qualityWarning = 'Atenção: Valor total das NFes foi inferido a partir da soma dos produtos. Verifique se os campos de ID e valor total da NFe estão presentes e corretos nos documentos originais.';
+    if (totalNfeValue === 0 && totalProductValue > 0) {
+        totalNfeValue = totalProductValue + totalICMS;
+        qualityWarnings.push('Valor total das NFes inferido a partir da soma dos produtos + ICMS. Verifique os campos vNF nos documentos.');
+        logger.log('AccountantAgent', 'WARN', 'Fallback total das NFes calculado via produtos + ICMS.');
     }
 
-    const totalIVA = (totals.totalPIS + totals.totalCOFINS) * MOCK_ALIQUOTAS.IVA;
+    if (totalICMS === 0 && totalProductValue > 0) {
+        totalICMS = totalProductValue * 0.18;
+        qualityWarnings.push('Valor total de ICMS estimado com alíquota padrão de 18% por ausência de dados.');
+        logger.log('AccountantAgent', 'WARN', 'Fallback de ICMS com alíquota padrão de 18%.');
+    }
+
+    const totalIVA = (totalPIS + totalCOFINS) * MOCK_ALIQUOTAS.IVA;
 
     const metrics: Record<string, string | number> = {
         'Número de Documentos Válidos': validDocs.length,
         'Valor Total das NFes': formatCurrency(totalNfeValue),
-        'Valor Total dos Produtos': formatCurrency(totals.totalProductValue),
+        'Valor Total dos Produtos': formatCurrency(totalProductValue),
         'Total de Itens Processados': allItems.length,
-        'Valor Total de ICMS': formatCurrency(totals.totalICMS),
-        'Valor Total de PIS': formatCurrency(totals.totalPIS),
-        'Valor Total de COFINS': formatCurrency(totals.totalCOFINS),
-        'Valor Total de ISS': formatCurrency(totals.totalISS),
+        'Valor Total de ICMS': formatCurrency(totalICMS),
+        'Valor Total de PIS': formatCurrency(totalPIS),
+        'Valor Total de COFINS': formatCurrency(totalCOFINS),
+        'Valor Total de ISS': formatCurrency(totalISS),
         'Estimativa de IVA (Simulado)': formatCurrency(totalIVA),
     };
-    
-    if (qualityWarning) {
-        metrics['Qualidade dos Dados'] = qualityWarning;
-    }
-    
-    if (totalNfeValue === 0 && allItems.length > 0) {
-        metrics['Alerta de Qualidade'] = 'O valor total das NFes processadas é zero. Isso é altamente incomum e pode indicar problemas nos dados de origem. Verifique os valores `vNF` nos arquivos XML.';
+
+    if (qualityWarnings.length) {
+        metrics['Avisos de Qualidade'] = qualityWarnings.join(' | ');
     }
 
     return metrics;
-}
-
+};
 const runAIAccountingSummary = async (dataSample: string, aggregatedMetrics: Record<string, any>): Promise<AnalysisResult> => {
   const dataQualityIssue = aggregatedMetrics['Alerta de Qualidade'] || aggregatedMetrics['Qualidade dos Dados'];
 

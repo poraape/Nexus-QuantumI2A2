@@ -8,6 +8,7 @@ from app.agents.base import Agent, retryable
 from app.schemas import Document, DocumentIn, DocumentItem, DocumentTotals
 from app.services import nlp_service, ocr_service
 from app.services.diagnostic_logger import log_totals_event
+from app.core.totals import ensure_document_totals, to_float
 
 logger = logging.getLogger(__name__)
 
@@ -38,26 +39,29 @@ class ExtractorAgent(Agent):
                     amount = 0.0
                     for value in raw_taxes.values():
                         if isinstance(value, dict):
-                            amount += float(value.get("value", 0) or 0)
+                            amount += to_float(value.get("value") or value.get("v"))
                         else:
-                            try:
-                                amount += float(value or 0)
-                            except (TypeError, ValueError):
-                                continue
+                            amount += to_float(value)
                     return amount
                 return 0.0
 
             for item_data in items_data:
-                total_value = item_data.get("total_value")
+                total_value = to_float(
+                    item_data.get("total_value")
+                    or item_data.get("valorTotalProduto")
+                    or item_data.get("vProd")
+                )
                 if not total_value:
                     logger.warning("Item sem valor total: %s", item_data)
                     continue
+                quantity = to_float(item_data.get("quantity") or 1.0)
+                unit_price = to_float(item_data.get("unit_price") or item_data.get("valorUnitario") or item_data.get("vUnCom"))
 
                 item = DocumentItem(
                     sku=item_data.get("sku"),
                     description=item_data.get("description", ""),
-                    quantity=item_data.get("quantity", 1.0),
-                    unit_price=item_data.get("unit_price"),
+                    quantity=quantity if quantity > 0 else 1.0,
+                    unit_price=unit_price if unit_price > 0 else total_value,
                     total_value=total_value,
                 )
 
@@ -92,15 +96,18 @@ class ExtractorAgent(Agent):
                 grand_total,
             )
 
+            document = Document(**document_in.model_dump(), items=items, totals=totals)
+            document = ensure_document_totals(document)  # type: ignore[assignment]
+
             log_totals_event(
                 agent=self.name,
                 stage="post_extraction",
                 document_id=document_in.document_id,
-                totals=totals,
+                totals=document.totals,
                 status="computed",
-                extra={"items": len(items)},
+                extra={"items": len(document.items)},
             )
 
-            return Document(**document_in.model_dump(), items=items, totals=totals)
+            return document
 
         return self._execute_with_metrics(_execute)
