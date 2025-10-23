@@ -1,13 +1,12 @@
-import { BACKEND_URL, getAccessToken } from './authService';
+import { BACKEND_URL, ensureSession } from './authService';
 import { logger } from './logger';
 
 export async function apiFetch<TResponse = any>(
   path: string,
   options: RequestInit = {},
 ): Promise<TResponse> {
-  const token = await getAccessToken();
+  await ensureSession();
   const headers = new Headers(options.headers ?? {});
-  headers.set('Authorization', `Bearer ${token}`);
   if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
@@ -15,6 +14,7 @@ export async function apiFetch<TResponse = any>(
   const response = await fetch(`${BACKEND_URL}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {

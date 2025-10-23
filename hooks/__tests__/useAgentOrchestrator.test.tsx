@@ -4,15 +4,13 @@ import { useAgentOrchestrator, getDetailedErrorMessage } from '../useAgentOrches
 import type { AuditReport, AuditedDocument } from '../../types';
 
 const mockStartAnalysis = jest.fn();
-const mockFetchProgress = jest.fn();
-const mockFetchAnalysis = jest.fn();
+const mockSubscribeToJobState = jest.fn();
 const mockStartChat = jest.fn();
 const mockRequestChatMessage = jest.fn();
 
 jest.mock('../../services/backendClient', () => ({
   startAnalysis: (...args: any[]) => mockStartAnalysis(...args),
-  fetchProgress: (...args: any[]) => mockFetchProgress(...args),
-  fetchAnalysis: (...args: any[]) => mockFetchAnalysis(...args),
+  subscribeToJobState: (...args: any[]) => mockSubscribeToJobState(...args),
 }));
 
 jest.mock('../../services/chatService', () => ({
@@ -55,9 +53,16 @@ describe('getDetailedErrorMessage', () => {
 });
 
 describe('useAgentOrchestrator', () => {
+  let lastSubscription: { onUpdate: (payload: any) => void; onError?: (error: unknown) => void } | null;
+
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    lastSubscription = null;
+    mockSubscribeToJobState.mockImplementation((_jobId: string, handlers: any) => {
+      lastSubscription = handlers;
+      return jest.fn();
+    });
   });
 
   const buildReport = (): AuditReport => ({
@@ -104,18 +109,7 @@ describe('useAgentOrchestrator', () => {
       jobId: 'job-1',
       status: 'running',
       agentStates: buildBackendStates(),
-    });
-    mockFetchProgress.mockResolvedValue({
-      jobId: 'job-1',
-      status: 'completed',
-      agentStates: buildBackendStates(),
-      error: null,
-    });
-    mockFetchAnalysis.mockResolvedValue({
-      jobId: 'job-1',
-      status: 'completed',
-      agentStates: buildBackendStates(),
-      result: report,
+      result: null,
     });
     mockStartChat.mockResolvedValue({ sessionId: 'session-1' });
 
@@ -127,8 +121,21 @@ describe('useAgentOrchestrator', () => {
     });
 
     expect(mockStartAnalysis).toHaveBeenCalledWith([file]);
-    expect(mockFetchProgress).toHaveBeenCalledWith('job-1');
-    expect(mockFetchAnalysis).toHaveBeenCalledWith('job-1');
+    expect(mockSubscribeToJobState).toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({ onUpdate: expect.any(Function) }),
+    );
+
+    await act(async () => {
+      lastSubscription?.onUpdate?.({
+        jobId: 'job-1',
+        status: 'completed',
+        agentStates: buildBackendStates(),
+        result: report,
+      });
+      await Promise.resolve();
+    });
+
     expect(result.current.auditReport?.summary.title).toBe('Resumo');
     expect(result.current.agentStates.auditor.status).toBe('completed');
     expect(result.current.isPipelineComplete).toBe(true);
@@ -142,17 +149,7 @@ describe('useAgentOrchestrator', () => {
       jobId: 'job-1',
       status: 'running',
       agentStates: buildBackendStates(),
-    });
-    mockFetchProgress.mockResolvedValue({
-      jobId: 'job-1',
-      status: 'completed',
-      agentStates: buildBackendStates(),
-    });
-    mockFetchAnalysis.mockResolvedValue({
-      jobId: 'job-1',
-      status: 'completed',
-      agentStates: buildBackendStates(),
-      result: report,
+      result: null,
     });
     mockStartChat.mockResolvedValue({ sessionId: 'session-1' });
 
@@ -161,6 +158,16 @@ describe('useAgentOrchestrator', () => {
 
     await act(async () => {
       await result.current.runPipeline([file]);
+    });
+
+    await act(async () => {
+      lastSubscription?.onUpdate?.({
+        jobId: 'job-1',
+        status: 'completed',
+        agentStates: buildBackendStates(),
+        result: report,
+      });
+      await Promise.resolve();
     });
 
     await act(async () => {
@@ -182,4 +189,3 @@ describe('useAgentOrchestrator', () => {
     expect(result.current.error).toContain('não foi inicializado');
   });
 });
-

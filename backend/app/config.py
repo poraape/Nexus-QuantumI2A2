@@ -23,8 +23,23 @@ class Settings(BaseSettings):
     jwt_expires_minutes: int = Field(30, env='JWT_EXPIRES_MINUTES')
     refresh_token_ttl_hours: int = Field(24, env='REFRESH_TOKEN_TTL_HOURS')
 
+    access_token_cookie_name: str = Field('nexus_session', env='ACCESS_TOKEN_COOKIE_NAME')
+    refresh_token_cookie_name: str = Field('nexus_session_refresh', env='REFRESH_TOKEN_COOKIE_NAME')
+    cookie_domain: Optional[str] = Field(None, env='COOKIE_DOMAIN')
+    cookie_secure: bool = Field(True, env='COOKIE_SECURE')
+    cookie_samesite: str = Field('none', env='COOKIE_SAMESITE')
+
     # PKCE clients (comma separated list of allowed client ids)
     oauth_client_ids: list[str] = Field(['nexus-spa'], env='OAUTH_CLIENT_IDS')
+
+    # CORS configuration
+    cors_allow_origins: list[str] = Field(
+        ['https://app.nexus-i2a2.local', 'https://*.trusted.corp'],
+        env='CORS_ALLOW_ORIGINS',
+    )
+
+    rate_limit_requests: int = Field(120, env='RATE_LIMIT_REQUESTS')
+    rate_limit_window_seconds: int = Field(60, env='RATE_LIMIT_WINDOW_SECONDS')
 
     # Paths
     data_dir: Path = Field(Path('backend_data'), env='BACKEND_DATA_DIR')
@@ -70,6 +85,22 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [v.strip() for v in value.split(',') if v.strip()]
         return value
+
+    @validator('cors_allow_origins', pre=True)
+    def split_cors_origins(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(',') if v.strip()]
+        return value
+
+    @validator('cookie_samesite', pre=True)
+    def normalize_samesite(cls, value: str) -> str:
+        if not value:
+            return 'lax'
+        normalized = value.strip().lower()
+        allowed = {'lax', 'none', 'strict'}
+        if normalized not in allowed:
+            raise ValueError('COOKIE_SAMESITE must be one of: lax, none, strict')
+        return normalized
 
 
 @lru_cache()

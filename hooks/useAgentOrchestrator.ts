@@ -1,21 +1,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { importFiles } from '../utils/importPipeline';
-import { runAudit } from '../agents/auditorAgent';
-import { runClassification } from '../agents/classifierAgent';
-import { runIntelligenceAnalysis } from '../agents/intelligenceAgent';
-import { runAccountingAnalysis } from '../agents/accountantAgent';
-import { startChat, requestChatMessage, ChatSession } from '../services/chatService';
-import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
 import Papa from 'papaparse';
 
-import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
 import { startChat, requestChatMessage, ChatSession } from '../services/chatService';
+import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
 import { logger } from '../services/logger';
 import { telemetry } from '../services/telemetry';
 import {
   startAnalysis,
-  fetchProgress,
-  fetchAnalysis,
+  subscribeToJobState,
   type AnalysisJobResponse,
   type BackendAgentState,
 } from '../services/backendClient';
@@ -44,13 +36,6 @@ export const cloneInitialAgentStates = (): AgentStates =>
   JSON.parse(JSON.stringify(initialAgentStates)) as AgentStates;
 
 const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
-
-const generateExecutionId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `exec-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-};
 
 export const getDetailedErrorMessage = (error: unknown): string => {
   logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
@@ -86,6 +71,31 @@ export const getDetailedErrorMessage = (error: unknown): string => {
   return 'Ocorreu um erro desconhecido durante a operação.';
 };
 
+const normalizeAgentStates = (states?: Record<string, BackendAgentState | undefined>): AgentStates => {
+  const base = cloneInitialAgentStates();
+  if (!states) {
+    return base;
+  }
+
+  Object.entries(states).forEach(([name, backendState]) => {
+    if (!backendState) {
+      return;
+    }
+    const typedName = name as AgentName;
+    const progress = backendState.progress ?? { step: '', current: 0, total: 0 };
+    (base as Record<string, AgentState>)[typedName] = {
+      status: (backendState.status as AgentStatus) ?? 'pending',
+      progress: {
+        step: progress.step ?? '',
+        current: progress.current ?? 0,
+        total: progress.total ?? 0,
+      },
+    };
+  });
+
+  return base;
+};
+
 export const useAgentOrchestrator = () => {
   const [agentStates, setAgentStates] = useState<AgentStates>(cloneInitialAgentStates());
   const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
@@ -98,7 +108,9 @@ export const useAgentOrchestrator = () => {
   const [classificationCorrections, setClassificationCorrections] = useState<ClassificationCorrections>({});
 
   const chatRef = useRef<ChatSession | null>(null);
-  const executionIdRef = useRef<string>('');
+  const chatJobIdRef = useRef<string | null>(null);
+  const subscriptionAbortRef = useRef<AbortController | null>(null);
+  const subscriptionCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const correlationId = telemetry.createCorrelationId('backend');
@@ -120,153 +132,152 @@ export const useAgentOrchestrator = () => {
     }
   }, []);
 
-  const reset = useCallback(() => {
-    setAgentStates(cloneInitialAgentStates());
-    setError(null);
-    setPipelineError(false);
-    setAuditReport(null);
-    setMessages([]);
-    chatRef.current = null;
-    setIsPipelineComplete(false);
-    executionIdRef.current = '';
+  useEffect(() => () => {
+    subscriptionAbortRef.current?.abort();
+    subscriptionCleanupRef.current?.();
   }, []);
 
-  const runPipeline = useCallback(async (files: File[]) => {
-    const pipelineCorrelationId = telemetry.createCorrelationId('backend');
-    const agentCorrelations: Record<AgentName, string> = {
-      ocr: telemetry.createCorrelationId('ocr', pipelineCorrelationId),
-      auditor: telemetry.createCorrelationId('agent', pipelineCorrelationId),
-      classifier: telemetry.createCorrelationId('agent', pipelineCorrelationId),
-      crossValidator: telemetry.createCorrelationId('agent', pipelineCorrelationId),
-      intelligence: telemetry.createCorrelationId('agent', pipelineCorrelationId),
-      accountant: telemetry.createCorrelationId('agent', pipelineCorrelationId),
-    };
+  const initializeChatFromReport = useCallback(
+    async (report: AuditReport, jobId?: string) => {
+      if (!jobId || chatJobIdRef.current === jobId) {
+        return;
+      }
+      const correlationId = telemetry.createCorrelationId('llm');
+      try {
+        const validDocsData = report.documents
+          .filter(doc => doc.status !== 'ERRO' && doc.doc.data)
+          .flatMap(doc => doc.doc.data ?? []);
+        const dataSample = validDocsData.length > 0 ? Papa.unparse(validDocsData.slice(0, 200)) : '';
 
-    logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.', undefined, {
-      correlationId: pipelineCorrelationId,
-      scope: 'backend',
-    });
+        logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.', undefined, {
+          correlationId,
+          scope: 'llm',
+        });
 
-    setIsPipelineRunning(true);
-    setIsPipelineComplete(false);
-    setPipelineError(false);
-    setError(null);
-    setAuditReport(null);
-    setMessages([]);
-    chatRef.current = null;
-    setAgentStates(cloneInitialAgentStates());
-    executionIdRef.current = generateExecutionId();
-
-    const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
-      setAgentStates(prev => {
-        const next = {
-          ...prev,
-          [agent]: {
-            status,
-            progress: { ...prev[agent].progress, ...progress },
+        chatRef.current = await startChat(dataSample, report.aggregatedMetrics);
+        chatJobIdRef.current = jobId;
+        setMessages([
+          {
+            id: 'initial-ai-message',
+            sender: 'ai',
+            text: 'Sua análise fiscal está pronta. Explore os detalhes abaixo ou me faça uma pergunta sobre os dados.',
           },
-        };
-        const correlationId = agentCorrelations[agent];
-        if (status === 'running') {
-          logger.log(agent, 'INFO', progress?.step ?? 'Iniciando etapa.', undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
-        } else if (status === 'completed') {
-          logger.log(agent, 'INFO', 'Etapa concluída.', undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
-        }
-        return next;
-      });
-    };
+        ]);
+      } catch (err) {
+        logger.log('Orchestrator', 'ERROR', 'Falha ao inicializar chat pós-orquestração.', { error: err }, {
+          correlationId,
+          scope: 'backend',
+        });
+      }
+    },
+    [],
+  );
 
-    try {
-      updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
-      const importedDocs = await importFiles(
-        files,
-        (current, total) => updateAgentState('ocr', 'running', { step: 'Processando arquivos...', current, total }),
-        agentCorrelations.ocr,
-      );
-      updateAgentState('ocr', 'completed');
-
-      const isSingleZip = files.length === 1 && (files[0].name.toLowerCase().endsWith('.zip') || files[0].type.includes('zip'));
-      const hasValidDocs = importedDocs.some(doc => doc.status !== 'unsupported' && doc.status !== 'error');
-      if (!hasValidDocs) {
-        let errorMessage = 'Nenhum arquivo válido foi processado. Verifique os formatos.';
-        if (importedDocs.length === 1 && importedDocs[0].error) {
-          errorMessage = importedDocs[0].error;
-        } else if (isSingleZip) {
-          errorMessage = 'O arquivo ZIP está vazio ou não contém arquivos com formato suportado.';
-        }
-        throw new Error(errorMessage);
+  const applyBackendUpdate = useCallback(
+    (update: AnalysisJobResponse) => {
+      if (!update) {
+        return;
       }
 
-      updateAgentState('auditor', 'running', { step: `Validando ${importedDocs.length} documentos...` });
-      const auditedReport = await runAudit(importedDocs, agentCorrelations.auditor);
-      updateAgentState('auditor', 'completed');
+      setAgentStates(normalizeAgentStates(update.agentStates as Record<string, BackendAgentState | undefined>));
 
-      updateAgentState('classifier', 'running', { step: 'Classificando operações...' });
-      const classifiedReport = await runClassification(auditedReport, classificationCorrections, agentCorrelations.classifier);
-      updateAgentState('classifier', 'completed');
+      const status = update.status?.toLowerCase();
+      if (status === 'completed') {
+        setIsPipelineRunning(false);
+        setIsPipelineComplete(true);
+        setPipelineError(false);
+      } else if (status === 'failed') {
+        setIsPipelineRunning(false);
+        setIsPipelineComplete(true);
+        setPipelineError(true);
+      } else if (status === 'running' || status === 'queued') {
+        setIsPipelineRunning(true);
+        setIsPipelineComplete(false);
+        setPipelineError(false);
+      }
 
-      updateAgentState('crossValidator', 'running', { step: 'Executando validação cruzada...' });
-      const { findings: deterministicCrossValidation, artifacts: deterministicArtifacts } =
-        await runDeterministicCrossValidation(classifiedReport, executionIdRef.current);
-      const reportWithCrossValidation: AuditReport = {
-        ...classifiedReport,
-        deterministicCrossValidation,
-        deterministicArtifacts,
-        executionId: executionIdRef.current,
-      };
-      updateAgentState('crossValidator', 'completed');
+      if (typeof update.error === 'string' && update.error.length > 0) {
+        setError(update.error);
+        setPipelineError(true);
+      } else if (status === 'running' || status === 'queued') {
+        setError(null);
+      }
 
-      updateAgentState('intelligence', 'running', { step: 'Analisando padrões com IA...' });
-      const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation, agentCorrelations.intelligence);
-      updateAgentState('intelligence', 'completed');
+      if (Object.prototype.hasOwnProperty.call(update, 'result')) {
+        setAuditReport((update.result ?? null) as AuditReport | null);
+        if (update.result) {
+          void initializeChatFromReport(update.result as AuditReport, update.jobId);
+        }
+      }
+    },
+    [initializeChatFromReport],
+  );
 
-      updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
-      const finalReport = await runAccountingAnalysis(
-        { ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults },
-        agentCorrelations.accountant,
-      );
-      setAuditReport(finalReport);
-      updateAgentState('accountant', 'completed');
+  const resetSubscription = useCallback(() => {
+    subscriptionAbortRef.current?.abort();
+    subscriptionAbortRef.current = null;
+    subscriptionCleanupRef.current?.();
+    subscriptionCleanupRef.current = null;
+  }, []);
 
-      const validDocsData = finalReport.documents
-        .filter(d => d.status !== 'ERRO' && d.doc.data)
-        .flatMap(d => d.doc.data!);
-      const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
+  const runPipeline = useCallback(
+    async (files: File[]) => {
+      if (!files.length) {
+        setError('Selecione ao menos um arquivo para iniciar a análise.');
+        setPipelineError(true);
+        return;
+      }
 
-      logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.', undefined, {
-        correlationId: pipelineCorrelationId,
-        scope: 'llm',
+      const correlationId = telemetry.createCorrelationId('backend');
+      logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise no backend.', undefined, {
+        correlationId,
+        scope: 'backend',
       });
-      chatRef.current = await startChat(dataSampleForAI, finalReport.aggregatedMetrics);
-      setMessages([
-        {
-          id: 'initial-ai-message',
-          sender: 'ai',
-          text: 'Sua análise fiscal está pronta. Explore os detalhes abaixo ou me faça uma pergunta sobre os dados.',
-        },
-      ]);
-    } catch (err) {
-      console.error('Pipeline failed:', err);
-      logger.log('Orchestrator', 'ERROR', 'Falha na execução do pipeline.', { error: err }, { correlationId: pipelineCorrelationId, scope: 'backend' });
-      const errorMessage = getDetailedErrorMessage(err);
-      setError(errorMessage);
-      setPipelineError(true);
-      setAgentStates(prev => {
-        const runningAgent = (Object.keys(prev) as AgentName[]).find(agent => prev[agent].status === 'running');
-        if (!runningAgent) return prev;
-        return {
-          ...prev,
-          [runningAgent]: {
-            ...prev[runningAgent],
-            status: 'error',
+
+      resetSubscription();
+      chatRef.current = null;
+      chatJobIdRef.current = null;
+
+      setAgentStates(cloneInitialAgentStates());
+      setError(null);
+      setPipelineError(false);
+      setAuditReport(null);
+      setMessages([]);
+      setIsPipelineComplete(false);
+      setIsPipelineRunning(true);
+
+      const abortController = new AbortController();
+      subscriptionAbortRef.current = abortController;
+
+      try {
+        const job = await startAnalysis(files);
+        applyBackendUpdate(job);
+
+        subscriptionCleanupRef.current = subscribeToJobState(job.jobId, {
+          onUpdate: applyBackendUpdate,
+          onError: event => {
+            logger.log('Orchestrator', 'WARN', 'Canal SSE indisponível. Alternando para polling automático.', { error: event }, {
+              correlationId,
+              scope: 'backend',
+            });
           },
-        };
-      });
-    } finally {
-      setIsPipelineRunning(false);
-      setIsPipelineComplete(true);
-    }
-  }, [classificationCorrections]);
+          signal: abortController.signal,
+        });
+      } catch (err) {
+        logger.log('Orchestrator', 'ERROR', 'Falha ao iniciar pipeline no backend.', { error: err }, {
+          correlationId,
+          scope: 'backend',
+        });
+        const detailedMessage = getDetailedErrorMessage(err);
+        setError(detailedMessage);
+        setPipelineError(true);
+        setIsPipelineRunning(false);
+        setIsPipelineComplete(true);
+        resetSubscription();
+      }
+    },
+    [applyBackendUpdate, resetSubscription],
+  );
 
   const handleSendMessage = useCallback(async (message: string) => {
     if (!chatRef.current) {
@@ -294,37 +305,53 @@ export const useAgentOrchestrator = () => {
     }
   }, []);
 
-  const handleClassificationChange = useCallback((docName: string, newClassification: ClassificationResult['operationType']) => {
-    setAuditReport(prevReport => {
-      if (!prevReport) return null;
-      const updatedDocs = prevReport.documents.map(doc => {
-        if (doc.doc.name === docName && doc.classification) {
-          return {
-            ...doc,
-            classification: { ...doc.classification, operationType: newClassification, confidence: 1.0 },
-          };
-        }
-        return doc;
+  const handleClassificationChange = useCallback(
+    (docName: string, newClassification: ClassificationResult['operationType']) => {
+      setAuditReport(prevReport => {
+        if (!prevReport) return null;
+        const updatedDocs = prevReport.documents.map(doc => {
+          if (doc.doc.name === docName && doc.classification) {
+            return {
+              ...doc,
+              classification: { ...doc.classification, operationType: newClassification, confidence: 1.0 },
+            };
+          }
+          return doc;
+        });
+        return { ...prevReport, documents: updatedDocs };
       });
-      return { ...prevReport, documents: updatedDocs };
-    });
 
-    const newCorrections = { ...classificationCorrections, [docName]: newClassification };
-    setClassificationCorrections(newCorrections);
-    try {
-      localStorage.setItem(CORRECTIONS_STORAGE_KEY, JSON.stringify(newCorrections));
-      logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`, undefined, {
-        correlationId: telemetry.createCorrelationId('backend'),
-        scope: 'backend',
-      });
-    } catch (e) {
-      logger.log('Orchestrator', 'ERROR', 'Falha ao salvar correção no localStorage.', { error: e }, {
-        correlationId: telemetry.createCorrelationId('backend'),
-        scope: 'backend',
-      });
-      setError('Não foi possível salvar a correção de classificação. Ela será perdida ao recarregar a página.');
-    }
-  }, [classificationCorrections]);
+      const newCorrections = { ...classificationCorrections, [docName]: newClassification };
+      setClassificationCorrections(newCorrections);
+      try {
+        localStorage.setItem(CORRECTIONS_STORAGE_KEY, JSON.stringify(newCorrections));
+        logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`, undefined, {
+          correlationId: telemetry.createCorrelationId('backend'),
+          scope: 'backend',
+        });
+      } catch (e) {
+        logger.log('Orchestrator', 'ERROR', 'Falha ao salvar correção no localStorage.', { error: e }, {
+          correlationId: telemetry.createCorrelationId('backend'),
+          scope: 'backend',
+        });
+        setError('Não foi possível salvar a correção de classificação. Ela será perdida ao recarregar a página.');
+      }
+    },
+    [classificationCorrections],
+  );
+
+  const reset = useCallback(() => {
+    resetSubscription();
+    chatRef.current = null;
+    chatJobIdRef.current = null;
+    setAgentStates(cloneInitialAgentStates());
+    setError(null);
+    setPipelineError(false);
+    setAuditReport(null);
+    setMessages([]);
+    setIsPipelineComplete(false);
+    setIsPipelineRunning(false);
+  }, [resetSubscription]);
 
   return {
     agentStates,
@@ -344,4 +371,3 @@ export const useAgentOrchestrator = () => {
     reset,
   };
 };
-
