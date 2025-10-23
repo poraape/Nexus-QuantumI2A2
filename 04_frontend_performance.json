@@ -1,0 +1,81 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "04_frontend_performance",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Performance e responsividade nas jornadas fiscais",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "scope": {
+    "paths": [
+      "frontend/**",
+      "apps/web/**",
+      "packages/ui/**",
+      "**/*.{ts,tsx,js,jsx,css,scss}"
+    ]
+  },
+  "checks": [
+    {
+      "id": "build_ok",
+      "run": "npm run build || pnpm build || yarn build",
+      "expect": "build ok"
+    },
+    {
+      "id": "bundle_analyze",
+      "run": "npx source-map-explorer 'dist/**/*.js' --json codex_reports/bundle_map.json || true",
+      "expect": "mapa gerado"
+    },
+    {
+      "id": "lighthouse",
+      "run": "npx @lhci/cli autorun --upload.target=filesystem --upload.outputDir=codex_reports/lhci || true",
+      "expect": "scores LH"
+    },
+    {
+      "id": "images",
+      "run": "codex.frontend.scan_images",
+      "expect": "webp/avif + responsive",
+      "autofix": "converter imagens + <Image>"
+    },
+    {
+      "id": "code_splitting",
+      "run": "codex.frontend.detect_large_imports:threshold_kb=150",
+      "autofix": "dynamic import"
+    }
+  ],
+  "user_flows": [
+    {
+      "name": "upload→validacao→classificacao→automacao→relatorios",
+      "measure": "tti, tbt, cls"
+    }
+  ],
+  "i18n": {
+    "default": "pt-BR",
+    "masks": [
+      "CNPJ",
+      "CPF"
+    ],
+    "currency": "pt-BR"
+  },
+  "budgets": {
+    "lighthouse": {
+      "performance": 85,
+      "accessibility": 95,
+      "best-practices": 90,
+      "seo": 90
+    }
+  },
+  "reporting": {
+    "save": "codex_reports/frontend_perf.json"
+  }
+}

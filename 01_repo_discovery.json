@@ -1,0 +1,130 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "01_repo_discovery",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Inventário, gráficos de dependência e saneamento inicial",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "inputs": {
+    "root": "."
+  },
+  "actions": [
+    {
+      "type": "git.create_branch"
+    },
+    {
+      "type": "inventory.scan",
+      "globs": [
+        "**/*"
+      ],
+      "exclude": [
+        "node_modules/**",
+        ".venv/**",
+        ".git/**",
+        "dist/**",
+        "build/**",
+        "codex_reports/**"
+      ]
+    },
+    {
+      "type": "deps.detect"
+    },
+    {
+      "type": "graph.build",
+      "modes": [
+        "imports",
+        "services",
+        "agents",
+        "ui-components"
+      ]
+    },
+    {
+      "type": "housekeeping.ensure_files",
+      "files": {
+        ".editorconfig": "root = true\n[*]\nindent_style = space\nindent_size = 2\ncharset = utf-8\nend_of_line = lf\ninsert_final_newline = true\ntrim_trailing_whitespace = true\n",
+        ".gitattributes": "* text=auto eol=lf\n",
+        ".gitignore": "dist/\nbuild/\nnode_modules/\n.venv/\n__pycache__/\n.env\n.env.*\ncoverage/\n.playwright/\n"
+      },
+      "mode": "create_if_missing"
+    },
+    {
+      "type": "deps.align_lockfiles",
+      "prefer": "pnpm|yarn|npm"
+    },
+    {
+      "type": "data.privacy.scan",
+      "pii": [
+        "CNPJ",
+        "CPF",
+        "Endereco",
+        "Telefone"
+      ],
+      "autofix": "mask|hash|drop"
+    },
+    {
+      "type": "data.classify",
+      "rules": [
+        {
+          "name": "nfe_xml",
+          "glob": "data/**/*.xml"
+        },
+        {
+          "name": "danfe_pdf",
+          "glob": "data/**/*.pdf"
+        },
+        {
+          "name": "sped",
+          "glob": "data/**/SPED/**/*.txt"
+        },
+        {
+          "name": "rules",
+          "glob": "rules/**/*.yaml"
+        }
+      ]
+    },
+    {
+      "type": "save.inventory",
+      "path": "codex_reports/repo_inventory.json"
+    },
+    {
+      "type": "save.dataset_index",
+      "path": "codex_reports/fiscal_dataset_index.json"
+    }
+  ],
+  "metrics": [
+    {
+      "key": "files_total"
+    },
+    {
+      "key": "languages_distribution"
+    },
+    {
+      "key": "dead_code_items"
+    }
+  ],
+  "validation": [
+    {
+      "type": "git.status_clean"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "codex_reports/repo_inventory.json"
+    },
+    {
+      "path": "codex_reports/fiscal_dataset_index.json"
+    }
+  ]
+}

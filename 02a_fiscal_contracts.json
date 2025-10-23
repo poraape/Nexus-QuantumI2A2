@@ -1,0 +1,133 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "02a_fiscal_contracts",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Contratos de agentes, schemas e KPIs do domínio fiscal",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "agents": [
+    {
+      "id": "extractor",
+      "role": "OCR/NLP NFe",
+      "inputs": [
+        "xml",
+        "pdf"
+      ],
+      "outputs": [
+        "fiscal_record"
+      ],
+      "kpis": [
+        "ocr_accuracy",
+        "parse_latency_ms"
+      ]
+    },
+    {
+      "id": "validator",
+      "role": "Validação/Auditoria fiscal",
+      "inputs": [
+        "fiscal_record"
+      ],
+      "outputs": [
+        "validated_record",
+        "issues[]"
+      ],
+      "kpis": [
+        "validation_precision",
+        "rule_coverage"
+      ]
+    },
+    {
+      "id": "classifier",
+      "role": "Classificação do documento/conta",
+      "inputs": [
+        "validated_record"
+      ],
+      "outputs": [
+        "classified_record"
+      ],
+      "kpis": [
+        "classification_accuracy"
+      ]
+    },
+    {
+      "id": "automation",
+      "role": "Automação contábil/fiscal (ERP)",
+      "inputs": [
+        "classified_record"
+      ],
+      "outputs": [
+        "posting_result"
+      ],
+      "kpis": [
+        "posting_success_rate",
+        "rework_rate"
+      ]
+    },
+    {
+      "id": "manager",
+      "role": "Síntese e relatórios",
+      "inputs": [
+        "issues[]",
+        "posting_result"
+      ],
+      "outputs": [
+        "insights",
+        "reports"
+      ],
+      "kpis": [
+        "insight_latency_ms",
+        "report_completeness"
+      ]
+    }
+  ],
+  "message_contracts": {
+    "schema_version": "1.0",
+    "fiscal_record": "schema/fiscal_record.json",
+    "validated_record": "schema/validated_record.json",
+    "issues": "schema/issue.json",
+    "posting_result": "schema/posting_result.json"
+  },
+  "coordination": {
+    "pattern": "pipeline-with-feedback",
+    "ack": "at-least-once",
+    "timeouts_sec": 60
+  },
+  "legal_ruleset": "rules/fiscal_rules_v1.yaml",
+  "kpis_project": [
+    "error_reduction",
+    "processing_time_gain"
+  ],
+  "sector_scenarios": [
+    "agronegocio",
+    "industria",
+    "automotivo"
+  ],
+  "actions": [
+    {
+      "type": "schemas.ensure",
+      "paths": [
+        "schema/fiscal_record.json",
+        "schema/validated_record.json",
+        "schema/issue.json",
+        "schema/posting_result.json"
+      ],
+      "mode": "create_if_missing"
+    },
+    {
+      "type": "ruleset.validate",
+      "path": "rules/fiscal_rules_v1.yaml"
+    }
+  ]
+}

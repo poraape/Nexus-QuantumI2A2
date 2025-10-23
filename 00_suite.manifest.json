@@ -1,0 +1,168 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "00_suite.manifest",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Manifesto completo com domínio fiscal, MAS e LGPD",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "modules": [
+    {
+      "id": "repo_discovery",
+      "file": "01_repo_discovery.json",
+      "critical": true
+    },
+    {
+      "id": "fiscal_contracts",
+      "file": "02a_fiscal_contracts.json",
+      "critical": true
+    },
+    {
+      "id": "backend_audit",
+      "file": "02_backend_audit.json",
+      "critical": true
+    },
+    {
+      "id": "multiagent_arch_audit",
+      "file": "03_multiagent_arch_audit.json",
+      "critical": true
+    },
+    {
+      "id": "frontend_performance",
+      "file": "04_frontend_performance.json",
+      "critical": true
+    },
+    {
+      "id": "uiux_accessibility",
+      "file": "05_uiux_accessibility.json",
+      "critical": true
+    },
+    {
+      "id": "security_hardening",
+      "file": "06_security_hardening.json",
+      "critical": true
+    },
+    {
+      "id": "tests_validation",
+      "file": "07_tests_validation.json",
+      "critical": true
+    },
+    {
+      "id": "perf_observability",
+      "file": "08_performance_observability.json",
+      "critical": true
+    },
+    {
+      "id": "cicd_integration",
+      "file": "09_cicd_integration.json",
+      "critical": true
+    },
+    {
+      "id": "reporting_telemetry",
+      "file": "10_reporting_telemetry.json",
+      "critical": true
+    },
+    {
+      "id": "risk_register",
+      "file": "11_risk_register.json",
+      "critical": false
+    }
+  ],
+  "execution_order": [
+    "repo_discovery",
+    "fiscal_contracts",
+    "backend_audit",
+    "multiagent_arch_audit",
+    "frontend_performance",
+    "uiux_accessibility",
+    "security_hardening",
+    "tests_validation",
+    "perf_observability",
+    "cicd_integration",
+    "reporting_telemetry",
+    "risk_register"
+  ],
+  "shared_config": {
+    "languages_expected": [
+      "python",
+      "typescript",
+      "javascript",
+      "bash",
+      "yaml",
+      "json"
+    ],
+    "package_managers": [
+      "pip",
+      "npm",
+      "pnpm",
+      "yarn"
+    ],
+    "node_version": ">=18",
+    "python_version": ">=3.11",
+    "test_tools": [
+      "pytest",
+      "coverage.py",
+      "jest",
+      "playwright"
+    ],
+    "linters": [
+      "ruff",
+      "mypy",
+      "eslint",
+      "prettier"
+    ],
+    "security_tools": [
+      "bandit",
+      "pip-audit",
+      "npm audit",
+      "trivy",
+      "gitleaks"
+    ],
+    "accessibility_tools": [
+      "axe-core",
+      "pa11y"
+    ],
+    "frontend_perf_tools": [
+      "lighthouse-ci"
+    ],
+    "complexity_tools": [
+      "radon",
+      "plato"
+    ],
+    "report_dir": "codex_reports",
+    "artifacts_branch": "codex/audit-artifacts",
+    "allow_net_new_devdeps": true,
+    "domain": {
+      "fiscal_docs": [
+        "NFe XML",
+        "DANFE PDF",
+        "SPED"
+      ],
+      "erp_targets": [
+        "Domínio",
+        "Alterdata",
+        "Protheus"
+      ],
+      "legal_ruleset": "rules/fiscal_rules_v1.yaml",
+      "lgpd_mode": "strict",
+      "sector_scenarios": [
+        "agronegocio",
+        "industria",
+        "automotivo"
+      ],
+      "timezone": "America/Sao_Paulo",
+      "currency_locale": "pt-BR"
+    }
+  }
+}

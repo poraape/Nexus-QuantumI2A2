@@ -1,0 +1,72 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "07_tests_validation",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Descoberta, autogeração e execução de testes com gates de KPIs de domínio",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "fixtures": {
+    "nfe_xml": "tests/fixtures/nfe/**/*.xml",
+    "danfe_pdf": "tests/fixtures/pdf/**/*.pdf"
+  },
+  "golden": {
+    "validated_record": "tests/golden/validated_record/*.json"
+  },
+  "coverage_gates": {
+    "backend": 0.8,
+    "frontend": 0.75,
+    "agents": 0.7
+  },
+  "kpi_gates": {
+    "validator.validation_precision": 0.98,
+    "extractor.ocr_accuracy": 0.95,
+    "pipeline.error_reduction": 0.3,
+    "pipeline.processing_time_gain": 0.4
+  },
+  "actions": [
+    {
+      "type": "tests.discover"
+    },
+    {
+      "type": "tests.autogen",
+      "when": "coverage < gate",
+      "engines": [
+        "pytest",
+        "jest",
+        "playwright"
+      ]
+    },
+    {
+      "type": "tests.run",
+      "commands": [
+        "pytest -q --maxfail=1 --disable-warnings --cov=.",
+        "npm run test -- --coverage || pnpm test -- --coverage || true",
+        "npx playwright test || true"
+      ]
+    },
+    {
+      "type": "tests.flaky_detect",
+      "autofix": "quarentena + estabilizar com seeds/delays controlados"
+    }
+  ],
+  "reports": [
+    {
+      "save": "codex_reports/coverage_summary.json"
+    },
+    {
+      "save": "codex_reports/tests_results.json"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "06_security_hardening",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Higienização de segredos, dependências, contêineres e LGPD",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "checks": [
+    {
+      "id": "pip_audit",
+      "run": "pip-audit -f json -o codex_reports/pip_audit.json || true",
+      "autofix": "upgrade constraints; pin secure versions"
+    },
+    {
+      "id": "npm_audit",
+      "run": "npm audit --json > codex_reports/npm_audit.json || true",
+      "autofix": "npm audit fix (não-breaking)"
+    },
+    {
+      "id": "secret_scan",
+      "run": "gitleaks detect -v --report-format json --report-path codex_reports/gitleaks.json || true",
+      "autofix": "revogar/rotacionar; scrub history"
+    },
+    {
+      "id": "docker_trivy",
+      "run": "trivy fs --security-checks vuln,config -f json -o codex_reports/trivy_fs.json . || true",
+      "autofix": "harden Dockerfile + user não-root"
+    },
+    {
+      "id": "headers",
+      "run": "codex.security.headers_check",
+      "autofix": "HSTS, CSP, X-Frame-Options, X-Content-Type-Options"
+    },
+    {
+      "id": "pii_masking",
+      "run": "codex.security.ensure_pii_masking:['CPF','CNPJ','Endereco','Telefone']",
+      "autofix": "mask/hash"
+    },
+    {
+      "id": "data_retention",
+      "run": "codex.security.ensure_retention:days=180",
+      "autofix": "política de expurgo"
+    },
+    {
+      "id": "consent_logging",
+      "run": "codex.security.ensure_consent_logs",
+      "autofix": "incluir consentId em trilha"
+    }
+  ],
+  "policies": [
+    "Least privilege por agente/ferramenta",
+    "Segredos via secret manager",
+    "TLS, secure cookies; CSRF em APIs stateful",
+    "Criptografia em repouso para datasets de teste"
+  ],
+  "reporting": {
+    "save": "codex_reports/security_hardening.json"
+  }
+}

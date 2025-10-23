@@ -1,0 +1,119 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "02_backend_audit",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Auditoria backend com contratos fiscais, LGPD e performance",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "scope": {
+    "paths": [
+      "backend/**",
+      "api/**",
+      "src/**",
+      "**/*.py",
+      "**/*.ts",
+      "**/*.js"
+    ]
+  },
+  "preconditions": [
+    "python -V >= 3.11 if Python present",
+    "node -v >= 18 if Node present"
+  ],
+  "checks": [
+    {
+      "id": "py_style",
+      "run": "ruff --fix . || true",
+      "expect": "sem erros críticos"
+    },
+    {
+      "id": "py_types",
+      "run": "mypy --install-types --non-interactive || true",
+      "expect": "tipagem ok"
+    },
+    {
+      "id": "py_security",
+      "run": "bandit -r . -f json -o codex_reports/bandit.json || true",
+      "expect": "sem HIGH"
+    },
+    {
+      "id": "py_perf_hotspots",
+      "run": "python -m radon cc -s -j . > codex_reports/radon_cc.json",
+      "expect": "cc <= 10"
+    },
+    {
+      "id": "ts_eslint",
+      "run": "eslint . --ext .ts,.tsx,.js --fix || true",
+      "expect": "eslint ok"
+    },
+    {
+      "id": "ts_types",
+      "run": "tsc -p tsconfig.json --noEmit || true",
+      "expect": "ts ok"
+    },
+    {
+      "id": "api_fiscal_contracts",
+      "run": "pytest -q tests/fiscal_contracts || true",
+      "expect": "contratos fiscais conformes"
+    },
+    {
+      "id": "audit_trail",
+      "run": "codex.audit.ensure_append_only_logs",
+      "expect": "trilha imutável habilitada"
+    }
+  ],
+  "autofixes": [
+    {
+      "pattern": "blocking I/O in async handlers",
+      "replacement": "usar libs async (httpx[async], asyncpg, aioredis)"
+    },
+    {
+      "pattern": "N+1 queries",
+      "replacement": "prefetch/select_related ou bulk ops"
+    },
+    {
+      "pattern": "float em cálculos monetários",
+      "replacement": "Decimal + contexto BRL"
+    },
+    {
+      "pattern": "missing timeouts/retries",
+      "replacement": "padronizar via http client wrapper com jitter"
+    },
+    {
+      "pattern": "timezone não definido",
+      "replacement": "America/Sao_Paulo"
+    }
+  ],
+  "metrics": [
+    {
+      "key": "complexity_avg",
+      "source": "radon"
+    },
+    {
+      "key": "coverage_backend",
+      "source": "pytest-coverage"
+    },
+    {
+      "key": "latency_p50_ms",
+      "source": "bench"
+    },
+    {
+      "key": "mem_peak_mb",
+      "source": "bench"
+    }
+  ],
+  "reporting": {
+    "save": "codex_reports/backend_audit.json"
+  }
+}

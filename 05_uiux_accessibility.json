@@ -1,0 +1,72 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "05_uiux_accessibility",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Consistência visual, WCAG AA e design tokens",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "standards": [
+    "WCAG 2.1 AA",
+    "Material Design 3",
+    "Apple HIG"
+  ],
+  "checks": [
+    {
+      "id": "axe",
+      "run": "npx axe --tags wcag2a,wcag2aa --save codex_reports/axe.json || true",
+      "expect": "0 critical"
+    },
+    {
+      "id": "pa11y",
+      "run": "npx pa11y-ci --json > codex_reports/pa11y.json || true",
+      "expect": "sem issues sérias"
+    },
+    {
+      "id": "contrast",
+      "run": "codex.ui.contrast_check:min_ratio=4.5",
+      "autofix": "ajustar tokens"
+    },
+    {
+      "id": "focus",
+      "run": "codex.ui.focusable_scan",
+      "autofix": "ordem de foco + outlines visíveis"
+    },
+    {
+      "id": "i18n",
+      "run": "codex.ui.i18n_missings",
+      "autofix": "extrair literais"
+    }
+  ],
+  "design_tokens": {
+    "ensure_file": "design/tokens.json",
+    "autofix_rules": [
+      {
+        "token": "color.primary",
+        "constraint": "contrast>=4.5"
+      },
+      {
+        "token": "spacing.scale",
+        "constraint": "múltiplos de 8px"
+      }
+    ]
+  },
+  "tables_dense": {
+    "keyboard_nav": true,
+    "badge_contrast": "AA"
+  },
+  "reporting": {
+    "save": "codex_reports/uiux_accessibility.json"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "11_risk_register",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Riscos técnicos/regulatórios e automação de issues",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "register": [
+    {
+      "id": "LEGAL-001",
+      "title": "Mudança normativa não refletida",
+      "severity": "critical",
+      "owner": "compliance",
+      "sla_days": 2
+    },
+    {
+      "id": "DATA-002",
+      "title": "PII não anonimizada em fixtures",
+      "severity": "critical",
+      "owner": "security",
+      "sla_days": 1
+    },
+    {
+      "id": "OCR-003",
+      "title": "Queda de acurácia em PDFs digitalizados",
+      "severity": "high",
+      "owner": "ml",
+      "sla_days": 5
+    },
+    {
+      "id": "ERP-004",
+      "title": "Inconsistência de integração ERP",
+      "severity": "high",
+      "owner": "backend",
+      "sla_days": 5
+    },
+    {
+      "id": "UX-005",
+      "title": "Falhas de contraste em badges/status",
+      "severity": "medium",
+      "owner": "frontend",
+      "sla_days": 7
+    }
+  ],
+  "automation": {
+    "ticketing": "github_issues",
+    "labels": [
+      "codex",
+      "audit"
+    ],
+    "auto_close_on_commit": true
+  },
+  "reporting": {
+    "save": "codex_reports/risk_register.json"
+  }
+}

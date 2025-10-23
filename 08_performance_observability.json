@@ -1,0 +1,82 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "08_performance_observability",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Benchmarks orientados a documentos e OTEL completo",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "benchmarks": [
+    {
+      "name": "api_smoke_latency",
+      "tool": "hey|autocannon",
+      "target": "http://localhost:PORT/health",
+      "rps": [
+        50,
+        100,
+        200
+      ]
+    },
+    {
+      "name": "ocr_throughput_docs_per_min",
+      "tool": "custom",
+      "script": "scripts/bench_ocr.py"
+    },
+    {
+      "name": "validator_p95_ms_per_doc",
+      "tool": "custom",
+      "script": "scripts/bench_validator.py"
+    },
+    {
+      "name": "automation_posting_latency_ms",
+      "tool": "custom",
+      "script": "scripts/bench_automation.py"
+    }
+  ],
+  "observability": {
+    "otel": {
+      "enabled": true,
+      "exporter": "otlp",
+      "service_name": "nexus-quantum-i2a2"
+    },
+    "logging": {
+      "level_default": "INFO",
+      "json": true,
+      "append_only": true,
+      "signed_hash": true
+    },
+    "metrics": {
+      "prometheus": true,
+      "path": "/metrics",
+      "labels": [
+        "doc_id",
+        "rule_id",
+        "agent_id"
+      ]
+    }
+  },
+  "autofixes": [
+    {
+      "pattern": "missing trace spans",
+      "replacement": "anotações de trace por agente"
+    },
+    {
+      "pattern": "no metrics critical paths",
+      "replacement": "add counters/histograms"
+    }
+  ],
+  "reporting": {
+    "save": "codex_reports/perf_observability.json"
+  }
+}

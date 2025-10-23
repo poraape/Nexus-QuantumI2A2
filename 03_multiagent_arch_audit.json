@@ -1,0 +1,100 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "03_multiagent_arch_audit",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Coerência MAS, contratos e segurança por agente",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "scope": {
+    "paths": [
+      "agents/**",
+      "src/agents/**",
+      "graph/**",
+      "workflows/**",
+      "**/*agent*.{py,ts}"
+    ]
+  },
+  "modeling": {
+    "extract_graph": true,
+    "export_mermaid": "codex_reports/agents_graph.mmd"
+  },
+  "checks": [
+    {
+      "id": "contracts_sync",
+      "run": "codex.agents.schema.validate --contracts 02a_fiscal_contracts.json",
+      "expect": "schemas consistentes"
+    },
+    {
+      "id": "cycles",
+      "run": "codex.agents.detect_cycles",
+      "expect": "sem ciclos inseguros"
+    },
+    {
+      "id": "timeouts",
+      "run": "codex.agents.ensure_timeouts:default=60s",
+      "expect": "timeouts set"
+    },
+    {
+      "id": "tool_sandbox",
+      "run": "codex.agents.permissions.audit",
+      "expect": "least privilege"
+    },
+    {
+      "id": "observability",
+      "run": "codex.agents.ensure_tracing:otlp=true",
+      "expect": "traces por nó/aresta"
+    }
+  ],
+  "slas": [
+    {
+      "agent": "extractor",
+      "p95_ms_per_page": 1500
+    },
+    {
+      "agent": "validator",
+      "p95_ms_per_doc": 300
+    },
+    {
+      "agent": "classifier",
+      "p95_ms_per_doc": 200
+    },
+    {
+      "agent": "automation",
+      "p95_ms_per_op": 500
+    }
+  ],
+  "autofixes": [
+    {
+      "pattern": "implicit global state",
+      "replacement": "injetar contexto explícito"
+    },
+    {
+      "pattern": "blocking calls no step",
+      "replacement": "async + bounded concurrency"
+    },
+    {
+      "pattern": "sem circuit breaker",
+      "replacement": "bulkhead + retry jitter"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "codex_reports/agents_graph.mmd"
+    }
+  ],
+  "reporting": {
+    "save": "codex_reports/multiagent_audit.json"
+  }
+}

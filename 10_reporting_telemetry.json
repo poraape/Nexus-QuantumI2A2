@@ -1,0 +1,62 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "10_reporting_telemetry",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Agregação de métricas, scores e tendências com KPIs de domínio",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "inputs": {
+    "reports_glob": "codex_reports/**/*.json"
+  },
+  "scores": {
+    "domain_kpis": [
+      "ocr_accuracy",
+      "validation_precision",
+      "classification_accuracy",
+      "error_reduction",
+      "processing_time_gain"
+    ],
+    "quality_score": {
+      "weights": {
+        "backend": 0.2,
+        "frontend": 0.15,
+        "agents": 0.25,
+        "security": 0.2,
+        "domain_kpis": 0.2
+      }
+    },
+    "risk_index": {
+      "formula": "(open_findings_critical*3 + open_findings_high*2 + open_findings_medium)/max(issues_total,1)"
+    }
+  },
+  "outputs": [
+    {
+      "file": "codex_reports/summary.md",
+      "format": "markdown"
+    },
+    {
+      "file": "codex_reports/summary.json",
+      "format": "json"
+    },
+    {
+      "file": "codex_reports/trends.json",
+      "format": "json_append"
+    }
+  ],
+  "changelog": {
+    "file": "codex_reports/refactors.log",
+    "append": true
+  }
+}

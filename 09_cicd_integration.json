@@ -1,0 +1,147 @@
+{
+  "$schema": "https://nexus-quantum.dev/schemas/codex-audit-suite.schema.json",
+  "metadata": {
+    "name": "09_cicd_integration",
+    "version": "2.0.0",
+    "created_at": "2025-10-23T18:56:26",
+    "owner": "NEXUS QUANTUM I2A2",
+    "description": "Pipeline GA com sanitização, matrizes setoriais e gates de KPI",
+    "target_repo_hint": "https://github.com/poraape/Nexus-QuantumI2A2.git",
+    "execution_engine": "Codex/CodeAssistant",
+    "idempotent": true,
+    "safety": {
+      "dry_run_supported": true,
+      "confirm_before_destructive_changes": true,
+      "backup_modified_files": true,
+      "create_git_branch": "codex/audit-autofix",
+      "commit_prefix": "[codex-audit]"
+    }
+  },
+  "ci": {
+    "provider": "github_actions"
+  },
+  "jobs": [
+    {
+      "name": "codex-audit",
+      "on": [
+        "pull_request",
+        "push"
+      ],
+      "uses": "./.github/workflows/codex-audit.yml",
+      "template": {
+        "name": "Codex Audit & Autofix",
+        "on": {
+          "pull_request": {},
+          "push": {
+            "branches": [
+              "main"
+            ]
+          }
+        },
+        "jobs": {
+          "sanitize-fixtures": {
+            "runs-on": "ubuntu-latest",
+            "steps": [
+              {
+                "uses": "actions/checkout@v4",
+                "with": {
+                  "fetch-depth": 0
+                }
+              },
+              {
+                "name": "Sanitize",
+                "run": "python scripts/sanitize_fixtures.py"
+              }
+            ]
+          },
+          "ruleset-validate": {
+            "runs-on": "ubuntu-latest",
+            "steps": [
+              {
+                "uses": "actions/checkout@v4"
+              },
+              {
+                "name": "Validate ruleset",
+                "run": "python scripts/validate_ruleset.py rules/fiscal_rules_v1.yaml"
+              }
+            ]
+          },
+          "audit": {
+            "runs-on": "ubuntu-latest",
+            "strategy": {
+              "matrix": {
+                "sector": [
+                  "agronegocio",
+                  "industria",
+                  "automotivo"
+                ]
+              }
+            },
+            "steps": [
+              {
+                "uses": "actions/checkout@v4",
+                "with": {
+                  "fetch-depth": 0
+                }
+              },
+              {
+                "uses": "actions/setup-node@v4",
+                "with": {
+                  "node-version": "18"
+                }
+              },
+              {
+                "uses": "actions/setup-python@v5",
+                "with": {
+                  "python-version": "3.11"
+                }
+              },
+              {
+                "name": "Install deps",
+                "run": "pip install ruff mypy bandit radon pip-audit && npm i -g @lhci/cli gitleaks pa11y-ci axe-core"
+              },
+              {
+                "name": "Run suite",
+                "run": "python scripts/run_codex_suite.py --sector ${{matrix.sector}} || true"
+              },
+              {
+                "name": "Upload reports",
+                "uses": "actions/upload-artifact@v4",
+                "with": {
+                  "name": "codex_reports_${{matrix.sector}}",
+                  "path": "codex_reports"
+                }
+              },
+              {
+                "name": "Autofix PR",
+                "uses": "stefanzweifel/git-auto-commit-action@v5",
+                "with": {
+                  "commit_message": "[codex-audit] autofix",
+                  "branch": "codex/audit-autofix"
+                }
+              }
+            ]
+          },
+          "gates": {
+            "runs-on": "ubuntu-latest",
+            "needs": [
+              "audit"
+            ],
+            "steps": [
+              {
+                "uses": "actions/checkout@v4"
+              },
+              {
+                "name": "Enforce KPI gates",
+                "run": "python scripts/enforce_kpis.py codex_reports/summary.json"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "reporting": {
+    "save": "codex_reports/cicd_integration.json"
+  }
+}
