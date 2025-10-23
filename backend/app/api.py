@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from .models import AnalysisJob
 from .orchestrator import PipelineOrchestrator, orchestrator
-from .auth import get_current_user, issue_auth_cookies
+from .auth import issue_auth_cookies
 from .config import get_settings
 from .services.session import SpaSessionManager, get_session_manager
 
@@ -85,7 +85,6 @@ async def get_progress(
 async def stream_orchestrator_state(
     job_id: uuid.UUID,
     orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
-    _: str = Depends(get_current_user),
 ):
     async def event_stream() -> AsyncIterator[str]:
         last_payload: Optional[dict] = None

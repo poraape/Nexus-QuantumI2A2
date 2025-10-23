@@ -147,8 +147,6 @@ app.add_middleware(
 )
 app.add_middleware(AuditMiddleware, audit_logger=audit_logger)
 
-app.include_router(analysis_router)
-
 
 @app.post('/auth/authorize')
 async def authorize(request: AuthorizationRequest) -> Dict[str, str]:
