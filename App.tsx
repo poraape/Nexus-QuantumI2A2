@@ -84,6 +84,28 @@ const App: React.FC = () => {
         collapsedStateRef.current = collapsedModules;
     }, [collapsedModules]);
 
+    useEffect(() => {
+        if (!autoExportEnabled || pipelineStep !== 'COMPLETE' || !auditReport) {
+            return;
+        }
+
+        const executionId = auditReport.executionId ?? auditReport.summary.title;
+        if (lastAutoExportExecutionId.current === executionId) {
+            return;
+        }
+
+        lastAutoExportExecutionId.current = executionId;
+
+        const runAutoExport = async () => {
+            await handleExport('pdf');
+            await handleExport('docx');
+        };
+
+        runAutoExport().catch((autoExportError) => {
+            console.error('Auto export failed', autoExportError);
+        });
+    }, [autoExportEnabled, pipelineStep, auditReport]);
+
     const handleStartAnalysis = (files: File[]) => {
         setCollapsedModules({ ...DEFAULT_MODULE_STATE });
         lastAutoExportExecutionId.current = null;
@@ -196,6 +218,13 @@ const App: React.FC = () => {
             console.error('Auto export failed', autoExportError);
         });
     }, [autoExportEnabled, pipelineStep, auditReport, handleExport]);
+
+    const toggleModule = (module: CollapsibleModuleKey) => {
+        setCollapsedModules(prev => ({
+            ...prev,
+            [module]: !prev[module],
+        }));
+    };
 
     const toggleModule = (module: CollapsibleModuleKey) => {
         setCollapsedModules(prev => ({

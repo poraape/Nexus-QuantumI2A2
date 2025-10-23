@@ -360,11 +360,7 @@ export const importFiles = async (
           });
         }
       };
-      if (Array.isArray(result)) {
-        result.forEach(logResult);
-      } else {
-        logResult(result);
-      }
+      Array.isArray(result) ? result.forEach(logResult) : logResult(result);
 
       progressCounter++;
       onProgress(progressCounter, files.length);
