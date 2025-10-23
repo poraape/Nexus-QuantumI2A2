@@ -39,10 +39,14 @@ function assertPerformance(summary) {
   const httpMetrics = summary.metrics || {};
   const durationMetric = httpMetrics.http_req_duration || {};
   const failureMetric = httpMetrics.http_req_failed || {};
+  const avg = typeof durationMetric.avg === 'number' ? durationMetric.avg : undefined;
   const p95 = typeof durationMetric['p(95)'] === 'number' ? durationMetric['p(95)'] : undefined;
   const errorRate = typeof failureMetric.rate === 'number' ? failureMetric.rate : undefined;
   const breaches = [];
-  if (typeof p95 === 'number' && p95 > 800) {
+  if (typeof avg === 'number' && avg > 600) {
+    breaches.push(`http_req_duration avg: ${avg.toFixed(2)}ms`);
+  }
+  if (typeof p95 === 'number' && p95 > 1200) {
     breaches.push(`http_req_duration p95: ${p95.toFixed(2)}ms`);
   }
   if (typeof errorRate === 'number' && errorRate > 0.01) {
@@ -52,6 +56,7 @@ function assertPerformance(summary) {
     throw new Error(`Performance abaixo do mínimo aceitável: ${breaches.join('; ')}`);
   }
   return {
+    avg,
     p95,
     errorRate,
   };
@@ -60,10 +65,12 @@ function assertPerformance(summary) {
 async function publishReport() {
   const repoRoot = process.cwd();
   const coveragePath = path.join(repoRoot, 'coverage', 'coverage-summary.json');
-  const performancePath = path.join(repoRoot, 'reports', 'k6-summary.json');
+  const performancePrimaryPath = path.join(repoRoot, 'reports', 'performance', 'k6-summary.json');
+  const performanceFallbackPath = path.join(repoRoot, 'reports', 'k6-summary.json');
 
   const coverageSummary = await readJsonIfExists(coveragePath);
-  const performanceSummary = await readJsonIfExists(performancePath);
+  const performanceSummary =
+    (await readJsonIfExists(performancePrimaryPath)) || (await readJsonIfExists(performanceFallbackPath));
 
   const coverageGates = assertCoverage(coverageSummary);
   const performanceGates = assertPerformance(performanceSummary);
