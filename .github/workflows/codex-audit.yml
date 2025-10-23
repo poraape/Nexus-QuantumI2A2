@@ -59,11 +59,13 @@ jobs:
           retention-days: 7
 
       - name: Commit and push auto-fixes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "[codex-audit] Automated fixes and reports"
-          branch: codex/audit-autofix
-          push_options: '--force-with-lease'
+        run: |
+          git config --global user.name "codex-bot"
+          git config --global user.email "actions@github.com"
+          git checkout -b codex/audit-autofix || git checkout codex/audit-autofix
+          git add .
+          git commit -am "[codex-audit] Automated fixes and reports" || echo "No changes to commit"
+          git push origin codex/audit-autofix --force
 
       - name: Create Pull Request if needed
         uses: peter-evans/create-pull-request@v6
