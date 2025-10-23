@@ -59,7 +59,6 @@ export const bootstrapPostgres = async () => {
     try {
         await postgresClient.migrate();
     } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('[PostgresClient] Failed to run migrations', error);
         throw error;
     }

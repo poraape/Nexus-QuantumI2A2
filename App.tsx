@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import FileUpload from './components/FileUpload';
 import ReportViewer from './components/ReportViewer';
 import ChatPanel from './components/ChatPanel';
@@ -141,7 +141,7 @@ const App: React.FC = () => {
         resetOrchestrator();
     };
 
-    const handleExport = async (type: ExportType) => {
+    const handleExport = useCallback(async (type: ExportType) => {
         if (!auditReport) return;
         setIsExporting(type);
         const previousCollapsed = { ...collapsedStateRef.current };
@@ -195,6 +195,35 @@ const App: React.FC = () => {
             }
             setIsExporting(null);
         }
+    }, [auditReport, setError]);
+
+    useEffect(() => {
+        if (!autoExportEnabled || pipelineStep !== 'COMPLETE' || !auditReport) {
+            return;
+        }
+
+        const executionId = auditReport.executionId ?? auditReport.summary.title;
+        if (lastAutoExportExecutionId.current === executionId) {
+            return;
+        }
+
+        lastAutoExportExecutionId.current = executionId;
+
+        const runAutoExport = async () => {
+            await handleExport('pdf');
+            await handleExport('docx');
+        };
+
+        runAutoExport().catch((autoExportError) => {
+            console.error('Auto export failed', autoExportError);
+        });
+    }, [autoExportEnabled, pipelineStep, auditReport, handleExport]);
+
+    const toggleModule = (module: CollapsibleModuleKey) => {
+        setCollapsedModules(prev => ({
+            ...prev,
+            [module]: !prev[module],
+        }));
     };
 
     const toggleModule = (module: CollapsibleModuleKey) => {

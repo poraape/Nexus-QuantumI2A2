@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ChartData } from '../types';
 
-const Chart: React.FC<ChartData> = ({ type, title, data, options, xAxisLabel, yAxisLabel }) => {
+const Chart: React.FC<ChartData> = ({ type, title, data, xAxisLabel, yAxisLabel }) => {
   const colors = [
     '#38bdf8', '#34d399', '#f87171', '#fbbf24', '#a78bfa', '#f472b6', 
     '#60a5fa', '#818cf8', '#a3e635', '#2dd4bf'
@@ -105,7 +105,7 @@ const Chart: React.FC<ChartData> = ({ type, title, data, options, xAxisLabel, yA
     }).join(' ');
 
     return (
-         <svg width="100%" height={chartHeight + 40} viewBox={`0 0 ${chartWidth} ${chartHeight + 40}`}>
+      <svg width="100%" height={chartHeight + 40} viewBox={`0 0 ${chartWidth} ${chartHeight + 40}`}>
             {/* Y Axis Label */}
             {yAxisLabel && (
               <text x={-(chartHeight / 2)} y={10} transform="rotate(-90)" textAnchor="middle" fontSize="10" fill="#9ca3af">{yAxisLabel}</text>
@@ -125,10 +125,10 @@ const Chart: React.FC<ChartData> = ({ type, title, data, options, xAxisLabel, yA
             <line x1={padding.left} y1={padding.top} x2={padding.left} y2={chartHeight-padding.bottom+padding.top} stroke="#4b5563" />
             {/* X Axis Label */}
             {xAxisLabel && (
-                <text x={chartWidth/2} y={chartHeight+25} textAnchor="middle" fontSize="10" fill="#9ca3af">{xAxisLabel}</text>
+              <text x={chartWidth / 2} y={chartHeight + 25} textAnchor="middle" fontSize="10" fill="#9ca3af">{xAxisLabel}</text>
             )}
         </svg>
-    )
+    );
   };
 
   const renderScatterChart = () => {
