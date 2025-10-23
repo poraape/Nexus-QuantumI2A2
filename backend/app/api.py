@@ -28,6 +28,7 @@ async def create_analysis(
     files: list[UploadFile] = File(...),
     webhook_url: Optional[str] = None,
     orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+    _: str = Depends(get_current_user),
 ):
     if not files:
         raise HTTPException(status_code=400, detail="Nenhum arquivo enviado.")
@@ -52,7 +53,11 @@ async def create_session(
 
 
 @router.get("/analysis/{job_id}")
-async def get_analysis(job_id: uuid.UUID, orchestrator: PipelineOrchestrator = Depends(get_orchestrator)):
+async def get_analysis(
+    job_id: uuid.UUID,
+    orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+    _: str = Depends(get_current_user),
+):
     job = orchestrator.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Análise não encontrada")
@@ -60,7 +65,11 @@ async def get_analysis(job_id: uuid.UUID, orchestrator: PipelineOrchestrator = D
 
 
 @router.get("/analysis/{job_id}/progress")
-async def get_progress(job_id: uuid.UUID, orchestrator: PipelineOrchestrator = Depends(get_orchestrator)):
+async def get_progress(
+    job_id: uuid.UUID,
+    orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+    _: str = Depends(get_current_user),
+):
     job = orchestrator.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Análise não encontrada")

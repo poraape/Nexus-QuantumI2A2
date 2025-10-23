@@ -21,6 +21,7 @@ from .auth import (
     get_current_user,
     issue_auth_cookies,
 )
+from .api import router as analysis_router
 from .config import get_settings
 from .middleware import AuditMiddleware, RateLimitMiddleware
 from .services.audit import AuditLogger
