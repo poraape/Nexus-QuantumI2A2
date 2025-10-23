@@ -1,6 +1,6 @@
 import React from 'react';
 import type { DeterministicCrossValidationResult } from '../types';
-import { ShieldExclamationIcon, FileIcon } from './icons';
+import { FileIcon } from './icons';
 
 interface AnalysisDisplayProps {
   results: DeterministicCrossValidationResult[] | undefined;
@@ -31,7 +31,7 @@ const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ results }) => {
                                 <span className="bg-gray-700/70 text-blue-300 font-bold uppercase tracking-wide px-2 py-0.5 rounded">{result.ruleCode}</span>
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-md bg-gray-700/70`}>{result.severity}</span>
                             </div>
-                            <p className="font-semibold text-gray-200">{result.attribute}: <span className="font-normal text-gray-400">"{result.comparisonKey}"</span></p>
+                            <p className="font-semibold text-gray-200">{result.attribute}: <span className="font-normal text-gray-400">&ldquo;{result.comparisonKey}&rdquo;</span></p>
                             <p className="text-sm text-yellow-300">{result.description}</p>
                             <p className="text-xs text-gray-500">
                                 Contexto: NCM {result.context.ncm} • CFOP {result.context.cfop} • {result.context.dataEmissao ? `Data ${result.context.dataEmissao}` : 'Data não informada'}

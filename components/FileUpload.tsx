@@ -24,7 +24,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onStartAnalysis, disabled }) =>
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   };
 
-  const handleFilesAdded = (newFiles: FileList) => {
+  const handleFilesAdded = useCallback((newFiles: FileList) => {
       logger.log('FileUpload', 'INFO', `${newFiles.length} arquivo(s) recebido(s) para processamento.`);
       setError(null);
       const acceptedFiles: File[] = [];
@@ -50,7 +50,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onStartAnalysis, disabled }) =>
       if (acceptedFiles.length > 0) {
         setFiles(prev => [...prev, ...acceptedFiles]);
       }
-  };
+  }, [files]);
 
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -76,7 +76,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onStartAnalysis, disabled }) =>
     if (!disabled && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFilesAdded(e.dataTransfer.files);
     }
-  }, [disabled, files]);
+  }, [disabled, handleFilesAdded]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!disabled && e.target.files && e.target.files.length > 0) {

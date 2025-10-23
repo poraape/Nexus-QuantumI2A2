@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-02-17T00:00:00Z",
+  "dry_run": true,
+  "dimensions": [
+    { "category": "Arquitetura Multiagente", "weight": 25, "score": 40 },
+    { "category": "Integração e Backend", "weight": 20, "score": 35 },
+    { "category": "Inteligência e Aprendizado", "weight": 20, "score": 45 },
+    { "category": "Interface e UX", "weight": 15, "score": 50 },
+    { "category": "Segurança e Governança", "weight": 20, "score": 30 }
+  ],
+  "global_score": 40,
+  "qualitative_level": "Não Conforme",
+  "gate_evaluation": {
+    "category": "Avaliação e Experimentação",
+    "status": "reprovado",
+    "reason": "Sem KPIs setoriais nem relatórios de cobertura/performance atualizados."
+  }
+}

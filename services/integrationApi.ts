@@ -43,7 +43,6 @@ export const subscribeToQueueEvents = (
             const data = await fetchIntegrationDashboard();
             onUpdate(data);
         } catch (error) {
-            // eslint-disable-next-line no-console
             console.error('[IntegrationApi] Falha ao atualizar dashboard', error);
         } finally {
             timer = window.setTimeout(poll, interval);

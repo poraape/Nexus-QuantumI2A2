@@ -6,10 +6,13 @@ from typing import Dict, Optional
 
 import httpx
 
-from .config import settings
+from .config import get_settings
 from .crud import get_job, set_job_status, upsert_agent_state
 from .database import get_session
 from .models import AgentStatus, JobStatus
+
+
+settings = get_settings()
 
 
 def update_agent(
@@ -58,8 +61,6 @@ def set_job_result(
             result_payload=result_payload,
         )
         _send_webhook(job)
-
-
 def _send_webhook(job) -> None:
     if not job.webhook_url:
         return

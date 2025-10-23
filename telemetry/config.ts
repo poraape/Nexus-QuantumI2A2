@@ -24,13 +24,6 @@ export interface TelemetryConfig {
   };
 }
 
-const defaultThreshold: ThresholdConfig = {
-  latencyMs: 2500,
-  errorRate: 0.15,
-  throughputMin: 1,
-  consecutiveRetries: 3,
-};
-
 export const telemetryConfig: TelemetryConfig = {
   serviceName: env('VITE_TELEMETRY_SERVICE', 'nexus-quantum-backend'),
   serviceVersion: env('VITE_APP_VERSION', '1.0.0'),

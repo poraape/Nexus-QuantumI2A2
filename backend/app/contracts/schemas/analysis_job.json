@@ -1,0 +1,749 @@
+{
+  "definitions": {
+    "AccountingEntryContract": {
+      "properties": {
+        "account": {
+          "title": "Account",
+          "type": "string"
+        },
+        "docName": {
+          "title": "Docname",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "D",
+            "C"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "docName",
+        "account",
+        "type",
+        "value"
+      ],
+      "title": "AccountingEntryContract",
+      "type": "object"
+    },
+    "AgentProgressContract": {
+      "properties": {
+        "current": {
+          "title": "Current",
+          "type": "integer"
+        },
+        "extra": {
+          "title": "Extra",
+          "type": "object"
+        },
+        "step": {
+          "title": "Step",
+          "type": "string"
+        },
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "title": "AgentProgressContract",
+      "type": "object"
+    },
+    "AgentStateContract": {
+      "properties": {
+        "details": {
+          "title": "Details",
+          "type": "object"
+        },
+        "progress": {
+          "$ref": "#/definitions/AgentProgressContract"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "AgentStateContract",
+      "type": "object"
+    },
+    "AnalysisResultContract": {
+      "properties": {
+        "actionableInsights": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Actionableinsights",
+          "type": "array"
+        },
+        "keyMetrics": {
+          "items": {
+            "$ref": "#/definitions/KeyMetricContract"
+          },
+          "title": "Keymetrics",
+          "type": "array"
+        },
+        "strategicRecommendations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Strategicrecommendations",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "summary",
+        "keyMetrics",
+        "actionableInsights"
+      ],
+      "title": "AnalysisResultContract",
+      "type": "object"
+    },
+    "AuditReportContract": {
+      "properties": {
+        "accountingEntries": {
+          "items": {
+            "$ref": "#/definitions/AccountingEntryContract"
+          },
+          "title": "Accountingentries",
+          "type": "array"
+        },
+        "aggregatedMetrics": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Aggregatedmetrics",
+          "type": "object"
+        },
+        "aiDrivenInsights": {
+          "items": {
+            "type": "object"
+          },
+          "title": "Aidriveninsights",
+          "type": "array"
+        },
+        "crossValidationResults": {
+          "items": {
+            "$ref": "#/definitions/CrossValidationResultContract"
+          },
+          "title": "Crossvalidationresults",
+          "type": "array"
+        },
+        "deterministicArtifacts": {
+          "items": {
+            "$ref": "#/definitions/DeterministicArtifactDescriptorContract"
+          },
+          "title": "Deterministicartifacts",
+          "type": "array"
+        },
+        "deterministicCrossValidation": {
+          "items": {
+            "$ref": "#/definitions/DeterministicCrossValidationResultContract"
+          },
+          "title": "Deterministiccrossvalidation",
+          "type": "array"
+        },
+        "documents": {
+          "items": {
+            "$ref": "#/definitions/AuditedDocumentContract"
+          },
+          "title": "Documents",
+          "type": "array"
+        },
+        "executionId": {
+          "title": "Executionid",
+          "type": "string"
+        },
+        "spedFile": {
+          "$ref": "#/definitions/SpedFileContract"
+        },
+        "summary": {
+          "$ref": "#/definitions/AnalysisResultContract"
+        }
+      },
+      "required": [
+        "summary",
+        "documents"
+      ],
+      "title": "AuditReportContract",
+      "type": "object"
+    },
+    "AuditedDocumentContract": {
+      "properties": {
+        "classification": {
+          "$ref": "#/definitions/ClassificationResultContract"
+        },
+        "doc": {
+          "$ref": "#/definitions/ImportedDocContract"
+        },
+        "inconsistencies": {
+          "items": {
+            "$ref": "#/definitions/InconsistencyContract"
+          },
+          "title": "Inconsistencies",
+          "type": "array"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "OK",
+            "ALERTA",
+            "ERRO"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "doc",
+        "status",
+        "inconsistencies"
+      ],
+      "title": "AuditedDocumentContract",
+      "type": "object"
+    },
+    "ClassificationResultContract": {
+      "properties": {
+        "businessSector": {
+          "title": "Businesssector",
+          "type": "string"
+        },
+        "confidence": {
+          "title": "Confidence",
+          "type": "number"
+        },
+        "operationType": {
+          "enum": [
+            "Compra",
+            "Venda",
+            "Devolu\u00e7\u00e3o",
+            "Servi\u00e7o",
+            "Transfer\u00eancia",
+            "Outros"
+          ],
+          "title": "Operationtype",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operationType",
+        "businessSector",
+        "confidence"
+      ],
+      "title": "ClassificationResultContract",
+      "type": "object"
+    },
+    "CrossValidationDocumentContract": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "CrossValidationDocumentContract",
+      "type": "object"
+    },
+    "CrossValidationResultContract": {
+      "properties": {
+        "attribute": {
+          "title": "Attribute",
+          "type": "string"
+        },
+        "documents": {
+          "items": {
+            "$ref": "#/definitions/CrossValidationDocumentContract"
+          },
+          "title": "Documents",
+          "type": "array"
+        },
+        "observation": {
+          "title": "Observation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attribute",
+        "observation",
+        "documents"
+      ],
+      "title": "CrossValidationResultContract",
+      "type": "object"
+    },
+    "DeterministicArtifactDescriptorContract": {
+      "properties": {
+        "createdAt": {
+          "title": "Createdat",
+          "type": "string"
+        },
+        "executionId": {
+          "title": "Executionid",
+          "type": "string"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "json",
+            "csv",
+            "md"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "size": {
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "executionId",
+        "format",
+        "filename",
+        "createdAt",
+        "size"
+      ],
+      "title": "DeterministicArtifactDescriptorContract",
+      "type": "object"
+    },
+    "DeterministicContextSnapshotContract": {
+      "properties": {
+        "cfop": {
+          "title": "Cfop",
+          "type": "string"
+        },
+        "dataEmissao": {
+          "title": "Dataemissao",
+          "type": "string"
+        },
+        "destinatarioCnpj": {
+          "title": "Destinatariocnpj",
+          "type": "string"
+        },
+        "emitenteCnpj": {
+          "title": "Emitentecnpj",
+          "type": "string"
+        },
+        "ncm": {
+          "title": "Ncm",
+          "type": "string"
+        },
+        "produtoNome": {
+          "title": "Produtonome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ncm",
+        "cfop"
+      ],
+      "title": "DeterministicContextSnapshotContract",
+      "type": "object"
+    },
+    "DeterministicCrossValidationResultContract": {
+      "properties": {
+        "attribute": {
+          "title": "Attribute",
+          "type": "string"
+        },
+        "comparisonKey": {
+          "title": "Comparisonkey",
+          "type": "string"
+        },
+        "context": {
+          "$ref": "#/definitions/DeterministicContextSnapshotContract"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "discrepancies": {
+          "items": {
+            "$ref": "#/definitions/DeterministicDiscrepancyContract"
+          },
+          "title": "Discrepancies",
+          "type": "array"
+        },
+        "justification": {
+          "title": "Justification",
+          "type": "string"
+        },
+        "ruleCode": {
+          "title": "Rulecode",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "ALERTA",
+            "INFO"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "comparisonKey",
+        "attribute",
+        "description",
+        "discrepancies",
+        "severity",
+        "ruleCode",
+        "justification",
+        "context"
+      ],
+      "title": "DeterministicCrossValidationResultContract",
+      "type": "object"
+    },
+    "DeterministicDiscrepancyContract": {
+      "properties": {
+        "docA": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Doca",
+          "type": "object"
+        },
+        "docB": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Docb",
+          "type": "object"
+        },
+        "justification": {
+          "title": "Justification",
+          "type": "string"
+        },
+        "ruleCode": {
+          "title": "Rulecode",
+          "type": "string"
+        },
+        "valueA": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Valuea"
+        },
+        "valueB": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Valueb"
+        }
+      },
+      "required": [
+        "valueA",
+        "docA",
+        "valueB",
+        "docB",
+        "ruleCode",
+        "justification"
+      ],
+      "title": "DeterministicDiscrepancyContract",
+      "type": "object"
+    },
+    "ImportedDocContract": {
+      "properties": {
+        "data": {
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "title": "Data",
+          "type": "array"
+        },
+        "error": {
+          "title": "Error",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "NFE_XML",
+            "CSV",
+            "XLSX",
+            "PDF",
+            "IMAGE",
+            "UNSUPPORTED"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "meta": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "size": {
+          "title": "Size",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "parsed",
+            "ocr_needed",
+            "unsupported",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "size",
+        "status"
+      ],
+      "title": "ImportedDocContract",
+      "type": "object"
+    },
+    "InconsistencyContract": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "explanation": {
+          "title": "Explanation",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "normativeBase": {
+          "title": "Normativebase",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "ERRO",
+            "ALERTA",
+            "INFO"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "explanation",
+        "severity"
+      ],
+      "title": "InconsistencyContract",
+      "type": "object"
+    },
+    "KeyMetricContract": {
+      "properties": {
+        "insight": {
+          "title": "Insight",
+          "type": "string"
+        },
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "value",
+        "insight"
+      ],
+      "title": "KeyMetricContract",
+      "type": "object"
+    },
+    "SpedFileContract": {
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        }
+      },
+      "required": [
+        "filename",
+        "content"
+      ],
+      "title": "SpedFileContract",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "agentStates": {
+      "additionalProperties": {
+        "$ref": "#/definitions/AgentStateContract"
+      },
+      "title": "Agentstates",
+      "type": "object"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "title": "Createdat",
+      "type": "string"
+    },
+    "error": {
+      "title": "Error",
+      "type": "string"
+    },
+    "jobId": {
+      "format": "uuid",
+      "title": "Jobid",
+      "type": "string"
+    },
+    "result": {
+      "$ref": "#/definitions/AuditReportContract"
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "updatedAt": {
+      "format": "date-time",
+      "title": "Updatedat",
+      "type": "string"
+    }
+  },
+  "required": [
+    "jobId",
+    "status",
+    "agentStates"
+  ],
+  "title": "AnalysisJobContract",
+  "type": "object"
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "id": "ARCH-001",
+    "category": "Arquitetura Multiagente",
+    "severity": "crítica",
+    "description": "Pipeline multiagente continua orquestrado no frontend, contrariando a diretriz de backend único.",
+    "evidence": ["hooks/useAgentOrchestrator.ts:1-200"],
+    "impact": "Duplicidade de lógica, ausência de contratos formais e risco de inconsistência fiscal.",
+    "eta_hours": 20,
+    "recommendation": "Migrar orquestração para backend/app/orchestrator.py e expor estados consumíveis pelo front."
+  },
+  {
+    "id": "INT-002",
+    "category": "Integração e Backend",
+    "severity": "alta",
+    "description": "Fluxos concorrentes de LLM (backend vs proxy Gemini) geram contratos e auditorias divergentes.",
+    "evidence": ["services/llmService.ts:1-40", "services/geminiService.ts:1-200"],
+    "impact": "Quebra de compliance e rastreabilidade, risco de vazamento de segredos.",
+    "eta_hours": 15,
+    "recommendation": "Consolidar uso do backend /api/llm/*, removendo proxy duplicado e alinhando telemetria." 
+  },
+  {
+    "id": "SEC-003",
+    "category": "Segurança e Governança",
+    "severity": "alta",
+    "description": "CORS liberado e tokens persistidos em localStorage expõem superfícies a XSS e abuso cross-origin.",
+    "evidence": ["backend/app/main.py:125-132", "services/authService.ts:1-66"],
+    "impact": "Compromete confidencialidade de dados fiscais e credenciais de acesso.",
+    "eta_hours": 12,
+    "recommendation": "Restringir CORS, adotar cookies httpOnly com PKCE e implementar roteiros de rotação de tokens." 
+  },
+  {
+    "id": "UX-004",
+    "category": "Interface e UX",
+    "severity": "média",
+    "description": "Dependência de bibliotecas via CDN compromete responsividade offline e controle de versão.",
+    "evidence": ["index.html:7-41", "utils/importPipeline.ts:1-198"],
+    "impact": "Risco de indisponibilidade e dificuldade de certificação de supply chain.",
+    "eta_hours": 6,
+    "recommendation": "Empacotar dependências via build local e adicionar SRI/air-gap ao pipeline." 
+  },
+  {
+    "id": "OBS-005",
+    "category": "Segurança e Governança",
+    "severity": "média",
+    "description": "Inicialização de telemetria sem validação de endpoint pode travar a SPA em redes restritas.",
+    "evidence": ["services/telemetry.ts:1-120"],
+    "impact": "Degrada experiência e aumenta latência caso o collector OTLP esteja indisponível.",
+    "eta_hours": 6,
+    "recommendation": "Implementar health-check, timeouts progressivos e fallback para buffer local." 
+  }
+]

@@ -85,23 +85,24 @@ async function streamFromProxy(url: string, message: string): Promise<ProxyChatS
 
     async function* iterator(): ProxyChatStream {
         let buffer = "";
+        let streamFinished = false;
         try {
-            // eslint-disable-next-line no-constant-condition
-            while (true) {
+            while (!streamFinished) {
                 const { done, value } = await reader.read();
                 if (done) {
                     if (buffer.trim().length > 0) {
                         yield { text: buffer };
                     }
-                    break;
+                    streamFinished = true;
+                    continue;
                 }
                 buffer += decoder.decode(value, { stream: true });
                 let newlineIndex = buffer.indexOf("\n");
                 while (newlineIndex !== -1) {
                     const chunk = buffer.slice(0, newlineIndex);
                     buffer = buffer.slice(newlineIndex + 1);
-                    if (chunk.length > 0) {
-                        yield { text: chunk };
+                    if (chunk.trim().length > 0) {
+                        yield { text: chunk.trim() };
                     }
                     newlineIndex = buffer.indexOf("\n");
                 }

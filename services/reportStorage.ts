@@ -44,12 +44,12 @@ class ReportStorageService {
         }, existing);
 
         this.storage.set(executionId, merged);
-        return merged.map(({ content, ...descriptor }) => descriptor);
+        return merged.map(({ content: _content, ...descriptor }) => descriptor);
     }
 
     async listArtifacts(executionId: string): Promise<DeterministicArtifactDescriptor[]> {
         const stored = this.storage.get(executionId) || [];
-        return stored.map(({ content, ...descriptor }) => descriptor);
+        return stored.map(({ content: _content, ...descriptor }) => descriptor);
     }
 
     async getArtifact(executionId: string, format: DeterministicArtifactFormat): Promise<StoredArtifact | undefined> {
