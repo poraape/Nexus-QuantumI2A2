@@ -7,9 +7,18 @@ import { runAccountingAnalysis } from '../agents/accountantAgent';
 import { startChat, requestChatMessage, ChatSession } from '../services/chatService';
 import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
 import Papa from 'papaparse';
+
+import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
+import { startChat, requestChatMessage, ChatSession } from '../services/chatService';
 import { logger } from '../services/logger';
 import { telemetry } from '../services/telemetry';
-import { runDeterministicCrossValidation } from '../utils/fiscalCompare';
+import {
+  startAnalysis,
+  fetchProgress,
+  fetchAnalysis,
+  type AnalysisJobResponse,
+  type BackendAgentState,
+} from '../services/backendClient';
 
 export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'crossValidator' | 'intelligence' | 'accountant';
 export type AgentStatus = 'pending' | 'running' | 'completed' | 'error';
@@ -18,7 +27,7 @@ export interface AgentProgress {
   current: number;
   total: number;
 }
-export type AgentState = { status: AgentStatus; progress: AgentProgress; };
+export type AgentState = { status: AgentStatus; progress: AgentProgress };
 export type AgentStates = Record<AgentName, AgentState>;
 type ClassificationCorrections = Record<string, ClassificationResult['operationType']>;
 
@@ -335,3 +344,4 @@ export const useAgentOrchestrator = () => {
     reset,
   };
 };
+

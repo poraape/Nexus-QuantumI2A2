@@ -6,9 +6,12 @@ from typing import Iterable, List, Tuple
 
 from fastapi import UploadFile
 
-from .config import settings
+from .config import get_settings
 from .database import get_session
 from .models import StoredFile
+
+
+settings = get_settings()
 
 ALLOWED_CONTENT_TYPES = {
     "application/pdf",

@@ -1,0 +1,11 @@
+{
+  "models": [
+    "backend.app.contracts.models.AnalysisJobContract",
+    "backend.app.contracts.models.AuditReportContract"
+  ],
+  "schemas": {
+    "analysis_job": "backend/app/contracts/schemas/analysis_job.json",
+    "audit_report": "backend/app/contracts/schemas/audit_report.json"
+  },
+  "typescript": "src/types/contracts.d.ts"
+}

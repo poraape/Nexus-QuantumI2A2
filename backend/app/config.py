@@ -11,6 +11,12 @@ from pydantic import BaseSettings, Field, validator
 class Settings(BaseSettings):
     api_base_path: str = Field('/api', env='API_BASE_PATH')
 
+    # Core infrastructure
+    database_url: str = Field('sqlite:///backend_data/app.db', env='DATABASE_URL')
+    redis_url: str = Field('redis://localhost:6379/0', env='REDIS_URL')
+    storage_path: Path = Field(Path('backend_storage'), env='STORAGE_PATH')
+    webhook_timeout_seconds: int = Field(10, env='WEBHOOK_TIMEOUT_SECONDS')
+
     # OAuth2 / JWT configuration
     jwt_secret_key: str = Field(..., env='JWT_SECRET_KEY')
     jwt_algorithm: str = Field('HS256', env='JWT_ALGORITHM')
@@ -70,4 +76,5 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     settings = Settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.storage_path.mkdir(parents=True, exist_ok=True)
     return settings
