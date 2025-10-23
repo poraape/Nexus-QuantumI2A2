@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AgentStates } from '../hooks/useAgentOrchestrator';
-import { CheckIcon, LoadingSpinnerIcon, ErrorIcon } from './icons';
+import { CheckIcon, LoadingSpinnerIcon } from './icons';
 
 const ProgressTracker: React.FC<{ agentStates: AgentStates }> = ({ agentStates }) => {
     const steps = [

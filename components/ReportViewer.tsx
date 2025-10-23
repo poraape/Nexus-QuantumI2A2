@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import type { AuditReport, AuditedDocument, AuditStatus, ClassificationResult, AccountingEntry, AIDrivenInsight, AIFindingSeverity } from '../types';
-import { 
-    MetricIcon, 
-    InsightIcon, 
-    ShieldCheckIcon, 
-    ShieldExclamationIcon, 
+import type { AuditReport, AuditStatus, ClassificationResult, AccountingEntry, AIFindingSeverity } from '../types';
+import {
+    MetricIcon,
+    InsightIcon,
+    ShieldCheckIcon,
+    ShieldExclamationIcon,
     ChevronDownIcon,
-    FileIcon,
     AiIcon
 } from './icons';
 import TotalSummary from './Insights/TotalSummary';
@@ -50,7 +49,7 @@ const severityStyles: Record<AIFindingSeverity, string> = {
 };
 
 
-const DocumentItem: React.FC<{ item: AuditedDocument, onClassificationChange: (docName: string, newClassification: ClassificationResult['operationType']) => void }> = ({ item, onClassificationChange }) => {
+const DocumentItem: React.FC<{ item: AuditReport['documents'][number], onClassificationChange: (docName: string, newClassification: ClassificationResult['operationType']) => void }> = ({ item, onClassificationChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const { doc, status, score, inconsistencies, classification } = item;
     const style = statusStyles[status];

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ChatMessage, SmartSearchResult } from '../types';
+import type { ChatMessage } from '../types';
 import type { ExportType } from '../App';
 import Chart from './Chart';
 import { SendIcon, UserIcon, AiIcon, LoadingSpinnerIcon, StopIcon, DownloadIcon, DocumentTextIcon, PaperClipIcon } from './icons';

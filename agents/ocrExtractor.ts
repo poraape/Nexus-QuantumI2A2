@@ -9,24 +9,24 @@ import { executeWithResilience } from '../services/resilience';
  * @returns A promise that resolves to the extracted text.
  */
 export async function runOCRFromImage(buffer: ArrayBuffer, lang = "por", correlationId?: string): Promise<string> {
-    const correlationId = correlationId || telemetry.createCorrelationId('ocr');
+    const runCorrelationId = correlationId ?? telemetry.createCorrelationId('ocr');
     try {
         const { createWorker } = await executeWithResilience('ocr', 'ocr.loadWorker', async () => import('tesseract.js'), {
-            correlationId,
+            correlationId: runCorrelationId,
             attributes: { lang },
             maxAttempts: 3,
         });
         const worker = await createWorker(lang);
         const { data } = await executeWithResilience('ocr', 'ocr.recognize', async () => worker.recognize(buffer), {
-            correlationId,
+            correlationId: runCorrelationId,
             attributes: { lang },
             maxAttempts: 3,
         });
         await worker.terminate();
-        logger.log('OCR', 'INFO', 'Processamento OCR concluído.', { lang }, { correlationId, scope: 'ocr' });
+        logger.log('OCR', 'INFO', 'Processamento OCR concluído.', { lang }, { correlationId: runCorrelationId, scope: 'ocr' });
         return data.text;
     } catch (error) {
-        logger.log('OCR', 'ERROR', 'Tesseract OCR falhou.', { error, lang }, { correlationId, scope: 'ocr' });
+        logger.log('OCR', 'ERROR', 'Tesseract OCR falhou.', { error, lang }, { correlationId: runCorrelationId, scope: 'ocr' });
         console.error('Tesseract OCR failed:', error);
         throw new Error('Falha ao executar OCR na imagem. A biblioteca Tesseract pode não ter sido carregada.');
     }
