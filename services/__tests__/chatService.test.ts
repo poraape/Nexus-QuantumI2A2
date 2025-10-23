@@ -1,39 +1,34 @@
-import { startChat, sendMessageStream } from '../chatService';
-
-type MockChat = { sendMessageStream: jest.Mock };
+import { startChat, requestChatMessage } from '../chatService';
 
 const mockCreateChatSession = jest.fn();
-const mockStream = jest.fn();
+const mockSendChatMessage = jest.fn();
 
-jest.mock('../geminiService', () => ({
+jest.mock('../llmService', () => ({
   createChatSession: (...args: any[]) => mockCreateChatSession(...args),
-  streamChatMessage: (...args: any[]) => mockStream(...args),
+  sendChatMessage: (...args: any[]) => mockSendChatMessage(...args),
 }));
-
-const fakeChat: MockChat = {
-  sendMessageStream: jest.fn(),
-};
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockCreateChatSession.mockResolvedValue(fakeChat);
+  mockCreateChatSession.mockResolvedValue({ sessionId: 'session-1', systemInstruction: '', schema: { type: 'object' } });
 });
 
 describe('chatService', () => {
   it('starts chat sessions embedding aggregated metrics into the prompt', async () => {
     const chat = await startChat('sample-data', { total: 123 });
-    expect(chat).toBe(fakeChat);
+    expect(chat).toEqual({ sessionId: 'session-1', systemInstruction: '', schema: { type: 'object' } });
     expect(mockCreateChatSession).toHaveBeenCalledTimes(1);
-    const [, instruction] = mockCreateChatSession.mock.calls[0];
+    const [, instruction, schema] = mockCreateChatSession.mock.calls[0];
     expect(instruction).toContain('sample-data');
     expect(instruction).toContain('"total": 123');
+    expect(schema).toMatchObject({ type: 'object' });
   });
 
-  it('delegates streaming to geminiService', () => {
-    const chat = {} as any;
-    mockStream.mockReturnValue('stream');
-    const result = sendMessageStream(chat, 'hello');
-    expect(result).toBe('stream');
-    expect(mockStream).toHaveBeenCalledWith(chat, 'hello');
+  it('delegates message sending to the unified llmService', async () => {
+    mockSendChatMessage.mockResolvedValue({ text: 'ok' });
+    const session = { sessionId: 'session-1', systemInstruction: '', schema: { type: 'object' } } as any;
+    const response = await requestChatMessage(session, 'hello');
+    expect(response).toEqual({ text: 'ok' });
+    expect(mockSendChatMessage).toHaveBeenCalledWith(session, 'hello');
   });
 });

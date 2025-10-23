@@ -9,10 +9,9 @@ import secrets
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, Header, HTTPException, Request, Response, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -21,9 +20,6 @@ from .services.crypto import EncryptedJsonStore, KMSClient
 from .services.audit import AuditLogger
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/token')
-
 
 class UserManager:
     def __init__(self, data_path: Path):
@@ -147,7 +143,33 @@ def create_access_token(subject: str, expires_minutes: int) -> str:
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
+def _extract_bearer_token(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    scheme, _, value = authorization.partition(' ')
+    if scheme.lower() != 'bearer' or not value:
+        return None
+    return value.strip()
+
+
+def get_access_token(
+    request: Request,
+    authorization: str | None = Header(default=None, alias='Authorization'),
+) -> str:
+    settings = get_settings()
+    token = _extract_bearer_token(authorization)
+    if not token:
+        token = request.cookies.get(settings.access_token_cookie_name)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Credenciais inválidas.',
+            headers={'WWW-Authenticate': 'Bearer'},
+        )
+    return token
+
+
+def get_current_user(token: str = Depends(get_access_token)) -> str:
     settings = get_settings()
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -212,3 +234,28 @@ class AuthService:
         new_refresh = self.refresh_store.issue(username)
         self.audit_logger.log('auth', 'token.refreshed', {'username': username})
         return {'access_token': access_token, 'refresh_token': new_refresh, 'token_type': 'bearer'}
+
+
+def issue_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    settings = get_settings()
+    common_kwargs: dict[str, Any] = {
+        'httponly': True,
+        'secure': settings.cookie_secure,
+        'samesite': settings.cookie_samesite,
+        'path': '/',
+    }
+    if settings.cookie_domain:
+        common_kwargs['domain'] = settings.cookie_domain
+
+    response.set_cookie(
+        key=settings.access_token_cookie_name,
+        value=access_token,
+        max_age=settings.jwt_expires_minutes * 60,
+        **common_kwargs,
+    )
+    response.set_cookie(
+        key=settings.refresh_token_cookie_name,
+        value=refresh_token,
+        max_age=settings.refresh_token_ttl_hours * 3600,
+        **common_kwargs,
+    )

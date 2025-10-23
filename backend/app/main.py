@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -19,8 +19,11 @@ from .auth import (
     RefreshTokenStore,
     UserManager,
     get_current_user,
+    issue_auth_cookies,
 )
+from .api import router as analysis_router
 from .config import get_settings
+from .middleware import AuditMiddleware, RateLimitMiddleware
 from .services.audit import AuditLogger
 from .services.crypto import EncryptedJsonStore, KMSClient, SecretVault
 from .services.data_store import SensitiveDataStore
@@ -125,11 +128,26 @@ chat_sessions = ChatSessionManager()
 app = FastAPI(title='Nexus Quantum Backend', version='1.0.0')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allow_headers=[
+        'Accept',
+        'Accept-Language',
+        'Authorization',
+        'Content-Type',
+        'X-Requested-With',
+        'X-Correlation-ID',
+    ],
 )
+app.add_middleware(
+    RateLimitMiddleware,
+    limit=settings.rate_limit_requests,
+    window_seconds=settings.rate_limit_window_seconds,
+)
+app.add_middleware(AuditMiddleware, audit_logger=audit_logger)
+
+app.include_router(analysis_router)
 
 
 @app.post('/auth/authorize')
@@ -140,6 +158,7 @@ async def authorize(request: AuthorizationRequest) -> Dict[str, str]:
 
 @app.post('/auth/token')
 async def exchange_token(
+    response: Response,
     grant_type: str = Form(...),
     code: str = Form(...),
     code_verifier: str = Form(...),
@@ -147,12 +166,16 @@ async def exchange_token(
 ) -> Dict[str, str]:
     if grant_type != 'authorization_code':
         raise HTTPException(status_code=400, detail='grant_type inválido para este endpoint.')
-    return auth_service.exchange_token(code, code_verifier, client_id)
+    tokens = auth_service.exchange_token(code, code_verifier, client_id)
+    issue_auth_cookies(response, tokens['access_token'], tokens['refresh_token'])
+    return tokens
 
 
 @app.post('/auth/refresh')
-async def refresh_token(request: RefreshRequest) -> Dict[str, str]:
-    return auth_service.refresh(request.refresh_token)
+async def refresh_token(response: Response, request: RefreshRequest) -> Dict[str, str]:
+    tokens = auth_service.refresh(request.refresh_token)
+    issue_auth_cookies(response, tokens['access_token'], tokens['refresh_token'])
+    return tokens
 
 
 @app.post(f"{settings.api_base_path}/llm/generate-json")
