@@ -126,3 +126,11 @@ export const PanelLayoutIcon: React.FC<IconProps> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18V3H3zm9 0v18" />
     </svg>
 );
+
+export const AutoDownloadIcon: React.FC<IconProps> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75h-2a1.75 1.75 0 00-1.75 1.75v13a1.75 1.75 0 001.75 1.75h13a1.75 1.75 0 001.75-1.75v-13A1.75 1.75 0 0018.5 3.75h-2" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.25v10.5m0 0l-3-3m3 3l3-3" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75h7.5" />
+    </svg>
+);

@@ -248,7 +248,6 @@ export const startServer = async () => {
     const port = Number(process.env.PORT ?? 4000);
     return new Promise((resolve) => {
         const server = app.listen(port, () => {
-            // eslint-disable-next-line no-console
             console.log(`Integration server running on port ${port}`);
             resolve(server);
         });

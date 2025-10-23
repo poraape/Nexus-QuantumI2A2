@@ -1,24 +1,12 @@
 import type { AuditReport } from '../types';
+import type { AgentStateContract, AnalysisJobContract } from '../src/types/contracts';
 
-export type BackendAgentStatus = 'pending' | 'running' | 'completed' | 'error';
-export interface BackendAgentState {
-    status: BackendAgentStatus;
-    progress?: {
-        step?: string;
-        current?: number;
-        total?: number;
-        [key: string]: unknown;
-    };
-    [key: string]: unknown;
-}
+export type BackendAgentStatus = AgentStateContract['status'];
+export type BackendAgentState = AgentStateContract;
 
-export interface AnalysisJobResponse {
-    jobId: string;
-    status: 'queued' | 'running' | 'completed' | 'failed';
-    agentStates: Record<string, BackendAgentState>;
-    error?: string | null;
+export type AnalysisJobResponse = Omit<AnalysisJobContract, 'result'> & {
     result?: AuditReport | null;
-}
+};
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
 

@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import type { AuditReport, AuditedDocument } from '../types';
+import type { AuditReport } from '../types';
 
 // --- Helper Functions ---
 

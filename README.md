@@ -1,49 +1,30 @@
 # Nexus QuantumI2A2: Análise Fiscal com IA
 
-<<<<<<< HEAD
-**Nexus QuantumI2A2** é uma solução completa para análise fiscal assistida por IA. O projeto agora é composto por uma SPA em React/TypeScript e por um backend em FastAPI que centraliza autenticação, chamadas a LLM/OCR e o armazenamento seguro de segredos e trilhas de auditoria.
-=======
-[![Quality Gate](https://github.com/<owner>/Nexus-QuantumI2A2/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/Nexus-QuantumI2A2/actions/workflows/ci.yml)
-
-**Nexus QuantumI2A2** é uma Single Page Application (SPA) de análise fiscal interativa que processa dados de Notas Fiscais Eletrônicas (NFe) e gera insights acionáveis através de um sistema de IA que simula múltiplos agentes especializados.
-
-Esta aplicação demonstra uma arquitetura frontend completa e robusta, onde todo o processamento, desde o parsing de arquivos até a análise por IA, ocorre diretamente no navegador do cliente, combinando análise determinística com o poder de modelos de linguagem generativa (LLMs) para fornecer uma análise fiscal completa e um assistente de chat inteligente.
->>>>>>> main
+**Nexus QuantumI2A2** é uma solução completa para análise fiscal assistida por IA. O projeto combina uma SPA em React/TypeScript com um backend em FastAPI que centraliza autenticação, chamadas a LLM/OCR, sanitização de dados sensíveis e a trilha imutável de auditoria.
 
 ---
 
 ## ✨ Funcionalidades Principais
 
-<<<<<<< HEAD
-* **Pipeline multiagente:** processamento determinístico e heurístico de documentos fiscais com agentes de OCR/NLP, auditoria, classificação, inteligência e contabilidade.
-* **Upload flexível:** suporte a `XML`, `CSV`, `XLSX`, `PDF`, imagens (`PNG`, `JPG`) e `.ZIP` contendo múltiplos arquivos.
-* **Assistente inteligente:** chat contextualizado com os dados auditados, geração de insights e gráficos sob demanda e busca em linguagem natural.
-* **Persistência segura:** chaves e dados sensíveis protegidos com AES-256 (KMS interno) e registros append-only em `audit_log.jsonl` assinados digitalmente e enviados para bucket S3/MinIO.
-* **Sanitização centralizada:** CPF/CNPJ mascarados exclusivamente no backend antes de qualquer dado ser entregue ao frontend.
-=======
-*   **Pipeline Multiagente Client-Side:** Uma cadeia de agentes especializados (Importação/OCR, Auditor, Classificador, Agente de Inteligência, Contador) processa os arquivos em etapas diretamente no navegador.
-*   **Upload Flexível de Arquivos:** Suporte para múltiplos formatos, incluindo `XML`, `CSV`, `XLSX`, `PDF`, imagens (`PNG`, `JPG`) e arquivos `.ZIP` contendo múltiplos documentos.
-*   **Análise Fiscal Aprofundada por IA:** Geração de um relatório detalhado com:
-    *   **Resumo Executivo e Recomendações Estratégicas** gerados por IA.
-    *   **Detecção de Anomalias por IA** que vai além de regras fixas.
-    *   **Validação Cruzada (Cross-Validation)** entre documentos para encontrar discrepâncias sutis.
-*   **Busca Inteligente (Smart Search):** Interaja com seus dados através de perguntas em linguagem natural diretamente no dashboard.
-*   **Chat Interativo com IA:** Um assistente de IA, contextualizado com os dados do relatório, permite explorar os resultados e gera visualizações de dados sob demanda.
-*   **Dashboards Dinâmicos:** Painéis interativos com KPIs, gráficos e filtros para uma visão aprofundada dos dados fiscais.
-*   **Apuração Contábil e Geração de SPED/EFD:** Geração automática de lançamentos contábeis e de um arquivo de texto no layout simplificado do SPED Fiscal.
+* **Pipeline multiagente híbrido:** importação, OCR/NLP, auditoria determinística, classificação fiscal, validação cruzada e análises gerenciais são orquestradas pelo frontend e contam com serviços especializados expostos pelo backend.
+* **Upload flexível:** suporte a `XML`, `CSV`, `XLSX`, `PDF`, imagens (`PNG`, `JPG`) e pacotes `.ZIP` contendo múltiplos arquivos.
+* **Assistente inteligente:** chat contextualizado com os dados auditados, geração de insights, gráficos sob demanda e busca em linguagem natural (Smart Search).
+* **Persistência segura:** chaves e dados sensíveis protegidos com AES-256 (KMS interno) e registros append-only em `audit_log.jsonl`, assinados digitalmente e enviados para S3/MinIO quando configurado.
+* **Sanitização centralizada:** CPF/CNPJ e demais identificadores mascarados no backend antes de os dados chegarem ao navegador.
+* **Exportação de relatórios:** geração de resumos estratégicos, dashboards e arquivos SPED/EFD simplificados diretamente da aplicação.
+
+---
 
 ## 🧪 Qualidade & Testes
 
 | Comando | Descrição |
 | --- | --- |
 | `npm test` | Executa a suíte de testes unitários com Jest/Testing Library e gera relatório de cobertura (≥90% para agentes, serviços, orchestrator e dashboard). |
-| `npm run e2e` | Sobe o build de preview do Vite e roda os testes E2E de fumaça com Cypress. |
-| `npm run load` | Executa o teste de carga do k6 (configurável via `K6_BASE_URL`, `K6_VUS`, `K6_DURATION`) e exporta métricas em `reports/k6-summary.json`. |
-| `npm run report:quality` | Consolida cobertura + performance, envia para o backend de auditoria (`AUDIT_BACKEND_URL`) e falha caso algum gate esteja abaixo do mínimo. |
+| `npm run e2e` | Sobe o preview do Vite e roda os testes de fumaça com Cypress. |
+| `npm run load` | Executa o teste de carga com k6 (parametrizável via `K6_BASE_URL`, `K6_VUS`, `K6_DURATION`) e exporta métricas em `reports/k6-summary.json`. |
+| `npm run report:quality` | Consolida cobertura + performance, envia para o backend de auditoria (`AUDIT_BACKEND_URL`) e falha caso algum gate fique abaixo do mínimo. |
 
-> **Importante:** substitua `<owner>` na badge do topo pelo nome da organização/usuário GitHub que hospeda o repositório para ativar o selo de conformidade.
-*   **Exportação de Relatórios:** Exporte a análise completa ou as conversas do chat para formatos como `PDF`, `DOCX`, `HTML` e `Markdown`.
->>>>>>> main
+> **Importante:** substitua `<owner>` na badge de status do GitHub Actions (se desejar exibi-la) pelo nome da organização ou usuário que hospeda o repositório.
 
 ---
 
@@ -52,15 +33,15 @@ Esta aplicação demonstra uma arquitetura frontend completa e robusta, onde tod
 ### Frontend (React + Vite)
 
 * SPA em **React 19 + TypeScript**, estilizada com TailwindCSS.
-* Orquestra a experiência do usuário (`useAgentOrchestrator`) e consome apenas endpoints autenticados expostos pelo backend.
+* Orquestra a experiência do usuário (`useAgentOrchestrator`) consumindo endpoints autenticados do backend.
 * Tokens OAuth2 PKCE + refresh são obtidos e renovados automaticamente (`services/authService.ts`).
-* Integra-se ao backend através do `services/apiClient.ts` para LLM, OCR, sanitização de dados e chat.
+* Consome serviços dedicados para OCR, sanitização, geração de relatórios e chat via `services/apiClient.ts`.
 
 ### Backend (FastAPI)
 
-* **Autenticação OAuth2 PKCE** com refresh tokens criptografados e JWT de 30 minutos para o frontend.
-* **LLM/OCR**: endpoints autenticados que intermediam chamadas ao Gemini e Tesseract (via `pytesseract`).
-* **KMS + Cofre de Segredos**: armazenamento das chaves (ex.: Gemini) cifrado com AES-256-GCM (`SecretVault`).
+* **Autenticação OAuth2 PKCE** com refresh tokens criptografados e JWT com expiração curta para o frontend.
+* **LLM/OCR**: endpoints autenticados que intermediam chamadas ao Gemini e ao Tesseract (via `pytesseract`).
+* **KMS + Cofre de Segredos**: armazenamento de chaves (ex.: Gemini) cifrado com AES-256-GCM (`SecretVault`).
 * **Sanitização e Criptografia**: CPF/CNPJ mascarados antes de persistir ou devolver ao cliente; dados sensíveis gravados via `SensitiveDataStore`.
 * **Auditoria Imutável**: `audit_log.jsonl` assinado com Ed25519 e enviado para bucket S3/MinIO quando configurado.
 
@@ -70,7 +51,7 @@ Esta aplicação demonstra uma arquitetura frontend completa e robusta, onde tod
 
 ### Variáveis de Ambiente do Backend
 
-Crie um arquivo `.env` na raiz do projeto (mesmo nível de `backend/`) com, no mínimo:
+Crie um arquivo `.env` na raiz do backend com, no mínimo:
 
 ```env
 # Criptografia e tokens
@@ -97,13 +78,13 @@ Instale as dependências do backend e execute o servidor:
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-# Requer Tesseract OCR instalado no sistema (ex.: sudo apt install tesseract-ocr)
+# Requer Tesseract OCR instalado (ex.: sudo apt install tesseract-ocr)
 uvicorn app.main:app --reload
 ```
 
 ### Variáveis de Ambiente do Frontend
 
-No diretório raiz crie `.env.local` com:
+Crie `.env.local` no diretório raiz com:
 
 ```env
 VITE_BACKEND_URL=http://localhost:8000
@@ -112,14 +93,14 @@ VITE_AUTH_USERNAME=admin
 VITE_AUTH_PASSWORD=admin123
 ```
 
-Em seguida instale as dependências do frontend e inicie o Vite:
+Instale as dependências do frontend e inicie o Vite:
 
 ```bash
 npm install
 npm run dev
 ```
 
-O frontend estará disponível em `http://localhost:5173` e utilizará o backend para todas as operações sensíveis.
+A SPA ficará disponível em `http://localhost:5173` e utilizará o backend para as operações sensíveis.
 
 ---
 
@@ -136,7 +117,7 @@ O frontend estará disponível em `http://localhost:5173` e utilizará o backend
 │   └── requirements.txt
 ├── components/                   # Componentes React
 ├── hooks/                        # Hooks (inclui useAgentOrchestrator)
-├── services/                     # Clientes para backend, logger, auth
+├── services/                     # Clientes para backend, logger, auth, LLM, OCR
 ├── utils/                        # Import pipeline, parsing, exports
 ├── App.tsx                       # Componente principal
 ├── index.html
@@ -149,7 +130,7 @@ O frontend estará disponível em `http://localhost:5173` e utilizará o backend
 ## ✅ Boas Práticas Inclusas
 
 * **OAuth2 PKCE com refresh tokens** e renovação automática no frontend.
-* **Segurança de dados**: AES-256-GCM para cofres, mascaramento de PII no backend, upload OCR intermediado.
+* **Segurança de dados**: AES-256-GCM para cofres, mascaramento de PII no backend, uploads OCR intermediados.
 * **Auditabilidade**: trilha append-only assinada, com suporte a upload S3/MinIO.
 * **Modularidade**: serviços reutilizáveis no frontend e backend claramente separados.
 
@@ -158,7 +139,7 @@ O frontend estará disponível em `http://localhost:5173` e utilizará o backend
 ## 🧪 Testes & Build
 
 * Frontend: `npm run build`
-* Backend: recomenda-se `uvicorn app.main:app --reload` + ferramentas como `pytest`/`mypy` (não incluídos) conforme necessário.
+* Backend: recomenda-se `uvicorn app.main:app --reload` e, conforme necessário, ferramentas como `pytest`/`mypy`.
 
 ---
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { DownloadIcon, LoadingSpinnerIcon, DocumentTextIcon, FileInfoIcon, PanelLayoutIcon } from './icons';
+import { DownloadIcon, LoadingSpinnerIcon, DocumentTextIcon, FileInfoIcon, PanelLayoutIcon, AutoDownloadIcon } from './icons';
 import type { ExportType } from '../App';
 import LogoIcon from './LogoIcon'; // Importa o novo ícone
 
@@ -12,9 +12,22 @@ interface HeaderProps {
     onToggleLogs: () => void;
     isPanelCollapsed?: boolean;
     onTogglePanel?: () => void;
+    autoExportEnabled?: boolean;
+    onToggleAutoExport?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onReset, showExports, showSpedExport, isExporting, onExport, onToggleLogs, isPanelCollapsed, onTogglePanel }) => {
+const Header: React.FC<HeaderProps> = ({
+    onReset,
+    showExports,
+    showSpedExport,
+    isExporting,
+    onExport,
+    onToggleLogs,
+    isPanelCollapsed,
+    onTogglePanel,
+    autoExportEnabled,
+    onToggleAutoExport,
+}) => {
   const exportOptions: { type: ExportType, label: string, icon: React.ReactNode }[] = [
       { type: 'pdf', label: 'PDF', icon: <span className="font-bold text-sm">P</span> },
       { type: 'docx', label: 'DOCX', icon: <DocumentTextIcon className="w-4 h-4" /> },
@@ -47,13 +60,17 @@ const Header: React.FC<HeaderProps> = ({ onReset, showExports, showSpedExport, i
             <div className="flex items-center gap-2">
                  {showExports && (
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={onTogglePanel}
-                            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors w-9 h-9 flex items-center justify-center"
-                            title={isPanelCollapsed ? "Mostrar Painel de Análise" : "Ocultar Painel de Análise"}
-                        >
-                            <PanelLayoutIcon className="w-5 h-5"/>
-                        </button>
+                        {onTogglePanel && (
+                            <button
+                                onClick={onTogglePanel}
+                                className={`p-2 rounded-md transition-colors w-9 h-9 flex items-center justify-center ${
+                                    isPanelCollapsed ? 'bg-blue-600/80 hover:bg-blue-500/80' : 'bg-gray-700 hover:bg-gray-600'
+                                }`}
+                                title={isPanelCollapsed ? "Restaurar Painéis de Análise" : "Minimizar Todos os Painéis"}
+                            >
+                                <PanelLayoutIcon className="w-5 h-5"/>
+                            </button>
+                        )}
                         <span className="text-sm text-gray-400 hidden sm:block">Exportar Relatório:</span>
                         {exportOptions.map(({ type, label, icon }) => (
                             <button
@@ -66,9 +83,20 @@ const Header: React.FC<HeaderProps> = ({ onReset, showExports, showSpedExport, i
                                 {isExporting === type ? <LoadingSpinnerIcon className="w-4 h-4 animate-spin"/> : icon}
                             </button>
                         ))}
+                        {onToggleAutoExport && (
+                            <button
+                                onClick={onToggleAutoExport}
+                                className={`p-2 rounded-md transition-colors w-9 h-9 flex items-center justify-center ${
+                                    autoExportEnabled ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-gray-700 hover:bg-gray-600'
+                                }`}
+                                title={autoExportEnabled ? 'Exportação automática ativa (PDF + DOCX)' : 'Ativar exportação automática (PDF + DOCX)'}
+                            >
+                                <AutoDownloadIcon className="w-5 h-5" />
+                            </button>
+                        )}
                     </div>
                 )}
-                
+
                 {showSpedExport && (
                     <button
                         onClick={() => onExport('sped')}

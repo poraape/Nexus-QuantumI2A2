@@ -1,0 +1,10 @@
+{
+  "updated_modules": [
+    "backend/app/database.py",
+    "backend/app/celery_app.py",
+    "backend/app/progress.py",
+    "backend/app/storage.py"
+  ],
+  "entrypoint": "backend/app/config.py:get_settings",
+  "status": "completed"
+}
