@@ -1,4 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { importFiles } from '../utils/importPipeline';
+import { runAudit } from '../agents/auditorAgent';
+import { runClassification } from '../agents/classifierAgent';
+import { runIntelligenceAnalysis } from '../agents/intelligenceAgent';
+import { runAccountingAnalysis } from '../agents/accountantAgent';
+import { startChat, requestChatMessage, ChatSession } from '../services/chatService';
+import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
 import Papa from 'papaparse';
 
 import type { ChatMessage, AuditReport, ClassificationResult } from '../types';
@@ -24,91 +31,25 @@ export type AgentState = { status: AgentStatus; progress: AgentProgress };
 export type AgentStates = Record<AgentName, AgentState>;
 type ClassificationCorrections = Record<string, ClassificationResult['operationType']>;
 
-const POLL_INTERVAL_MS = 1500;
-const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
-
-const agentNames: AgentName[] = ['ocr', 'auditor', 'classifier', 'crossValidator', 'intelligence', 'accountant'];
-
-const defaultProgress: AgentProgress = { step: 'Aguardando arquivos', current: 0, total: 0 };
-
-export const initialAgentStates: AgentStates = agentNames.reduce((acc, name) => {
-  acc[name] = { status: 'pending', progress: { ...defaultProgress } };
-  return acc;
-}, {} as AgentStates);
+export const initialAgentStates: AgentStates = {
+  ocr: { status: 'pending', progress: { step: 'Aguardando arquivos', current: 0, total: 0 } },
+  auditor: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+  classifier: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+  crossValidator: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+  intelligence: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+  accountant: { status: 'pending', progress: { step: '', current: 0, total: 0 } },
+};
 
 export const cloneInitialAgentStates = (): AgentStates =>
   JSON.parse(JSON.stringify(initialAgentStates)) as AgentStates;
 
-const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
 
-const asAgentStatus = (status: string | undefined): AgentStatus => {
-  if (status === 'running' || status === 'completed' || status === 'error') {
-    return status;
+const generateExecutionId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
   }
-  return 'pending';
-};
-
-const normalizeAgentStates = (backendStates?: Record<string, BackendAgentState>): AgentStates => {
-  const next = cloneInitialAgentStates();
-  if (!backendStates) {
-    return next;
-  }
-
-  agentNames.forEach(agent => {
-    const backendState = backendStates[agent];
-    if (!backendState) {
-      return;
-    }
-
-    const progress = backendState.progress ?? {};
-    const current = typeof progress.current === 'number' ? progress.current : 0;
-    const total = typeof progress.total === 'number' ? progress.total : 0;
-    const step = typeof progress.step === 'string' && progress.step.length > 0
-      ? progress.step
-      : next[agent].progress.step;
-
-    next[agent] = {
-      status: asAgentStatus(backendState.status as string | undefined),
-      progress: {
-        step,
-        current,
-        total,
-      },
-    };
-  });
-
-  return next;
-};
-
-const applyClassificationCorrections = (
-  report: AuditReport | null,
-  corrections: ClassificationCorrections,
-): AuditReport | null => {
-  if (!report) {
-    return null;
-  }
-
-  if (!Object.keys(corrections).length) {
-    return report;
-  }
-
-  return {
-    ...report,
-    documents: report.documents.map(doc => {
-      const override = corrections[doc.doc.name];
-      if (!override || !doc.classification) {
-        return doc;
-      }
-      return {
-        ...doc,
-        classification: {
-          ...doc.classification,
-          operationType: override,
-          confidence: 1,
-        },
-      };
-    }),
-  };
+  return `exec-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 };
 
 export const getDetailedErrorMessage = (error: unknown): string => {
@@ -158,7 +99,6 @@ export const useAgentOrchestrator = () => {
 
   const chatRef = useRef<ChatSession | null>(null);
   const executionIdRef = useRef<string>('');
-  const abortRef = useRef<boolean>(false);
 
   useEffect(() => {
     const correlationId = telemetry.createCorrelationId('backend');
@@ -180,12 +120,7 @@ export const useAgentOrchestrator = () => {
     }
   }, []);
 
-  useEffect(() => () => {
-    abortRef.current = true;
-  }, []);
-
   const reset = useCallback(() => {
-    abortRef.current = true;
     setAgentStates(cloneInitialAgentStates());
     setError(null);
     setPipelineError(false);
@@ -193,70 +128,25 @@ export const useAgentOrchestrator = () => {
     setMessages([]);
     chatRef.current = null;
     setIsPipelineComplete(false);
-    setIsPipelineRunning(false);
     executionIdRef.current = '';
-  }, []);
-
-  const hydrateChatSession = useCallback(async (finalReport: AuditReport, correlationId: string) => {
-    const validDocsData = finalReport.documents
-      .filter(d => d.status !== 'ERRO' && Array.isArray(d.doc.data) && d.doc.data.length > 0)
-      .flatMap(d => d.doc.data!);
-
-    if (!validDocsData.length) {
-      logger.log('ChatService', 'WARN', 'Nenhum dado tabular disponível para iniciar o chat.', undefined, {
-        correlationId,
-        scope: 'llm',
-      });
-      return;
-    }
-
-    const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
-    logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.', undefined, {
-      correlationId,
-      scope: 'llm',
-    });
-    chatRef.current = await startChat(dataSampleForAI, finalReport.aggregatedMetrics);
-    setMessages([
-      {
-        id: 'initial-ai-message',
-        sender: 'ai',
-        text: 'Sua análise fiscal está pronta. Explore os detalhes abaixo ou me faça uma pergunta sobre os dados.',
-      },
-    ]);
-  }, []);
-
-  const monitorJob = useCallback(async (jobId: string, correlationId: string): Promise<AnalysisJobResponse> => {
-    let attempts = 0;
-    while (!abortRef.current) {
-      const progress = await fetchProgress(jobId);
-      setAgentStates(normalizeAgentStates(progress.agentStates));
-
-      if (progress.status === 'failed') {
-        const message = progress.error ?? 'Falha na execução do pipeline.';
-        throw new Error(message);
-      }
-
-      if (progress.status === 'completed') {
-        const finalJob = await fetchAnalysis(jobId);
-        setAgentStates(normalizeAgentStates(finalJob.agentStates));
-        logger.log('Orchestrator', 'INFO', 'Pipeline concluído com sucesso.', undefined, {
-          correlationId,
-          scope: 'backend',
-        });
-        return finalJob;
-      }
-
-      attempts += 1;
-      const backoff = Math.min(POLL_INTERVAL_MS * Math.max(1, attempts), 5000);
-      await wait(backoff);
-    }
-
-    throw new Error('Pipeline interrompido.');
   }, []);
 
   const runPipeline = useCallback(async (files: File[]) => {
     const pipelineCorrelationId = telemetry.createCorrelationId('backend');
-    abortRef.current = false;
+    const agentCorrelations: Record<AgentName, string> = {
+      ocr: telemetry.createCorrelationId('ocr', pipelineCorrelationId),
+      auditor: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+      classifier: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+      crossValidator: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+      intelligence: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+      accountant: telemetry.createCorrelationId('agent', pipelineCorrelationId),
+    };
+
+    logger.log('Orchestrator', 'INFO', 'Iniciando novo pipeline de análise.', undefined, {
+      correlationId: pipelineCorrelationId,
+      scope: 'backend',
+    });
+
     setIsPipelineRunning(true);
     setIsPipelineComplete(false);
     setPipelineError(false);
@@ -265,32 +155,118 @@ export const useAgentOrchestrator = () => {
     setMessages([]);
     chatRef.current = null;
     setAgentStates(cloneInitialAgentStates());
+    executionIdRef.current = generateExecutionId();
+
+    const updateAgentState = (agent: AgentName, status: AgentStatus, progress?: Partial<AgentProgress>) => {
+      setAgentStates(prev => {
+        const next = {
+          ...prev,
+          [agent]: {
+            status,
+            progress: { ...prev[agent].progress, ...progress },
+          },
+        };
+        const correlationId = agentCorrelations[agent];
+        if (status === 'running') {
+          logger.log(agent, 'INFO', progress?.step ?? 'Iniciando etapa.', undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
+        } else if (status === 'completed') {
+          logger.log(agent, 'INFO', 'Etapa concluída.', undefined, { correlationId, scope: agent === 'ocr' ? 'ocr' : 'agent' });
+        }
+        return next;
+      });
+    };
 
     try {
-      const startResponse = await startAnalysis(files);
-      executionIdRef.current = startResponse.jobId;
-      setAgentStates(normalizeAgentStates(startResponse.agentStates));
+      updateAgentState('ocr', 'running', { step: 'Processando arquivos...' });
+      const importedDocs = await importFiles(
+        files,
+        (current, total) => updateAgentState('ocr', 'running', { step: 'Processando arquivos...', current, total }),
+        agentCorrelations.ocr,
+      );
+      updateAgentState('ocr', 'completed');
 
-      const finalJob = await monitorJob(startResponse.jobId, pipelineCorrelationId);
-      const correctedReport = applyClassificationCorrections(finalJob.result ?? null, classificationCorrections);
-      if (correctedReport) {
-        setAuditReport(correctedReport);
-        executionIdRef.current = correctedReport.executionId ?? finalJob.jobId;
-        await hydrateChatSession(correctedReport, pipelineCorrelationId);
+      const isSingleZip = files.length === 1 && (files[0].name.toLowerCase().endsWith('.zip') || files[0].type.includes('zip'));
+      const hasValidDocs = importedDocs.some(doc => doc.status !== 'unsupported' && doc.status !== 'error');
+      if (!hasValidDocs) {
+        let errorMessage = 'Nenhum arquivo válido foi processado. Verifique os formatos.';
+        if (importedDocs.length === 1 && importedDocs[0].error) {
+          errorMessage = importedDocs[0].error;
+        } else if (isSingleZip) {
+          errorMessage = 'O arquivo ZIP está vazio ou não contém arquivos com formato suportado.';
+        }
+        throw new Error(errorMessage);
       }
-    } catch (err) {
-      logger.log('Orchestrator', 'ERROR', 'Falha na execução do pipeline.', { error: err }, {
+
+      updateAgentState('auditor', 'running', { step: `Validando ${importedDocs.length} documentos...` });
+      const auditedReport = await runAudit(importedDocs, agentCorrelations.auditor);
+      updateAgentState('auditor', 'completed');
+
+      updateAgentState('classifier', 'running', { step: 'Classificando operações...' });
+      const classifiedReport = await runClassification(auditedReport, classificationCorrections, agentCorrelations.classifier);
+      updateAgentState('classifier', 'completed');
+
+      updateAgentState('crossValidator', 'running', { step: 'Executando validação cruzada...' });
+      const { findings: deterministicCrossValidation, artifacts: deterministicArtifacts } =
+        await runDeterministicCrossValidation(classifiedReport, executionIdRef.current);
+      const reportWithCrossValidation: AuditReport = {
+        ...classifiedReport,
+        deterministicCrossValidation,
+        deterministicArtifacts,
+        executionId: executionIdRef.current,
+      };
+      updateAgentState('crossValidator', 'completed');
+
+      updateAgentState('intelligence', 'running', { step: 'Analisando padrões com IA...' });
+      const { aiDrivenInsights, crossValidationResults } = await runIntelligenceAnalysis(reportWithCrossValidation, agentCorrelations.intelligence);
+      updateAgentState('intelligence', 'completed');
+
+      updateAgentState('accountant', 'running', { step: 'Gerando análise com IA...' });
+      const finalReport = await runAccountingAnalysis(
+        { ...reportWithCrossValidation, aiDrivenInsights, crossValidationResults },
+        agentCorrelations.accountant,
+      );
+      setAuditReport(finalReport);
+      updateAgentState('accountant', 'completed');
+
+      const validDocsData = finalReport.documents
+        .filter(d => d.status !== 'ERRO' && d.doc.data)
+        .flatMap(d => d.doc.data!);
+      const dataSampleForAI = Papa.unparse(validDocsData.slice(0, 200));
+
+      logger.log('ChatService', 'INFO', 'Iniciando sessão de chat com a IA.', undefined, {
         correlationId: pipelineCorrelationId,
-        scope: 'backend',
+        scope: 'llm',
       });
+      chatRef.current = await startChat(dataSampleForAI, finalReport.aggregatedMetrics);
+      setMessages([
+        {
+          id: 'initial-ai-message',
+          sender: 'ai',
+          text: 'Sua análise fiscal está pronta. Explore os detalhes abaixo ou me faça uma pergunta sobre os dados.',
+        },
+      ]);
+    } catch (err) {
+      console.error('Pipeline failed:', err);
+      logger.log('Orchestrator', 'ERROR', 'Falha na execução do pipeline.', { error: err }, { correlationId: pipelineCorrelationId, scope: 'backend' });
       const errorMessage = getDetailedErrorMessage(err);
       setError(errorMessage);
       setPipelineError(true);
+      setAgentStates(prev => {
+        const runningAgent = (Object.keys(prev) as AgentName[]).find(agent => prev[agent].status === 'running');
+        if (!runningAgent) return prev;
+        return {
+          ...prev,
+          [runningAgent]: {
+            ...prev[runningAgent],
+            status: 'error',
+          },
+        };
+      });
     } finally {
       setIsPipelineRunning(false);
       setIsPipelineComplete(true);
     }
-  }, [classificationCorrections, hydrateChatSession, monitorJob]);
+  }, [classificationCorrections]);
 
   const handleSendMessage = useCallback(async (message: string) => {
     if (!chatRef.current) {
