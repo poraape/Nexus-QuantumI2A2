@@ -1,4 +1,4 @@
-import { getAccessToken, clearTokens } from '../authService';
+import { ensureSession, clearSessionCache, getSessionExpiry } from '../authService';
 import { logger } from '../logger';
 
 jest.mock('../logger', () => ({
@@ -13,8 +13,8 @@ describe('authService', () => {
 
   beforeEach(() => {
     global.fetch = jest.fn() as typeof fetch;
-    localStorage.clear();
     (logger.log as jest.Mock | undefined)?.mockClear?.();
+    clearSessionCache();
     nowSpy.mockReturnValue(1_000_000);
   });
 
@@ -30,67 +30,88 @@ describe('authService', () => {
   it('requests a new backend session when none is cached', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ accessToken: 'token-123', expiresAt: 1_000_000 + 60_000 }),
+      json: async () => ({ expiresAt: 1_000_000 + 60_000 }),
     });
 
-    const token = await getAccessToken();
+    await ensureSession();
 
-    expect(token).toBe('token-123');
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/session'),
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({ credentials: 'include', method: 'POST' }),
     );
-    const stored = JSON.parse(localStorage.getItem('nexus-access-token') ?? '{}');
-    expect(stored.accessToken).toBe('token-123');
-    expect(stored.expiresAt).toBe(1_000_000 + 60_000);
+    expect(getSessionExpiry()).toBe(1_000_000 + 60_000);
   });
 
-  it('reuses cached session tokens when still valid', async () => {
-    localStorage.setItem(
-      'nexus-access-token',
-      JSON.stringify({ accessToken: 'cached', expiresAt: 1_000_000 + 120_000 }),
-    );
+  it('reuses cached session metadata when still valid', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ expiresAt: 1_000_000 + 120_000 }),
+    });
 
-    const token = await getAccessToken();
+    await ensureSession();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
 
-    expect(token).toBe('cached');
+    (global.fetch as jest.Mock).mockClear();
+    nowSpy.mockReturnValue(1_000_000 + 30_000);
+
+    await ensureSession();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('requests a new session when the cached token is expired', async () => {
-    localStorage.setItem(
-      'nexus-access-token',
-      JSON.stringify({ accessToken: 'old', expiresAt: 900_000 }),
-    );
+  it('requests a new session when metadata is expired', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ expiresAt: 1_000_000 + 10_000 }),
+    });
+
+    await ensureSession();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    (global.fetch as jest.Mock).mockClear();
+    nowSpy.mockReturnValue(1_000_000 + 60_001);
 
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ accessToken: 'refreshed', expiresAt: 1_000_000 + 30_000 }),
+      json: async () => ({ expiresAt: 1_000_000 + 120_000 }),
     });
 
-    const token = await getAccessToken();
-
-    expect(token).toBe('refreshed');
+    await ensureSession();
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    const stored = JSON.parse(localStorage.getItem('nexus-access-token') ?? '{}');
-    expect(stored.accessToken).toBe('refreshed');
+    expect(getSessionExpiry()).toBe(1_000_000 + 120_000);
   });
 
-  it('clears tokens explicitly', () => {
-    localStorage.setItem(
-      'nexus-access-token',
-      JSON.stringify({ accessToken: 'cached', expiresAt: 1_000_000 + 120_000 }),
-    );
+  it('clears cached state explicitly', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ expiresAt: 1_000_000 + 60_000 }),
+    });
 
-    clearTokens();
+    await ensureSession();
+    clearSessionCache();
 
-    expect(localStorage.getItem('nexus-access-token')).toBeNull();
+    (global.fetch as jest.Mock).mockClear();
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ expiresAt: 1_000_000 + 120_000 }),
+    });
+
+    await ensureSession();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('throws when backend session endpoint fails', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: false, json: async () => ({}) });
 
-    await expect(getAccessToken()).rejects.toThrow('Falha ao obter sessão autenticada.');
+    await expect(ensureSession()).rejects.toThrow('Falha ao obter sessão autenticada.');
     expect(global.fetch).toHaveBeenCalled();
+  });
+
+  it('throws when backend response payload is invalid', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ wrong: true }),
+    });
+
+    await expect(ensureSession()).rejects.toThrow('Resposta de sessão inválida.');
   });
 });

@@ -1,3 +1,4 @@
+import { ensureSession } from './authService';
 import type { AuditReport } from '../types';
 import type { AgentStateContract, AnalysisJobContract } from '../src/types/contracts';
 
@@ -22,6 +23,7 @@ const API_BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 const withBase = (path: string) => `${API_BASE_URL.replace(/\/$/, '')}${path}`;
 
 export async function startAnalysis(files: File[], webhookUrl?: string): Promise<AnalysisJobResponse> {
+    await ensureSession();
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
     if (webhookUrl) {
@@ -31,6 +33,7 @@ export async function startAnalysis(files: File[], webhookUrl?: string): Promise
     const response = await fetch(withBase('/api/analysis'), {
         method: 'POST',
         body: formData,
+        credentials: 'include',
     });
 
     if (!response.ok) {
@@ -42,7 +45,10 @@ export async function startAnalysis(files: File[], webhookUrl?: string): Promise
 }
 
 export async function fetchAnalysis(jobId: string): Promise<AnalysisJobResponse> {
-    const response = await fetch(withBase(`/api/analysis/${jobId}`));
+    await ensureSession();
+    const response = await fetch(withBase(`/api/analysis/${jobId}`), {
+        credentials: 'include',
+    });
     if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'Falha ao buscar status da análise.');
@@ -51,7 +57,10 @@ export async function fetchAnalysis(jobId: string): Promise<AnalysisJobResponse>
 }
 
 export async function fetchProgress(jobId: string): Promise<AnalysisJobResponse> {
-    const response = await fetch(withBase(`/api/analysis/${jobId}/progress`));
+    await ensureSession();
+    const response = await fetch(withBase(`/api/analysis/${jobId}/progress`), {
+        credentials: 'include',
+    });
     if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'Falha ao obter progresso da análise.');
@@ -135,8 +144,9 @@ export function subscribeToJobState(jobId: string, options: JobStateSubscription
     };
 
     if (typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
+        void ensureSession();
         const url = withBase(`/api/orchestrator/state/${jobId}`);
-        source = new EventSource(url);
+        source = new EventSource(url, { withCredentials: true });
         source.onmessage = event => processEventData(event as MessageEvent<string>);
         source.addEventListener('state', event => processEventData(event as MessageEvent<string>));
         source.onerror = event => {

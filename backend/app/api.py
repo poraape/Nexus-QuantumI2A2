@@ -7,11 +7,13 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
 from .models import AnalysisJob
 from .orchestrator import PipelineOrchestrator, orchestrator
+from .auth import issue_auth_cookies
+from .config import get_settings
 from .services.session import SpaSessionManager, get_session_manager
 
 router = APIRouter(prefix="/api", tags=["analysis"])
@@ -36,11 +38,15 @@ async def create_analysis(
 
 @router.post("/session", tags=["auth"])
 async def create_session(
+    response: Response,
     session_manager: SpaSessionManager = Depends(get_session_manager),
-) -> dict[str, float | str]:
+) -> dict[str, int]:
     state = session_manager.get_session()
+    issue_auth_cookies(response, state.access_token, state.refresh_token)
+    settings = get_settings()
+    response.headers['X-Session-Expires'] = str(int(state.expires_at))
+    response.headers['X-Session-Cookie'] = settings.access_token_cookie_name
     return {
-        "accessToken": state.access_token,
         "expiresAt": int(state.expires_at * 1000),
     }
 
