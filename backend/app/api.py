@@ -1,10 +1,14 @@
 """REST API routes."""
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
+from collections.abc import AsyncIterator
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
 from .models import AnalysisJob
 from .orchestrator import PipelineOrchestrator, orchestrator
@@ -60,6 +64,37 @@ async def get_progress(job_id: uuid.UUID, orchestrator: PipelineOrchestrator = D
         "agentStates": job.agent_states,
         "error": job.error_message,
     }
+
+
+@router.get("/orchestrator/state/{job_id}")
+async def stream_orchestrator_state(
+    job_id: uuid.UUID,
+    orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+):
+    async def event_stream() -> AsyncIterator[str]:
+        last_payload: Optional[dict] = None
+        try:
+            while True:
+                job = orchestrator.get_job(job_id)
+                if not job:
+                    yield "event: error\ndata: {\"detail\": \"Análise não encontrada\"}\n\n"
+                    return
+
+                payload = _serialize_job(job)
+                if payload != last_payload:
+                    data = json.dumps(payload, default=str)
+                    yield f"event: state\ndata: {data}\n\n"
+                    last_payload = payload
+
+                status = payload.get("status")
+                if status in {"completed", "failed"}:
+                    return
+
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:  # pragma: no cover - network disconnects
+            return
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 def _serialize_job(job: AnalysisJob) -> dict:
