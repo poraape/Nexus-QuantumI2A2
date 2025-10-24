@@ -33,20 +33,51 @@ class LLMService:
         self.fallback_model = fallback_model
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential_jitter(initial=0.5, exp_base=2))
-    def run(self, prompt: str, schema: dict[str, Any] | None = None) -> dict[str, Any]:
-        logger.info("Executando LLM %s", self.primary_model)
+    def run(
+        self,
+        prompt: str,
+        schema: dict[str, Any] | None = None,
+        *,
+        model: str | None = None,
+        generation_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        active_model = model or self.primary_model
+        logger.info("Executando LLM %s", active_model, extra={"generation_config": generation_config or {}})
         try:
-            response = self._fake_call(prompt, schema)
+            response = self._fake_call(
+                prompt,
+                schema,
+                model=active_model,
+                generation_config=generation_config,
+            )
             return response
         except Exception as exc:  # noqa: BLE001
             logger.error("Falha no modelo primário: %s", exc)
             if self.fallback_model:
                 logger.info("Tentando fallback %s", self.fallback_model)
-                return self._fake_call(prompt, schema)
+                return self._fake_call(
+                    prompt,
+                    schema,
+                    model=self.fallback_model,
+                    generation_config=generation_config,
+                )
             raise
 
-    def _fake_call(self, prompt: str, schema: dict[str, Any] | None) -> dict[str, Any]:
-        data = {"prompt": prompt, "schema": schema or {}, "result": "ok"}
+    def _fake_call(
+        self,
+        prompt: str,
+        schema: dict[str, Any] | None,
+        *,
+        model: str | None,
+        generation_config: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        data = {
+            "prompt": prompt,
+            "schema": schema or {},
+            "result": "ok",
+            "model": model or self.primary_model,
+            "generation_config": generation_config or {},
+        }
         return json.loads(json.dumps(data))
 
 

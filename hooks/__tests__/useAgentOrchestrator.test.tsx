@@ -201,6 +201,47 @@ describe('useAgentOrchestrator', () => {
     expect(mockPersistCorrection).toHaveBeenCalledWith('job-1', 'doc-1.xml', 'Compra');
   });
 
+  it('tracks incremental progress metadata from backend events', async () => {
+    mockStartAnalysis.mockResolvedValue({
+      jobId: 'job-1',
+      status: 'running',
+      agentStates: buildBackendStates(),
+      result: null,
+    });
+
+    const { result } = renderHook(() => useAgentOrchestrator());
+    const file = new File(['content'], 'doc-2.xml', { type: 'text/xml' });
+
+    await act(async () => {
+      await result.current.runPipeline([file]);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      lastSubscription?.onUpdate?.({
+        jobId: 'job-1',
+        agentStates: {
+          auditor: {
+            status: 'running',
+            progress: {
+              step: 'Revisando documentos',
+              current: 2,
+              total: 5,
+              extra: { issues: 3, documentId: 'NF-001' },
+            },
+          },
+        },
+      });
+      await Promise.resolve();
+    });
+
+    expect(result.current.agentStates.auditor.progress.step).toBe('Revisando documentos');
+    expect(result.current.agentStates.auditor.progress.extra?.issues).toBe(3);
+    expect(result.current.agentStates.auditor.progress.labels).toContain('Inconsistências: 3');
+    expect(result.current.agentStates.auditor.progress.labels).toContain('Documento: NF-001');
+    expect(result.current.agentStates.ocr.status).toBe('completed');
+  });
+
   it('returns friendly error when chat is not initialized', async () => {
     const { result } = renderHook(() => useAgentOrchestrator());
 

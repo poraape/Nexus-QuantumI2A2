@@ -9,7 +9,7 @@ from app.agents.base import Agent, retryable
 from app.core.totals import ensure_document_totals, to_float, totals_as_dict
 from app.schemas import InsightReference, InsightReport
 from app.services.diagnostic_logger import log_totals_event
-from app.services.llm_service import service as llm_service
+from app.services.agents.response_agent import response_agent_service
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class IntelligenceAgent(Agent):
                 status="ready",
             )
 
-            llm_service.run(
+            response_agent_service.generate_structured_response(
                 prompt="Gere resumo executivo", schema={"type": "object", "properties": {}}
             )
             return InsightReport(
