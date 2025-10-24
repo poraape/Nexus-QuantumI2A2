@@ -39,6 +39,17 @@
       "overall_completion_ms": {
         "expected": 4000,
         "max_allowed": 6000
+      },
+      "document_total_consistency_pct": {
+        "expected": 0.97,
+        "min_allowed": 0.95,
+        "description": "Proporção mínima de documentos com totais consistentes"
+      },
+      "batch_50_latency_seconds": {
+        "expected": 75,
+        "max_allowed": 90,
+        "sample_size": 50,
+        "description": "Latência alvo para processar lote de 50 NF-es"
       }
     },
     "runtime_tracking": {

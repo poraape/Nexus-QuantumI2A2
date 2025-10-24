@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from celery import Celery
 
-from app.orchestrator.state_machine import build_pipeline
-from app.schemas import DocumentIn
+from ..orchestrator.state_machine import build_pipeline
+from ..schemas import DocumentIn
+from ..utils import model_dump
 
 celery_app = Celery("nexus", broker="redis://localhost:6379/0")
 
@@ -14,4 +15,4 @@ def orchestrate_document(data: dict) -> dict:
     pipeline = build_pipeline()
     document_in = DocumentIn(**data)
     report = pipeline.run(document_in)
-    return report.model_dump()
+    return model_dump(report)
