@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+import uuid
+from typing import Any, Mapping
 
 from app.agents.accountant import AccountantAgent
 from app.agents.auditor import AuditorAgent
@@ -10,6 +11,8 @@ from app.agents.classifier import ClassifierAgent
 from app.agents.extractor import ExtractorAgent
 from app.agents.intelligence import IntelligenceAgent
 from app.core.totals import ensure_document_totals, to_float, totals_as_dict
+from app.crud import list_corrections_map
+from app.database import get_session
 from app.schemas import DocumentIn, InsightReport
 from app.services.diagnostic_logger import log_totals_event, update_post_validation_benchmark
 
@@ -23,6 +26,34 @@ class PipelineOrchestrator:
         self.classifier = ClassifierAgent()
         self.accountant = AccountantAgent()
         self.intelligence = IntelligenceAgent()
+
+    def _load_corrections(self, metadata: Mapping[str, Any] | None) -> dict[str, str]:
+        if not isinstance(metadata, Mapping):
+            return {}
+
+        raw_job_id = metadata.get("job_id") or metadata.get("jobId")
+        if not isinstance(raw_job_id, str):
+            return {}
+
+        try:
+            job_id = uuid.UUID(str(raw_job_id))
+        except (ValueError, TypeError):
+            logger.debug("Ignoring invalid job_id metadata for corrections: %s", raw_job_id)
+            return {}
+
+        with get_session() as session:
+            corrections = list_corrections_map(session, job_id)
+
+        materialized = {document: operation.value for document, operation in corrections.items()}
+        if materialized:
+            logger.info(
+                {
+                    "evt": "orchestrate_corrections_loaded",
+                    "job_id": str(job_id),
+                    "count": len(materialized),
+                }
+            )
+        return materialized
 
     def _totals_needs_attention(self, totals: Any) -> bool:
         if totals is None:
@@ -44,7 +75,8 @@ class PipelineOrchestrator:
         )
 
         audit = self.auditor.run(document)
-        classification = self.classifier.run(audit)
+        corrections = self._load_corrections(document_in.metadata if hasattr(document_in, "metadata") else None)
+        classification = self.classifier.run(audit, corrections=corrections)
         accounting = self.accountant.run(classification)
         logger.info(
             {

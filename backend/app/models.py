@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, Optional
 
-from sqlalchemy import JSON, DateTime, String
+from sqlalchemy import JSON, DateTime, String, UniqueConstraint
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,6 +27,15 @@ class AgentStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     ERROR = "error"
+
+
+class OperationType(str, Enum):
+    COMPRA = "Compra"
+    VENDA = "Venda"
+    DEVOLUCAO = "Devolução"
+    SERVICO = "Serviço"
+    TRANSFERENCIA = "Transferência"
+    OUTROS = "Outros"
 
 
 DEFAULT_AGENT_STATES: Dict[str, Dict[str, object]] = {
@@ -65,3 +74,20 @@ class StoredFile(Base):
     content_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     path: Mapped[str] = mapped_column(String(1000), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class ClassificationCorrection(Base):
+    """User-provided classification overrides tied to an analysis job."""
+
+    __tablename__ = "classification_corrections"
+    __table_args__ = (UniqueConstraint("job_id", "document_name", name="uq_corrections_job_document"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    document_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    operation_type: Mapped[OperationType] = mapped_column(SqlEnum(OperationType), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )

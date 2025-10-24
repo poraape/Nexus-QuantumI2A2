@@ -16,10 +16,25 @@ def run_classifier(context: Dict[str, object]) -> Dict[str, object]:
     job_id = uuid.UUID(context["job_id"])
     update_agent(job_id, "classifier", AgentStatus.RUNNING, step="Classificando operações")
     _simulate_work()
+    corrections = context.get("corrections") if isinstance(context, dict) else None
     classification = {
         "categories": {},
         "summary": {},
     }
-    update_agent(job_id, "classifier", AgentStatus.COMPLETED, extra={"categories": len(classification["categories"])})
+    applied = 0
+    if isinstance(corrections, dict) and corrections:
+        classification["categories"] = {
+            document: {"operationType": operation, "confidence": 1.0}
+            for document, operation in corrections.items()
+        }
+        applied = len(classification["categories"])
+        classification["summary"]["appliedCorrections"] = applied
+
+    update_agent(
+        job_id,
+        "classifier",
+        AgentStatus.COMPLETED,
+        extra={"categories": len(classification["categories"]), "appliedCorrections": applied},
+    )
     context["classification"] = classification
     return context

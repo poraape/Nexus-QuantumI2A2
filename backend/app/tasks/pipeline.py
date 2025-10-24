@@ -7,6 +7,8 @@ from typing import Dict
 
 from celery import chain, shared_task
 
+from ..crud import list_corrections_map
+from ..database import get_session
 from ..models import JobStatus
 from ..progress import set_job_result
 from .accountant import run_accountant
@@ -21,6 +23,11 @@ from .ocr import run_ocr
 def run_pipeline(context: Dict[str, object]) -> None:
     job_id = uuid.UUID(context["job_id"])
     context.setdefault("started_at", dt.datetime.utcnow().isoformat())
+
+    with get_session() as session:
+        corrections_map = list_corrections_map(session, job_id)
+    if corrections_map:
+        context["corrections"] = {name: operation.value for name, operation in corrections_map.items()}
 
     workflow = chain(
         run_ocr.s(),
