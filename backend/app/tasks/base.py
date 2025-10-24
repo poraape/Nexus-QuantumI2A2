@@ -1,16 +1,11 @@
 """Common utilities shared between Celery tasks."""
 from __future__ import annotations
 
-import time
 import uuid
 from typing import Any, Dict
 
 from ..models import AgentStatus, JobStatus
 from ..progress import set_job_result, update_agent
-
-
-def _simulate_work(duration: float = 0.5) -> None:
-    time.sleep(duration)
 
 
 def update_agent_running(job_id: uuid.UUID, agent: str, step: str) -> None:

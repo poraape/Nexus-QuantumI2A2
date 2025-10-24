@@ -2,7 +2,7 @@
   "attributes": {
     "title": "Nexus QuantumI2A2 - Observabilidade",
     "description": "Visão consolidada das integrações LLM, OCR e ERP com métricas chave (latência, taxa de erro, retries e throughput).",
-    "panelsJSON": "[\n  {\"panelIndex\":\"1\",\"type\":\"visualization\",\"panelRefName\":\"panel_0\"},\n  {\"panelIndex\":\"2\",\"type\":\"visualization\",\"panelRefName\":\"panel_1\"},\n  {\"panelIndex\":\"3\",\"type\":\"visualization\",\"panelRefName\":\"panel_2\"}\n]",
+    "panelsJSON": "[\n  {\"panelIndex\":\"1\",\"type\":\"visualization\",\"panelRefName\":\"panel_0\"},\n  {\"panelIndex\":\"2\",\"type\":\"visualization\",\"panelRefName\":\"panel_1\"},\n  {\"panelIndex\":\"3\",\"type\":\"visualization\",\"panelRefName\":\"panel_2\"},\n  {\"panelIndex\":\"4\",\"type\":\"visualization\",\"panelRefName\":\"panel_3\"},\n  {\"panelIndex\":\"5\",\"type\":\"visualization\",\"panelRefName\":\"panel_4\"},\n  {\"panelIndex\":\"6\",\"type\":\"visualization\",\"panelRefName\":\"panel_5\"}\n]",
     "references": [
       {
         "name": "panel_0",
@@ -18,6 +18,21 @@
         "name": "panel_2",
         "type": "visualization",
         "id": "retries-throughput"
+      },
+      {
+        "name": "panel_3",
+        "type": "visualization",
+        "id": "agent-latency-sli"
+      },
+      {
+        "name": "panel_4",
+        "type": "visualization",
+        "id": "agent-success-slo"
+      },
+      {
+        "name": "panel_5",
+        "type": "visualization",
+        "id": "agent-inconsistencies"
       }
     ],
     "timeRestore": true,

@@ -56,7 +56,7 @@ backend_app_pkg = importlib.import_module("backend.app")
 backend_app_pkg.models = models_stub
 backend_app_pkg.progress = progress_stub
 
-def test_run_ocr_updates_progress(monkeypatch):
+def test_run_ocr_updates_progress(monkeypatch, tmp_path):
     from ..ocr import AgentStatus, run_ocr
 
     calls = []
@@ -75,20 +75,34 @@ def test_run_ocr_updates_progress(monkeypatch):
         )
 
     monkeypatch.setattr("backend.app.tasks.ocr.update_agent", fake_update_agent)
-    monkeypatch.setattr("backend.app.tasks.ocr._simulate_work", lambda: None)
+    monkeypatch.setattr("backend.app.tasks.ocr.telemetry.record_latency", lambda *_, **__: None)
+    monkeypatch.setattr("backend.app.tasks.ocr.telemetry.record_success", lambda *_, **__: None)
+    monkeypatch.setattr("backend.app.tasks.ocr.telemetry.record_error", lambda *_, **__: None)
 
     job_id = uuid.uuid4()
+    file_one = tmp_path / "file-1.txt"
+    file_two = tmp_path / "file-2.txt"
+    file_one.write_text("Produto A 1 R$ 10,00")
+    file_two.write_text("Produto B 2 R$ 20,00")
     files = [
-        {"filename": "file-1.pdf"},
-        {"filename": "file-2.pdf"},
+        {"filename": "file-1.pdf", "path": str(file_one)},
+        {"filename": "file-2.pdf", "path": str(file_two)},
     ]
     context = {"job_id": str(job_id), "files": files}
 
     result = run_ocr(context)
 
     assert result["documents"] == [
-        {"name": "file-1.pdf", "status": "OK", "data": []},
-        {"name": "file-2.pdf", "status": "OK", "data": []},
+        {
+            "name": "file-1.pdf",
+            "status": "OK",
+            "data": [{"type": "text", "content": "Produto A 1 R$ 10,00"}],
+        },
+        {
+            "name": "file-2.pdf",
+            "status": "OK",
+            "data": [{"type": "text", "content": "Produto B 2 R$ 20,00"}],
+        },
     ]
 
     assert len(calls) == 4
