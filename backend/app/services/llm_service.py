@@ -6,7 +6,10 @@ import json
 import logging
 from typing import Any
 
-_TENACITY_AVAILABLE = importlib.util.find_spec("tenacity") is not None
+try:
+    _TENACITY_AVAILABLE = importlib.util.find_spec("tenacity") is not None
+except ValueError:  # pragma: no cover - namespace packages without spec
+    _TENACITY_AVAILABLE = False
 
 if _TENACITY_AVAILABLE:  # pragma: no cover - exercised em ambientes completos
     from tenacity import retry, stop_after_attempt, wait_exponential_jitter
