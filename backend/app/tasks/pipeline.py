@@ -1,14 +1,14 @@
 """Pipeline orchestration task executed synchronously."""
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import uuid
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 from celery import shared_task
 
 from ..models import AgentStatus, JobStatus
-from ..orchestrator.state_machine import PipelineOrchestrator
 from ..progress import set_job_result, update_agent
 from ..schemas import DocumentIn
 from ..services.persistence import persist_pipeline_artifacts
@@ -16,6 +16,15 @@ from ..tax import icms_service
 from ..utils import model_dump
 from ..services.orchestrator.budget import TokenBudgetExceeded, TokenBudgetManager
 from .base import build_operations_from_pipeline, serialize_pipeline_result
+from ..orchestrator.state_machine import PipelineRunResult
+
+from services.orchestrator.async_controller import AsyncAgentController
+from services.orchestrator.schemas import (
+    FinalInsightPayload,
+    MessageEnvelope,
+    RawDataPayload,
+    SemanticSummaryPayload,
+)
 
 
 def _prepare_documents(job_id: uuid.UUID, files: Iterable[Dict[str, object]]) -> List[DocumentIn]:
@@ -66,6 +75,90 @@ def _mark_agents_completed(job_id: uuid.UUID, documents: int) -> None:
     update_agent(job_id, "accountant", AgentStatus.COMPLETED, extra={"documents": documents})
 
 
+_STAGE_TO_AGENTS = {
+    "extraction": [("ocr", "Extraindo documento")],
+    "audit": [("auditor", "Validando documento")],
+    "classification": [("classifier", "Classificando documento")],
+    "accounting": [
+        ("crossValidator", "Gerando operações fiscais"),
+        ("accountant", "Consolidando relatório"),
+    ],
+    "insight": [("intelligence", "Gerando insights")],
+}
+
+
+def _build_progress_extra(message: MessageEnvelope[Any]) -> Dict[str, Any]:
+    extra: Dict[str, Any] = {}
+    if message.tokens is not None:
+        extra["tokens"] = message.tokens
+    if message.latency_ms is not None:
+        extra["latencyMs"] = round(message.latency_ms, 2)
+
+    payload = message.payload
+    if isinstance(payload, RawDataPayload):
+        extra["documentId"] = payload.document_id
+        extra["stage"] = payload.stage
+        data = dict(payload.data)
+        totals = data.get("totals")
+        if totals:
+            extra["totals"] = totals
+        if payload.metadata:
+            extra["metadata"] = dict(payload.metadata)
+    elif isinstance(payload, SemanticSummaryPayload):
+        extra["stage"] = payload.stage
+        extra["summary"] = payload.summary
+        if payload.highlights:
+            extra["highlights"] = list(payload.highlights)
+        if payload.score is not None:
+            extra["confidence"] = payload.score
+        if payload.extra:
+            extra["details"] = dict(payload.extra)
+    elif isinstance(payload, FinalInsightPayload):
+        extra["stage"] = payload.stage
+        extra["summary"] = payload.summary
+        extra["insights"] = list(payload.insights)
+        if payload.provenance:
+            extra["provenance"] = [dict(item) for item in payload.provenance]
+
+    return {key: value for key, value in extra.items() if value not in (None, [], {}, 0)}
+
+
+async def _relay_blackboard_events(
+    job_id: uuid.UUID, queue: asyncio.Queue[MessageEnvelope[Any] | None]
+) -> None:
+    while True:
+        message = await queue.get()
+        if message is None:
+            queue.task_done()
+            break
+
+        try:
+            stage = getattr(message.payload, "stage", None)
+            agents = _STAGE_TO_AGENTS.get(stage)
+            if not agents:
+                continue
+
+            extra = _build_progress_extra(message)
+            for agent_name, step in agents:
+                update_agent(job_id, agent_name, AgentStatus.RUNNING, step=step, extra=extra)
+        finally:
+            queue.task_done()
+
+
+async def _run_pipeline_with_controller(job_id: uuid.UUID, document_in: DocumentIn) -> PipelineRunResult:
+    controller = AsyncAgentController()
+    queue = controller.blackboard.subscribe()
+    consumer = asyncio.create_task(_relay_blackboard_events(job_id, queue))
+    try:
+        result = await controller.run(document_in)
+        return result
+    finally:
+        await controller.blackboard.wait_finalized()
+        await queue.join()
+        controller.blackboard.unsubscribe(queue)
+        await consumer
+
+
 @shared_task(name="pipeline.run")
 def run_pipeline(context: Dict[str, object]) -> None:
     job_id = uuid.UUID(context["job_id"])
@@ -85,7 +178,7 @@ def run_pipeline(context: Dict[str, object]) -> None:
     try:
         for index, document_in in enumerate(documents_in, start=1):
             _mark_agents_running(job_id, index, len(documents_in))
-            pipeline_result = orchestrator.run(document_in)
+            pipeline_result = asyncio.run(_run_pipeline_with_controller(job_id, document_in))
             serialized = serialize_pipeline_result(pipeline_result)
             operations = build_operations_from_pipeline(serialized)
             icms_payload = icms_service.calculate_for_operations(operations)
