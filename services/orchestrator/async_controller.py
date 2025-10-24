@@ -10,7 +10,15 @@ from backend.app.agents.accountant import AccountantAgent
 from backend.app.core.totals import ensure_document_totals
 from backend.app.orchestrator.state_machine import PipelineOrchestrator as SyncPipelineOrchestrator
 from backend.app.orchestrator.state_machine import PipelineRunResult
-from backend.app.schemas import AccountingOutput, AuditReport, ClassificationResult, Document, DocumentIn, InsightReport
+from backend.app.schemas import (
+    AccountingOutput,
+    AuditReport,
+    ClassificationResult,
+    CrossValidationReport,
+    Document,
+    DocumentIn,
+    InsightReport,
+)
 from backend.app.services.diagnostic_logger import log_totals_event, update_post_validation_benchmark
 from backend.app.utils import model_dump
 
@@ -152,6 +160,7 @@ class AsyncAgentController:
         self.auditor = self._sync_pipeline.auditor
         self.classifier = self._sync_pipeline.classifier
         self.accountant = self._sync_pipeline.accountant
+        self.cross_validator = self._sync_pipeline.cross_validator
         self.intelligence = self._sync_pipeline.intelligence
         self._load_corrections = self._sync_pipeline._load_corrections
         self._totals_needs_attention = self._sync_pipeline._totals_needs_attention
@@ -225,6 +234,22 @@ class AsyncAgentController:
                 latency_ms=acc_latency,
             )
 
+            cross_validation, cv_tokens, cv_latency = await self._run_agent(
+                "crossValidator",
+                self.cross_validator.run,
+                document,
+                audit,
+                classification,
+                accounting,
+                stage="consistency",
+            )
+            await self.blackboard.publish_summary(
+                "crossValidator",
+                self._build_cross_validation_summary(cross_validation),
+                tokens=cv_tokens,
+                latency_ms=cv_latency,
+            )
+
             insight, insight_tokens, insight_latency = await self._run_agent(
                 "intelligence", self.intelligence.run, accounting, stage="insight"
             )
@@ -240,6 +265,7 @@ class AsyncAgentController:
                 audit=audit,
                 classification=classification,
                 accounting=accounting,
+                cross_validation=cross_validation,
                 insight=insight,
             )
         finally:
@@ -376,6 +402,31 @@ class AsyncAgentController:
                 f"Entradas fiscais: {len(accounting.ledger_entries)}",
                 f"SPED gerado: {len(accounting.sped_files)} arquivo(s)",
             ],
+            extra=extra,
+        )
+
+    def _build_cross_validation_summary(
+        self, report: CrossValidationReport
+    ) -> SemanticSummaryPayload:
+        summary = (
+            "Validação cruzada sem inconsistências"
+            if not report.has_findings
+            else "Inconsistências detectadas na validação cruzada"
+        )
+        highlights = [
+            f"{finding.code} ({finding.severity})"
+            for finding in report.findings[:3]
+        ]
+        extra: Dict[str, Any] = {
+            "operationsCount": len(report.operations),
+        }
+        if report.findings:
+            extra["findings"] = [model_dump(finding) for finding in report.findings]
+        return SemanticSummaryPayload(
+            document_id=report.document_id,
+            stage="consistency",
+            summary=summary,
+            highlights=highlights,
             extra=extra,
         )
 

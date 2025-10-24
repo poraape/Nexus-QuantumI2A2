@@ -79,10 +79,8 @@ _STAGE_TO_AGENTS = {
     "extraction": [("ocr", "Extraindo documento")],
     "audit": [("auditor", "Validando documento")],
     "classification": [("classifier", "Classificando documento")],
-    "accounting": [
-        ("crossValidator", "Gerando operações fiscais"),
-        ("accountant", "Consolidando relatório"),
-    ],
+    "consistency": [("crossValidator", "Validando consistência fiscal")],
+    "accounting": [("accountant", "Consolidando relatório")],
     "insight": [("intelligence", "Gerando insights")],
 }
 
@@ -194,6 +192,7 @@ def run_pipeline(context: Dict[str, object]) -> None:
                     "totals": model_dump(totals) if totals else {},
                     "audit": serialized.get("audit", {}),
                     "classification": serialized.get("classification", {}),
+                    "crossValidation": serialized.get("cross_validation", {}),
                     "insight": serialized.get("insight", {}),
                     "fiscal": {"icms": icms_payload},
                 }

@@ -1,0 +1,2162 @@
+{
+  "project": {
+    "name": "Nexus QuantumI2A2",
+    "repo_root": "."
+  },
+  "inventory": [
+    {
+      "path": ".github/lighthouse/lighthouserc.json",
+      "size": 566,
+      "hash": "b1d3e09bd67c",
+      "kind": "config"
+    },
+    {
+      "path": ".gitignore",
+      "size": 253,
+      "hash": "fe718e7babb1",
+      "kind": "asset"
+    },
+    {
+      "path": ".lighthouseci/lhr-1761265191056.html",
+      "size": 589286,
+      "hash": "6dc2ddd15393",
+      "kind": "asset"
+    },
+    {
+      "path": ".lighthouseci/lhr-1761265191056.json",
+      "size": 540335,
+      "hash": "e706b9266329",
+      "kind": "config"
+    },
+    {
+      "path": ".lighthouseci/lhr-1761265209663.html",
+      "size": 605242,
+      "hash": "1ade70eeab53",
+      "kind": "asset"
+    },
+    {
+      "path": ".lighthouseci/lhr-1761265209663.json",
+      "size": 556572,
+      "hash": "a23f441ed643",
+      "kind": "config"
+    },
+    {
+      "path": ".lighthouseci/lhr-1761265225557.html",
+      "size": 604144,
+      "hash": "4c0da6b82316",
+      "kind": "asset"
+    },
+    {
+      "path": ".lighthouseci/lhr-1761265225557.json",
+      "size": 555161,
+      "hash": "a91347b05c0c",
+      "kind": "config"
+    },
+    {
+      "path": "00_suite.manifest.json",
+      "size": 3747,
+      "hash": "981f51e684b1",
+      "kind": "config"
+    },
+    {
+      "path": "01_repo_discovery.json",
+      "size": 2941,
+      "hash": "e85eb566b267",
+      "kind": "config"
+    },
+    {
+      "path": "02_backend_audit.json",
+      "size": 3014,
+      "hash": "0d3b963b89bd",
+      "kind": "config"
+    },
+    {
+      "path": "02a_fiscal_contracts.json",
+      "size": 3018,
+      "hash": "b7f646f01dc5",
+      "kind": "config"
+    },
+    {
+      "path": "03_multiagent_arch_audit.json",
+      "size": 2409,
+      "hash": "ff9733693757",
+      "kind": "config"
+    },
+    {
+      "path": "04_frontend_performance.json",
+      "size": 2108,
+      "hash": "16ad1ca02726",
+      "kind": "config"
+    },
+    {
+      "path": "05_uiux_accessibility.json",
+      "size": 1863,
+      "hash": "c97015608b1b",
+      "kind": "config"
+    },
+    {
+      "path": "06_security_hardening.json",
+      "size": 2317,
+      "hash": "b41b70fe6cb8",
+      "kind": "config"
+    },
+    {
+      "path": "07_tests_validation.json",
+      "size": 1909,
+      "hash": "9e8593ff0909",
+      "kind": "config"
+    },
+    {
+      "path": "08_performance_observability.json",
+      "size": 2016,
+      "hash": "5309148f6e5f",
+      "kind": "config"
+    },
+    {
+      "path": "09_cicd_integration.json",
+      "size": 4183,
+      "hash": "4fcde249952d",
+      "kind": "config"
+    },
+    {
+      "path": "10_reporting_telemetry.json",
+      "size": 1632,
+      "hash": "0a19df07eb01",
+      "kind": "config"
+    },
+    {
+      "path": "11_risk_register.json",
+      "size": 1744,
+      "hash": "2c55f3d9ea8f",
+      "kind": "config"
+    },
+    {
+      "path": "App.tsx",
+      "size": 14226,
+      "hash": "1b8c00a8cc1a",
+      "kind": "code"
+    },
+    {
+      "path": "Dockerfile",
+      "size": 1543,
+      "hash": "c877b0c2ba73",
+      "kind": "asset"
+    },
+    {
+      "path": "LICENSE",
+      "size": 1085,
+      "hash": "8d24ddbdac8d",
+      "kind": "asset"
+    },
+    {
+      "path": "README.md",
+      "size": 6769,
+      "hash": "6eae6872e023",
+      "kind": "doc"
+    },
+    {
+      "path": "agents/__tests__/auditorAgent.test.ts",
+      "size": 2050,
+      "hash": "c7c6147705d3",
+      "kind": "code"
+    },
+    {
+      "path": "agents/__tests__/classifierAgent.test.ts",
+      "size": 2147,
+      "hash": "2593c85acf07",
+      "kind": "code"
+    },
+    {
+      "path": "agents/accountantAgent.ts",
+      "size": 16447,
+      "hash": "53d3fa446583",
+      "kind": "code"
+    },
+    {
+      "path": "agents/auditorAgent.ts",
+      "size": 2948,
+      "hash": "27c1435fe98a",
+      "kind": "code"
+    },
+    {
+      "path": "agents/classifierAgent.ts",
+      "size": 5369,
+      "hash": "d9ff4c546c6f",
+      "kind": "code"
+    },
+    {
+      "path": "agents/erpIntegrator.ts",
+      "size": 9951,
+      "hash": "a026cffc013b",
+      "kind": "code"
+    },
+    {
+      "path": "agents/intelligenceAgent.ts",
+      "size": 5604,
+      "hash": "b64342038ffc",
+      "kind": "code"
+    },
+    {
+      "path": "agents/nlpAgent.ts",
+      "size": 3750,
+      "hash": "036cf3d5ff37",
+      "kind": "code"
+    },
+    {
+      "path": "agents/ocrExtractor.ts",
+      "size": 1755,
+      "hash": "68bc416e1284",
+      "kind": "code"
+    },
+    {
+      "path": "audit_log.jsonl",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "asset"
+    },
+    {
+      "path": "backend/.env.dev",
+      "size": 343,
+      "hash": "b1840e701b4c",
+      "kind": "asset"
+    },
+    {
+      "path": "backend/.env.example",
+      "size": 347,
+      "hash": "21b019692aff",
+      "kind": "asset"
+    },
+    {
+      "path": "backend/.env.test",
+      "size": 344,
+      "hash": "4f6a97b3b2b6",
+      "kind": "asset"
+    },
+    {
+      "path": "backend/__init__.py",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "code"
+    },
+    {
+      "path": "backend/alembic.ini",
+      "size": 562,
+      "hash": "5ef27e563974",
+      "kind": "config"
+    },
+    {
+      "path": "backend/alembic/env.py",
+      "size": 1117,
+      "hash": "4667ca5962ba",
+      "kind": "code"
+    },
+    {
+      "path": "backend/alembic/versions/0001_create_core_tables.py",
+      "size": 4097,
+      "hash": "eeeba0c64206",
+      "kind": "code"
+    },
+    {
+      "path": "backend/alembic/versions/0002_add_classification_corrections.py",
+      "size": 1764,
+      "hash": "71f5ad91f46d",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/__init__.py",
+      "size": 2591,
+      "hash": "983670541bf5",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/agents/__init__.py",
+      "size": 349,
+      "hash": "2ed458eef14e",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/agents/accountant.py",
+      "size": 7285,
+      "hash": "d86163f6c775",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/agents/auditor.py",
+      "size": 726,
+      "hash": "940e26b07211",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/agents/base.py",
+      "size": 3807,
+      "hash": "fac21ee077e1",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/agents/classifier.py",
+      "size": 1386,
+      "hash": "0a7b33b4266b",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/agents/extractor.py",
+      "size": 4508,
+      "hash": "c0f5577a2dfe",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/agents/intelligence.py",
+      "size": 5901,
+      "hash": "5f10f03371fb",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/api.py",
+      "size": 7530,
+      "hash": "7ed32f6dd807",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/api/__init__.py",
+      "size": 75,
+      "hash": "361a2d31a960",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/api/audit.py",
+      "size": 4923,
+      "hash": "becc11f8c03d",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/api/export.py",
+      "size": 1006,
+      "hash": "4aa1489ad578",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/api/main.py",
+      "size": 839,
+      "hash": "b75f513b88ae",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/api/monitoring.py",
+      "size": 2069,
+      "hash": "cfb9ba1596d5",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/auth.py",
+      "size": 9488,
+      "hash": "aaa51245b1ff",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/celery_app.py",
+      "size": 632,
+      "hash": "47d49e0dfd6f",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/config.py",
+      "size": 7720,
+      "hash": "eda6363731c3",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/connectivity_validator/__init__.py",
+      "size": 156,
+      "hash": "da2a76f5938f",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/connectivity_validator/checks.py",
+      "size": 11170,
+      "hash": "7df255c8a491",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/connectivity_validator/manifest_loader.py",
+      "size": 2065,
+      "hash": "0039f238cf98",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/connectivity_validator/runner.py",
+      "size": 15974,
+      "hash": "63d49797a340",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/contracts/__init__.py",
+      "size": 184,
+      "hash": "540722ed88fb",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/contracts/models.py",
+      "size": 5329,
+      "hash": "0d1aacf3e742",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/contracts/schemas/analysis_job.json",
+      "size": 16682,
+      "hash": "d6280f95f5ce",
+      "kind": "config"
+    },
+    {
+      "path": "backend/app/contracts/schemas/audit_report.json",
+      "size": 14371,
+      "hash": "22ce68efd4ff",
+      "kind": "config"
+    },
+    {
+      "path": "backend/app/core/__init__.py",
+      "size": 470,
+      "hash": "5949d3f132d8",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/core/tax_rules.py",
+      "size": 1606,
+      "hash": "bff609bee9ee",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/core/tax_simulation.py",
+      "size": 2809,
+      "hash": "b7d36086fdc1",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/core/totals.py",
+      "size": 4331,
+      "hash": "0e7db798a26a",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/crud.py",
+      "size": 4621,
+      "hash": "bb367a30a8d4",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/database.py",
+      "size": 1307,
+      "hash": "bd2d02435433",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/db/__init__.py",
+      "size": 95,
+      "hash": "5a5203fbf09c",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/db/models.py",
+      "size": 3593,
+      "hash": "e18b8c96ec71",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/db/session.py",
+      "size": 895,
+      "hash": "5a4f4d6378d6",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/graphql_schema.py",
+      "size": 1763,
+      "hash": "adbccfba3d6f",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/main.py",
+      "size": 8698,
+      "hash": "9684f112311a",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/middleware.py",
+      "size": 3701,
+      "hash": "5d3fb0b3b617",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/models.py",
+      "size": 4281,
+      "hash": "f3c3821ca8a2",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/orchestrator.py",
+      "size": 3664,
+      "hash": "cdb90fd80419",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/orchestrator/state_machine.py",
+      "size": 6504,
+      "hash": "ae8a9eea00ed",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/performance_evaluator/__init__.py",
+      "size": 155,
+      "hash": "84060b03f396",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/performance_evaluator/manifest_loader.py",
+      "size": 2088,
+      "hash": "0be12c4f82ca",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/performance_evaluator/runner.py",
+      "size": 20149,
+      "hash": "cf7ca2a33eb3",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/progress.py",
+      "size": 2013,
+      "hash": "aa66ce06e50d",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/rules/engine.py",
+      "size": 604,
+      "hash": "745e4961863a",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/schemas/__init__.py",
+      "size": 3222,
+      "hash": "64f089f673bb",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/__init__.py",
+      "size": 272,
+      "hash": "35563a079602",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/accounting_service.py",
+      "size": 948,
+      "hash": "ef832591ec7c",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/agents/__init__.py",
+      "size": 216,
+      "hash": "7902f0aad3b1",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/agents/response_agent.py",
+      "size": 3002,
+      "hash": "9c3647cd1242",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/audit.py",
+      "size": 2843,
+      "hash": "858a449491cf",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/audit/__init__.py",
+      "size": 162,
+      "hash": "589257703010",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/audit/report_generator.py",
+      "size": 3888,
+      "hash": "10ee95ec2be2",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/crypto.py",
+      "size": 3585,
+      "hash": "7e5280aacbb9",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/data_store.py",
+      "size": 786,
+      "hash": "ac766cc924f4",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/diagnostic_logger.py",
+      "size": 3541,
+      "hash": "2a2f8279dbdd",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/llm.py",
+      "size": 3858,
+      "hash": "d92d64b16f32",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/llm_service.py",
+      "size": 2803,
+      "hash": "6acc220461d0",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/masking.py",
+      "size": 1508,
+      "hash": "ba24b218756a",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/monitoring/__init__.py",
+      "size": 348,
+      "hash": "76d78eb60d4f",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/monitoring/metrics_collector.py",
+      "size": 12691,
+      "hash": "a8d7466b955b",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/nlp_service.py",
+      "size": 3910,
+      "hash": "207b170a668e",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/ocr.py",
+      "size": 719,
+      "hash": "e125db95a4ae",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/ocr_service.py",
+      "size": 408,
+      "hash": "55fa8ebec8d8",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/orchestrator/__init__.py",
+      "size": 276,
+      "hash": "9b8ebca222a3",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/orchestrator/budget.py",
+      "size": 10528,
+      "hash": "fc2102994c84",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/orchestrator/prompt_optimizer.py",
+      "size": 3463,
+      "hash": "f5038a4aef90",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/persistence.py",
+      "size": 8787,
+      "hash": "98f55329cc66",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/session.py",
+      "size": 6555,
+      "hash": "659aee3505ab",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/storage.py",
+      "size": 1140,
+      "hash": "50d696a01cb6",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/services/storage_service.py",
+      "size": 303,
+      "hash": "aa5f2bf9c33c",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/storage/__init__.py",
+      "size": 2330,
+      "hash": "e0df131f92f6",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/storage/session_store.py",
+      "size": 1501,
+      "hash": "5636f2971e1c",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/__init__.py",
+      "size": 719,
+      "hash": "e02fb7b4a749",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/accountant.py",
+      "size": 1679,
+      "hash": "1c193e6d11ef",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/auditor.py",
+      "size": 805,
+      "hash": "9fcfa9f080a9",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/base.py",
+      "size": 3586,
+      "hash": "5702785be61c",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/classifier.py",
+      "size": 834,
+      "hash": "ba0e49bed539",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/cross_validator.py",
+      "size": 953,
+      "hash": "a3bdb0282abc",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/intelligence.py",
+      "size": 821,
+      "hash": "6a9c3fa05440",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/ocr.py",
+      "size": 988,
+      "hash": "29a1ba3f1608",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/pipeline.py",
+      "size": 9130,
+      "hash": "db54b9872e28",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/tests/__init__.py",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/tests/test_metrics.py",
+      "size": 5012,
+      "hash": "a4affc57cd97",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tasks/tests/test_ocr.py",
+      "size": 1500,
+      "hash": "26c30e6177e2",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tax/__init__.py",
+      "size": 190,
+      "hash": "8ff6797ac88f",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/tax/icms.py",
+      "size": 6290,
+      "hash": "8647fdf4702d",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/telemetry.py",
+      "size": 8166,
+      "hash": "381be55208a4",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/utils/__init__.py",
+      "size": 98,
+      "hash": "aa5e8cda24fc",
+      "kind": "code"
+    },
+    {
+      "path": "backend/app/utils/pydantic.py",
+      "size": 544,
+      "hash": "10bcdfe13d33",
+      "kind": "code"
+    },
+    {
+      "path": "backend/pyproject.toml",
+      "size": 1215,
+      "hash": "1a5bb8a563d5",
+      "kind": "config"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "size": 264,
+      "hash": "00e2f044946d",
+      "kind": "doc"
+    },
+    {
+      "path": "backend/scripts/seed.py",
+      "size": 758,
+      "hash": "2f7487966d7b",
+      "kind": "code"
+    },
+    {
+      "path": "backend/setup.cfg",
+      "size": 189,
+      "hash": "2441fd98512f",
+      "kind": "config"
+    },
+    {
+      "path": "backend/tests/__init__.py",
+      "size": 1785,
+      "hash": "54e07735b068",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/integration/__init__.py",
+      "size": 30,
+      "hash": "357ecd11017e",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/integration/test_audit_api.py",
+      "size": 4436,
+      "hash": "0c1560e53ae2",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/integration/test_orchestrator_flow.py",
+      "size": 2772,
+      "hash": "601c2c2da2c1",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/integration/test_pipeline.py",
+      "size": 1438,
+      "hash": "d3e4d90309b4",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/perf/__init__.py",
+      "size": 46,
+      "hash": "6c0ceca730c7",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/spec/test_audit_cfop.py",
+      "size": 230,
+      "hash": "57d76959a974",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/spec/test_classify.py",
+      "size": 348,
+      "hash": "84705948253b",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/spec/test_extract_xml.py",
+      "size": 442,
+      "hash": "791608adea95",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/spec/test_intel_guard.py",
+      "size": 431,
+      "hash": "e1555e70421a",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/spec/test_sped.py",
+      "size": 911,
+      "hash": "66072d5b7400",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/test_analysis_contract.py",
+      "size": 4087,
+      "hash": "b13758199132",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/test_session_endpoint.py",
+      "size": 5205,
+      "hash": "0dcd43b5efae",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/__init__.py",
+      "size": 25,
+      "hash": "321a69a61f94",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_accountant_agent.py",
+      "size": 2058,
+      "hash": "5c37e8b511fa",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_agents_basic.py",
+      "size": 1292,
+      "hash": "a3f9d4c8e19f",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_corrections_repository.py",
+      "size": 1156,
+      "hash": "cc20e8f1493d",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_metrics_collector.py",
+      "size": 3310,
+      "hash": "fcf9e489b813",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_response_agent.py",
+      "size": 2058,
+      "hash": "20c4aecaa4b3",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_services.py",
+      "size": 286,
+      "hash": "32dbd54ebb71",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_tax_rules.py",
+      "size": 665,
+      "hash": "5794b50aa1be",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_tax_simulation.py",
+      "size": 1549,
+      "hash": "beba2225ed18",
+      "kind": "code"
+    },
+    {
+      "path": "backend/tests/unit/test_totals_core.py",
+      "size": 1336,
+      "hash": "134d07e2971a",
+      "kind": "code"
+    },
+    {
+      "path": "codex_reports/bandit.json",
+      "size": 3025943,
+      "hash": "ec2bd4f85922",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/bundle_map.json",
+      "size": 799,
+      "hash": "88602f6a670c",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_23_23_41_11.report.html",
+      "size": 515081,
+      "hash": "0dc61bb47209",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_23_23_41_11.report.json",
+      "size": 327951,
+      "hash": "d5128c6fc06e",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_23_23_41_30.report.html",
+      "size": 584371,
+      "hash": "67cc4e2f5bca",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_23_23_41_30.report.json",
+      "size": 397221,
+      "hash": "8dbb85c5e60f",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_23_23_41_45.report.html",
+      "size": 585223,
+      "hash": "19c1133f006e",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_23_23_41_45.report.json",
+      "size": 398073,
+      "hash": "3aea88a9285f",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_03_05.report.html",
+      "size": 589275,
+      "hash": "b00eeaba05ce",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_03_05.report.json",
+      "size": 402125,
+      "hash": "e09421921f1c",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_03_27.report.html",
+      "size": 590353,
+      "hash": "311819b96ae7",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_03_27.report.json",
+      "size": 403203,
+      "hash": "0d19af4d95fc",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_03_43.report.html",
+      "size": 604574,
+      "hash": "0a03af712ae0",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_03_43.report.json",
+      "size": 417434,
+      "hash": "bf9867daa4ac",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_09_01.report.html",
+      "size": 589768,
+      "hash": "6d689f620f4c",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_09_01.report.json",
+      "size": 402618,
+      "hash": "51715939d4ed",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_09_20.report.html",
+      "size": 605580,
+      "hash": "79c1b6cb673c",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_09_20.report.json",
+      "size": 418430,
+      "hash": "8a3a98d026c2",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_09_36.report.html",
+      "size": 605605,
+      "hash": "a2d9d9e38bff",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_09_36.report.json",
+      "size": 418455,
+      "hash": "6f0c92de3f64",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_19_41.report.html",
+      "size": 589286,
+      "hash": "6dc2ddd15393",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_19_41.report.json",
+      "size": 402146,
+      "hash": "1980caa349de",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_20_00.report.html",
+      "size": 605242,
+      "hash": "1ade70eeab53",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_20_00.report.json",
+      "size": 418102,
+      "hash": "c40023df637b",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_20_15.report.html",
+      "size": 604144,
+      "hash": "4c0da6b82316",
+      "kind": "asset"
+    },
+    {
+      "path": "codex_reports/lhci/localhost-index_html-2025_10_24_00_20_15.report.json",
+      "size": 417004,
+      "hash": "be060b490dfb",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/lhci/manifest.json",
+      "size": 1710,
+      "hash": "db2846550ec9",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/npm_audit.json",
+      "size": 1587,
+      "hash": "51ee8d2a368a",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/pa11y.json",
+      "size": 47,
+      "hash": "367f0d9f0dd0",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/pip_audit.json",
+      "size": 29649,
+      "hash": "977e93bdec0e",
+      "kind": "config"
+    },
+    {
+      "path": "codex_reports/radon_cc.json",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "config"
+    },
+    {
+      "path": "components/AnalysisDisplay.tsx",
+      "size": 4230,
+      "hash": "005e3c7f81ed",
+      "kind": "code"
+    },
+    {
+      "path": "components/ApiKeyModal.tsx",
+      "size": 332,
+      "hash": "4c302b65dd8d",
+      "kind": "code"
+    },
+    {
+      "path": "components/Chart.tsx",
+      "size": 8119,
+      "hash": "1e9313d62488",
+      "kind": "code"
+    },
+    {
+      "path": "components/ChatPanel.tsx",
+      "size": 10475,
+      "hash": "d92bd3e63c5e",
+      "kind": "code"
+    },
+    {
+      "path": "components/CollapsibleModule.tsx",
+      "size": 2040,
+      "hash": "fd3d31605961",
+      "kind": "code"
+    },
+    {
+      "path": "components/CrossValidationPanel.tsx",
+      "size": 3283,
+      "hash": "8480920f61fd",
+      "kind": "code"
+    },
+    {
+      "path": "components/Dashboard.tsx",
+      "size": 9983,
+      "hash": "0703e8969bfd",
+      "kind": "code"
+    },
+    {
+      "path": "components/DeterministicReportDownloads.tsx",
+      "size": 3771,
+      "hash": "0a9a1d6f9096",
+      "kind": "code"
+    },
+    {
+      "path": "components/DiscrepancyPanel.tsx",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "code"
+    },
+    {
+      "path": "components/ExportButton.tsx",
+      "size": 1020,
+      "hash": "44ebf8ecb8b4",
+      "kind": "code"
+    },
+    {
+      "path": "components/FileUpload.tsx",
+      "size": 18025,
+      "hash": "756d701e62e7",
+      "kind": "code"
+    },
+    {
+      "path": "components/Header.tsx",
+      "size": 6138,
+      "hash": "91902e69d538",
+      "kind": "code"
+    },
+    {
+      "path": "components/IncrementalInsights.tsx",
+      "size": 5247,
+      "hash": "c7ca200a9420",
+      "kind": "code"
+    },
+    {
+      "path": "components/Insights/TotalSummary.tsx",
+      "size": 1878,
+      "hash": "0264d52b773a",
+      "kind": "code"
+    },
+    {
+      "path": "components/Insights/WhatIfICMS.tsx",
+      "size": 8207,
+      "hash": "5814f91c63a0",
+      "kind": "code"
+    },
+    {
+      "path": "components/IntegrationStatusPanel.tsx",
+      "size": 8579,
+      "hash": "218be696722c",
+      "kind": "code"
+    },
+    {
+      "path": "components/LogoIcon.tsx",
+      "size": 996,
+      "hash": "fc84c3d38be1",
+      "kind": "code"
+    },
+    {
+      "path": "components/LogsPanel.tsx",
+      "size": 5248,
+      "hash": "84b76eb77644",
+      "kind": "code"
+    },
+    {
+      "path": "components/PipelineErrorDisplay.tsx",
+      "size": 936,
+      "hash": "18283ece94d2",
+      "kind": "code"
+    },
+    {
+      "path": "components/ProgressTracker.tsx",
+      "size": 4526,
+      "hash": "b059246abe3f",
+      "kind": "code"
+    },
+    {
+      "path": "components/ReportViewer.tsx",
+      "size": 14800,
+      "hash": "9698a40b497a",
+      "kind": "code"
+    },
+    {
+      "path": "components/SmartSearch.tsx",
+      "size": 6388,
+      "hash": "a63255ae1ae3",
+      "kind": "code"
+    },
+    {
+      "path": "components/Toast.tsx",
+      "size": 811,
+      "hash": "0f8d2e5bd5c2",
+      "kind": "code"
+    },
+    {
+      "path": "components/__tests__/Dashboard.test.tsx",
+      "size": 2793,
+      "hash": "ccb12c9523ba",
+      "kind": "code"
+    },
+    {
+      "path": "components/icons.tsx",
+      "size": 9681,
+      "hash": "e9917106dd12",
+      "kind": "code"
+    },
+    {
+      "path": "cypress.config.ts",
+      "size": 199,
+      "hash": "1a7ee4c1e484",
+      "kind": "code"
+    },
+    {
+      "path": "cypress/e2e/corrections.cy.ts",
+      "size": 4239,
+      "hash": "5192c43f522b",
+      "kind": "code"
+    },
+    {
+      "path": "cypress/e2e/smoke.cy.ts",
+      "size": 257,
+      "hash": "71d79bbea30b",
+      "kind": "code"
+    },
+    {
+      "path": "docs/api/reference.md",
+      "size": 744,
+      "hash": "8c5b2faaacab",
+      "kind": "doc"
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "size": 1032,
+      "hash": "5f118020a04d",
+      "kind": "doc"
+    },
+    {
+      "path": "docs/guides/agent_development.md",
+      "size": 722,
+      "hash": "38a71168c179",
+      "kind": "doc"
+    },
+    {
+      "path": "docs/guides/observability_dashboards.md",
+      "size": 2639,
+      "hash": "e1efa1bbf89e",
+      "kind": "doc"
+    },
+    {
+      "path": "docs/nexus_connectivity_validator_manifest.json",
+      "size": 12095,
+      "hash": "495df758b7c6",
+      "kind": "config"
+    },
+    {
+      "path": "docs/runtime_evaluator_manifest.json",
+      "size": 8765,
+      "hash": "225376d7ea16",
+      "kind": "config"
+    },
+    {
+      "path": "eslint.config.mjs",
+      "size": 3049,
+      "hash": "2d3bcce94814",
+      "kind": "asset"
+    },
+    {
+      "path": "hooks/__tests__/useAgentOrchestrator.test.tsx",
+      "size": 8330,
+      "hash": "c7db7c48fc1a",
+      "kind": "code"
+    },
+    {
+      "path": "hooks/useAgentOrchestrator.ts",
+      "size": 20449,
+      "hash": "79d9cbb2f78a",
+      "kind": "code"
+    },
+    {
+      "path": "index.html",
+      "size": 815,
+      "hash": "bdee8b5c7bc7",
+      "kind": "asset"
+    },
+    {
+      "path": "index.tsx",
+      "size": 349,
+      "hash": "850366f90c85",
+      "kind": "code"
+    },
+    {
+      "path": "jest.config.cjs",
+      "size": 1506,
+      "hash": "4387bb46d07b",
+      "kind": "asset"
+    },
+    {
+      "path": "jest.config.ts",
+      "size": 1503,
+      "hash": "d7842d3ab524",
+      "kind": "code"
+    },
+    {
+      "path": "jest.setup.ts",
+      "size": 730,
+      "hash": "f7a7137a653c",
+      "kind": "code"
+    },
+    {
+      "path": "load-tests/pipeline.load.js",
+      "size": 601,
+      "hash": "517067578c3a",
+      "kind": "code"
+    },
+    {
+      "path": "metadata.json",
+      "size": 317,
+      "hash": "f309ddc8a206",
+      "kind": "config"
+    },
+    {
+      "path": "package-lock.json",
+      "size": 562781,
+      "hash": "ab84829b23b9",
+      "kind": "config"
+    },
+    {
+      "path": "package.json",
+      "size": 2676,
+      "hash": "ffc9e3d7344c",
+      "kind": "config"
+    },
+    {
+      "path": "performance_evaluator.py",
+      "size": 2994,
+      "hash": "dac8ece9afd6",
+      "kind": "code"
+    },
+    {
+      "path": "reports/.gitkeep",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "asset"
+    },
+    {
+      "path": "reports/Conformity_Final.md",
+      "size": 4179,
+      "hash": "d42395a58a27",
+      "kind": "doc"
+    },
+    {
+      "path": "reports/Conformity_Reassessment.md",
+      "size": 9334,
+      "hash": "33794c16dccb",
+      "kind": "doc"
+    },
+    {
+      "path": "reports/Conformity_Report.md",
+      "size": 8002,
+      "hash": "98dfa815ecda",
+      "kind": "doc"
+    },
+    {
+      "path": "reports/Findings.json",
+      "size": 2563,
+      "hash": "8d62676aa0c4",
+      "kind": "config"
+    },
+    {
+      "path": "reports/Scores.json",
+      "size": 704,
+      "hash": "4ce3aa5b3545",
+      "kind": "config"
+    },
+    {
+      "path": "reports/audit-2025-02-17.md",
+      "size": 10942,
+      "hash": "c59e01566c06",
+      "kind": "doc"
+    },
+    {
+      "path": "reports/contracts_manifest.json",
+      "size": 337,
+      "hash": "44599199baae",
+      "kind": "config"
+    },
+    {
+      "path": "reports/generated/inventory_map.json",
+      "size": 5467906,
+      "hash": "99dd8ce1b67f",
+      "kind": "config"
+    },
+    {
+      "path": "reports/performance/.gitkeep",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "asset"
+    },
+    {
+      "path": "reports/preflight_settings_rewrite.json",
+      "size": 234,
+      "hash": "e68c6b155f8a",
+      "kind": "config"
+    },
+    {
+      "path": "reports/security/.gitkeep",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "asset"
+    },
+    {
+      "path": "reports/sped/.gitkeep",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "asset"
+    },
+    {
+      "path": "scripts/generate_contracts.py",
+      "size": 6866,
+      "hash": "b7beb520bd41",
+      "kind": "code"
+    },
+    {
+      "path": "scripts/publishQualityReport.mjs",
+      "size": 3901,
+      "hash": "aac276d1f72c",
+      "kind": "asset"
+    },
+    {
+      "path": "scripts_run_codex_suite.py",
+      "size": 1918,
+      "hash": "d096767fa476",
+      "kind": "code"
+    },
+    {
+      "path": "server/__tests__/geminiProxy.test.ts",
+      "size": 3966,
+      "hash": "6e4f684e445b",
+      "kind": "code"
+    },
+    {
+      "path": "server/index.ts",
+      "size": 8823,
+      "hash": "e246a4a10f95",
+      "kind": "code"
+    },
+    {
+      "path": "services/__tests__/auditLogRepository.integration.test.ts",
+      "size": 2128,
+      "hash": "c4bba8fc0b06",
+      "kind": "code"
+    },
+    {
+      "path": "services/__tests__/authService.test.ts",
+      "size": 3364,
+      "hash": "25e0839998ce",
+      "kind": "code"
+    },
+    {
+      "path": "services/__tests__/chatService.test.ts",
+      "size": 1517,
+      "hash": "8af2cd3c9eef",
+      "kind": "code"
+    },
+    {
+      "path": "services/__tests__/geminiService.test.ts",
+      "size": 2082,
+      "hash": "5fedbaec2d09",
+      "kind": "code"
+    },
+    {
+      "path": "services/__tests__/logger.test.ts",
+      "size": 1349,
+      "hash": "b79d5d7b4819",
+      "kind": "code"
+    },
+    {
+      "path": "services/__tests__/pipelineRegression.test.ts",
+      "size": 3321,
+      "hash": "6ba6047ab9b9",
+      "kind": "code"
+    },
+    {
+      "path": "services/agents/__init__.py",
+      "size": 333,
+      "hash": "323b4319c6d5",
+      "kind": "code"
+    },
+    {
+      "path": "services/agents/async_agent_controller.py",
+      "size": 4651,
+      "hash": "fd24e6edbc8a",
+      "kind": "code"
+    },
+    {
+      "path": "services/agents/efficiency_guard.py",
+      "size": 3970,
+      "hash": "d2448dd3c046",
+      "kind": "code"
+    },
+    {
+      "path": "services/agents/prompt_optimizer.py",
+      "size": 4673,
+      "hash": "108911ac492b",
+      "kind": "code"
+    },
+    {
+      "path": "services/apiClient.ts",
+      "size": 1053,
+      "hash": "a7d176633af1",
+      "kind": "code"
+    },
+    {
+      "path": "services/audit/consistency_checker.py",
+      "size": 5088,
+      "hash": "532370d29390",
+      "kind": "code"
+    },
+    {
+      "path": "services/auditLogRepository.ts",
+      "size": 3377,
+      "hash": "715711fd505d",
+      "kind": "code"
+    },
+    {
+      "path": "services/authService.ts",
+      "size": 1604,
+      "hash": "17ef72ffc235",
+      "kind": "code"
+    },
+    {
+      "path": "services/backendClient.ts",
+      "size": 9954,
+      "hash": "76d5dfd99406",
+      "kind": "code"
+    },
+    {
+      "path": "services/cache/__init__.py",
+      "size": 193,
+      "hash": "13b6e6eb5150",
+      "kind": "code"
+    },
+    {
+      "path": "services/cache/context_cache.py",
+      "size": 5715,
+      "hash": "659bd5048f2c",
+      "kind": "code"
+    },
+    {
+      "path": "services/chatService.ts",
+      "size": 1899,
+      "hash": "47f540e9c5ad",
+      "kind": "code"
+    },
+    {
+      "path": "services/exportService.ts",
+      "size": 1336,
+      "hash": "2f160a358528",
+      "kind": "code"
+    },
+    {
+      "path": "services/exporters/spedExporter.ts",
+      "size": 1622,
+      "hash": "87a3999c85f4",
+      "kind": "code"
+    },
+    {
+      "path": "services/geminiService.ts",
+      "size": 1066,
+      "hash": "4bed75c9b047",
+      "kind": "code"
+    },
+    {
+      "path": "services/importers/nfePublicImporter.ts",
+      "size": 2080,
+      "hash": "a4dac972091e",
+      "kind": "code"
+    },
+    {
+      "path": "services/ingestion/__init__.py",
+      "size": 302,
+      "hash": "3fca1d5aa169",
+      "kind": "code"
+    },
+    {
+      "path": "services/ingestion/preprocessor.py",
+      "size": 4102,
+      "hash": "fbdd12bde715",
+      "kind": "code"
+    },
+    {
+      "path": "services/integrationApi.ts",
+      "size": 1872,
+      "hash": "98f536a4e1dd",
+      "kind": "code"
+    },
+    {
+      "path": "services/integrationStateStore.ts",
+      "size": 4010,
+      "hash": "3a031f061914",
+      "kind": "code"
+    },
+    {
+      "path": "services/llmService.ts",
+      "size": 1476,
+      "hash": "0f1cc0b6e38e",
+      "kind": "code"
+    },
+    {
+      "path": "services/logger.ts",
+      "size": 2191,
+      "hash": "97b54f01403f",
+      "kind": "code"
+    },
+    {
+      "path": "services/ocrService.ts",
+      "size": 379,
+      "hash": "2d0ab837e601",
+      "kind": "code"
+    },
+    {
+      "path": "services/orchestrator/async_controller.py",
+      "size": 15879,
+      "hash": "2d933d2567fe",
+      "kind": "code"
+    },
+    {
+      "path": "services/orchestrator/schemas.py",
+      "size": 4134,
+      "hash": "85c8f401278e",
+      "kind": "code"
+    },
+    {
+      "path": "services/pipeline/index.ts",
+      "size": 992,
+      "hash": "ec014d120802",
+      "kind": "code"
+    },
+    {
+      "path": "services/pipeline/modules/correlation.ts",
+      "size": 3614,
+      "hash": "459aaee87a12",
+      "kind": "code"
+    },
+    {
+      "path": "services/pipeline/modules/dataExtractor.ts",
+      "size": 5295,
+      "hash": "14d3656d9474",
+      "kind": "code"
+    },
+    {
+      "path": "services/pipeline/modules/documentReader.ts",
+      "size": 1317,
+      "hash": "95ceb5f2acf2",
+      "kind": "code"
+    },
+    {
+      "path": "services/pipeline/modules/insights.ts",
+      "size": 3373,
+      "hash": "1155479fcb68",
+      "kind": "code"
+    },
+    {
+      "path": "services/pipeline/promptOptimizer.ts",
+      "size": 2530,
+      "hash": "79dab9511cca",
+      "kind": "code"
+    },
+    {
+      "path": "services/postgresClient.ts",
+      "size": 1931,
+      "hash": "2b5a7d640e81",
+      "kind": "code"
+    },
+    {
+      "path": "services/queues.ts",
+      "size": 1910,
+      "hash": "da3c0e61ac41",
+      "kind": "code"
+    },
+    {
+      "path": "services/reportStorage.ts",
+      "size": 2693,
+      "hash": "ad576ddd1c37",
+      "kind": "code"
+    },
+    {
+      "path": "services/resilience.ts",
+      "size": 3401,
+      "hash": "06ae08f73d0e",
+      "kind": "code"
+    },
+    {
+      "path": "services/sanitizationService.ts",
+      "size": 305,
+      "hash": "cd24ec22c8ea",
+      "kind": "code"
+    },
+    {
+      "path": "services/telemetry.ts",
+      "size": 10040,
+      "hash": "66926067ffe0",
+      "kind": "code"
+    },
+    {
+      "path": "services/telemetryAlerts.ts",
+      "size": 1122,
+      "hash": "4c1a7dcddaf7",
+      "kind": "code"
+    },
+    {
+      "path": "src/types/contracts.d.ts",
+      "size": 4824,
+      "hash": "801129c623d5",
+      "kind": "code"
+    },
+    {
+      "path": "telemetry/config.ts",
+      "size": 1820,
+      "hash": "77607017f204",
+      "kind": "code"
+    },
+    {
+      "path": "telemetry/dashboards/grafana-dashboard.json",
+      "size": 2401,
+      "hash": "aae8a4315ba9",
+      "kind": "config"
+    },
+    {
+      "path": "telemetry/dashboards/kibana-dashboard.json",
+      "size": 1600,
+      "hash": "e219f7d1c9c0",
+      "kind": "config"
+    },
+    {
+      "path": "tests/.gitkeep",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "asset"
+    },
+    {
+      "path": "tsconfig.json",
+      "size": 696,
+      "hash": "edf15af2721e",
+      "kind": "config"
+    },
+    {
+      "path": "types.ts",
+      "size": 6841,
+      "hash": "54e298da04dc",
+      "kind": "code"
+    },
+    {
+      "path": "utils/env.ts",
+      "size": 528,
+      "hash": "8caac41fd5df",
+      "kind": "code"
+    },
+    {
+      "path": "utils/exportConversationUtils.ts",
+      "size": 7697,
+      "hash": "e6a6511ec659",
+      "kind": "code"
+    },
+    {
+      "path": "utils/exportUtils.ts",
+      "size": 15275,
+      "hash": "c27056d538ca",
+      "kind": "code"
+    },
+    {
+      "path": "utils/fileUtils.ts",
+      "size": 0,
+      "hash": "e3b0c44298fc",
+      "kind": "code"
+    },
+    {
+      "path": "utils/fiscalCompare.ts",
+      "size": 15548,
+      "hash": "59e5af544462",
+      "kind": "code"
+    },
+    {
+      "path": "utils/importPipeline.ts",
+      "size": 15858,
+      "hash": "7cead6573282",
+      "kind": "code"
+    },
+    {
+      "path": "utils/parsingUtils.ts",
+      "size": 1186,
+      "hash": "345180840c6b",
+      "kind": "code"
+    },
+    {
+      "path": "utils/rulesDictionary.ts",
+      "size": 4968,
+      "hash": "532c237372a5",
+      "kind": "code"
+    },
+    {
+      "path": "utils/rulesEngine.ts",
+      "size": 4125,
+      "hash": "926e313b49b2",
+      "kind": "code"
+    },
+    {
+      "path": "validator.py",
+      "size": 3318,
+      "hash": "fb12e4857089",
+      "kind": "code"
+    },
+    {
+      "path": "vite.config.ts",
+      "size": 677,
+      "hash": "11a36ce12af8",
+      "kind": "code"
+    }
+  ],
+  "architecture": {
+    "agents_detected": [
+      {
+        "name": "ExtractorAgent",
+        "role": "extract",
+        "artifacts": [
+          "backend/app/agents/extractor.py"
+        ]
+      },
+      {
+        "name": "AuditorAgent",
+        "role": "validate",
+        "artifacts": [
+          "backend/app/agents/auditor.py"
+        ]
+      },
+      {
+        "name": "ClassifierAgent",
+        "role": "classify",
+        "artifacts": [
+          "backend/app/agents/classifier.py"
+        ]
+      },
+      {
+        "name": "AccountantAgent",
+        "role": "automate",
+        "artifacts": [
+          "backend/app/agents/accountant.py"
+        ]
+      },
+      {
+        "name": "IntelligenceAgent",
+        "role": "manage",
+        "artifacts": [
+          "backend/app/agents/intelligence.py",
+          "services/orchestrator/async_controller.py"
+        ]
+      },
+      {
+        "name": "EfficiencyGuardAgent",
+        "role": "manage",
+        "artifacts": [
+          "services/agents/efficiency_guard.py"
+        ]
+      }
+    ],
+    "coordination": {
+      "protocols": [
+        "http",
+        "rest",
+        "sse",
+        "celery"
+      ],
+      "handshakes": [
+        "FastAPI /api/analysis",
+        "SSE /api/orchestrator/state/{job_id}",
+        "Celery pipeline.run"
+      ],
+      "issues": [
+        "CrossValidator agent advertised but not executed in async controller",
+        "Parallel Express proxy (server/index.ts) duplicates orchestration without auth"
+      ]
+    }
+  },
+  "flows": {
+    "expected": [
+      "ocr_nlp",
+      "validate",
+      "classify",
+      "automate",
+      "report"
+    ],
+    "observed": [
+      "extraction",
+      "audit",
+      "classification",
+      "accounting",
+      "insight"
+    ],
+    "gaps": [
+      "missing_step:cross_validator",
+      "ordering_issue:cross_validation_after_accounting"
+    ]
+  },
+  "intelligence": {
+    "ocr": true,
+    "nlp": true,
+    "rules": true,
+    "heuristics": true,
+    "memory_logs": true,
+    "notes": [
+      "IntelligenceAgent run() references undefined optimized_prompt/llm_service/TokenBudgetExceeded causing runtime failure",
+      "Rules engine limited to CFOP whitelist and lacks severity stratification"
+    ]
+  },
+  "backend": {
+    "datastores": [
+      "SQLite via SQLAlchemy",
+      "Local file storage",
+      "Optional S3/MinIO"
+    ],
+    "integrations": [
+      "celery",
+      "redis",
+      "express_erp_proxy"
+    ],
+    "issues": [
+      "Express ERP proxy bypasses FastAPI security controls",
+      "No persistence of generated SPED/ERP exports from pipeline"
+    ]
+  },
+  "ui_interaction": {
+    "dashboards": [
+      "components/Dashboard.tsx",
+      "components/IntegrationStatusPanel.tsx"
+    ],
+    "reports": [
+      "components/DeterministicReportDownloads.tsx",
+      "reports/*.md"
+    ],
+    "accessibility_notes": [
+      "Dashboard lacks explicit ARIA landmarks and relies on color-heavy palette"
+    ]
+  },
+  "security": {
+    "authn": "OAuth2 PKCE with JWT via backend/app/auth.py",
+    "authz": "Role-less, per-session enforcement via get_current_user",
+    "encryption": "AES-256-GCM via SecretVault and EncryptedJsonStore",
+    "audit_logs": true,
+    "issues": [
+      "server/index.ts exposes LLM and ERP endpoints without authentication",
+      "Intelligence agent exception prevents audit logging of insights",
+      "No evidence of encryption for stored uploads beyond filesystem permissions"
+    ]
+  },
+  "performance": {
+    "latency_ms": 0,
+    "throughput": 0,
+    "resource_usage": {
+      "cpu": "n/a",
+      "mem": "n/a"
+    },
+    "robustness_notes": [
+      "EfficiencyGuard collects metrics but lacks exporters",
+      "Load test only checks SPA landing page and omits pipeline"
+    ]
+  },
+  "scoring": {
+    "axes": {
+      "architecture_communication": {
+        "score": 66,
+        "weight": 0.25,
+        "comments": [
+          "Pipeline orchestrator and SSE updates implemented, but crossValidator path unused and duplicate Express orchestrator adds drift"
+        ],
+        "maturity": "medium"
+      },
+      "intelligence_learning": {
+        "score": 48,
+        "weight": 0.2,
+        "comments": [
+          "OCR/NLP agents exist, yet IntelligenceAgent crashes due to undefined symbols and ruleset is minimal"
+        ],
+        "maturity": "low"
+      },
+      "backend_integration": {
+        "score": 46,
+        "weight": 0.15,
+        "comments": [
+          "FastAPI + Celery stack present, but ERP proxy runs out-of-band without security and SPED outputs stay local"
+        ],
+        "maturity": "low"
+      },
+      "interface_interaction": {
+        "score": 60,
+        "weight": 0.15,
+        "comments": [
+          "Rich dashboard and progress UI, albeit accessibility and error surfacing rely on color cues"
+        ],
+        "maturity": "medium"
+      },
+      "security_compliance": {
+        "score": 50,
+        "weight": 0.15,
+        "comments": [
+          "OAuth2/KMS implemented, but unauthenticated Express proxy and missing storage encryption controls weaken posture"
+        ],
+        "maturity": "medium"
+      },
+      "performance_efficiency": {
+        "score": 44,
+        "weight": 0.1,
+        "comments": [
+          "Budget guards configured yet no telemetry exporters and k6 smoke omits pipeline load"
+        ],
+        "maturity": "low"
+      }
+    },
+    "global_score": 54
+  },
+  "semantic_correlations": {
+    "inconsistencies": [
+      "structural_mismatch:Express proxy duplicates backend"
+    ],
+    "flow_breaks": [
+      "agent_handoff_missing:crossValidator"
+    ],
+    "missing_components": [
+      "agent_crossValidator_async",
+      "queue_dedicated_progress"
+    ],
+    "behavior_divergences": [
+      "predicted_vs_implemented:IntelligenceAgent fails before calling LLM"
+    ]
+  },
+  "executive_summary": [
+    "Pipeline core exists but diverges from prescribed agent chain because cross-validation never executes in async controller",
+    "Insight stage is non-functional due to undefined prompt orchestration, collapsing reporting and memory loops",
+    "Parallel Express proxy bypasses backend security, leaving ERP and LLM integrations unaudited"
+  ],
+  "recommendations": [
+    {
+      "action": "Fix IntelligenceAgent dependencies and prompt construction",
+      "priority": "P0",
+      "impact": "high",
+      "effort": "M"
+    },
+    {
+      "action": "Remove or harden Express proxy with shared auth and integrate ERP sync through FastAPI",
+      "priority": "P0",
+      "impact": "high",
+      "effort": "L"
+    },
+    {
+      "action": "Implement crossValidator step within AsyncAgentController before accounting completes",
+      "priority": "P1",
+      "impact": "medium",
+      "effort": "M"
+    },
+    {
+      "action": "Publish EfficiencyGuard metrics and extend k6 tests to cover /api/analysis",
+      "priority": "P1",
+      "impact": "medium",
+      "effort": "S"
+    }
+  ]
+}
