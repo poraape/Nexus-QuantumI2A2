@@ -17,12 +17,20 @@ import {
 
 export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'crossValidator' | 'intelligence' | 'accountant';
 export type AgentStatus = 'pending' | 'running' | 'completed' | 'error';
+export type AgentProgressExtra = Record<string, string | number | boolean>;
+
 export interface AgentProgress {
   step: string;
   current: number;
   total: number;
+  extra?: AgentProgressExtra;
+  labels?: string[];
 }
-export type AgentState = { status: AgentStatus; progress: AgentProgress };
+export type AgentState = {
+  status: AgentStatus;
+  progress: AgentProgress;
+  details?: Record<string, unknown>;
+};
 export type AgentStates = Record<AgentName, AgentState>;
 type ClassificationCorrections = Record<string, ClassificationResult['operationType']>;
 
@@ -37,6 +45,57 @@ export const initialAgentStates: AgentStates = {
 
 export const cloneInitialAgentStates = (): AgentStates =>
   JSON.parse(JSON.stringify(initialAgentStates)) as AgentStates;
+
+const PROGRESS_LABEL_DICTIONARY: Record<string, string> = {
+  documents: 'Documentos processados',
+  documentId: 'Documento',
+  insight: 'Insight',
+  issues: 'Inconsistências',
+  comparisons: 'Comparações',
+  recommendations: 'Recomendações',
+  sections: 'Seções',
+  icms_operations: 'Operações ICMS',
+  confidence: 'Confiança',
+  error: 'Erro',
+};
+
+const toTitleCase = (value: string): string =>
+  value
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .split(' ')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+
+const formatExtraLabel = (key: string, value: string | number | boolean): string => {
+  const label = PROGRESS_LABEL_DICTIONARY[key] ?? toTitleCase(key);
+  if (typeof value === 'boolean') {
+    return `${label}: ${value ? 'Sim' : 'Não'}`;
+  }
+  return `${label}: ${value}`;
+};
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const cloneAgentStates = (states: AgentStates): AgentStates => {
+  const entries = Object.entries(states).map(([agent, state]) => {
+    const clonedState: AgentState = {
+      status: state.status,
+      progress: {
+        step: state.progress.step,
+        current: state.progress.current,
+        total: state.progress.total,
+        extra: state.progress.extra ? { ...state.progress.extra } : undefined,
+        labels: state.progress.labels ? [...state.progress.labels] : undefined,
+      },
+      details: state.details ? { ...state.details } : undefined,
+    };
+    return [agent, clonedState];
+  });
+  return Object.fromEntries(entries) as AgentStates;
+};
 
 export const getDetailedErrorMessage = (error: unknown): string => {
   logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
@@ -72,8 +131,12 @@ export const getDetailedErrorMessage = (error: unknown): string => {
   return 'Ocorreu um erro desconhecido durante a operação.';
 };
 
-const normalizeAgentStates = (states?: Record<string, BackendAgentState | undefined>): AgentStates => {
-  const base = cloneInitialAgentStates();
+const normalizeAgentStates = (
+  states?: Record<string, BackendAgentState | undefined>,
+  previous?: AgentStates,
+): AgentStates => {
+  const fallbackInitial = cloneInitialAgentStates();
+  const base = previous ? cloneAgentStates(previous) : cloneAgentStates(fallbackInitial);
   if (!states) {
     return base;
   }
@@ -82,16 +145,52 @@ const normalizeAgentStates = (states?: Record<string, BackendAgentState | undefi
     if (!backendState) {
       return;
     }
+
     const typedName = name as AgentName;
-    const progress = backendState.progress ?? { step: '', current: 0, total: 0 };
-    (base as Record<string, AgentState>)[typedName] = {
-      status: (backendState.status as AgentStatus) ?? 'pending',
-      progress: {
-        step: progress.step ?? '',
-        current: progress.current ?? 0,
-        total: progress.total ?? 0,
-      },
+    const previousState = base[typedName] ?? fallbackInitial[typedName];
+    const progressPayload = (backendState.progress ?? {}) as Record<string, unknown> & { extra?: unknown };
+    const { step, current, total, extra: extraPayload, ...rest } = progressPayload;
+    const normalizedProgress: AgentProgress = {
+      step: typeof step === 'string' ? step : previousState.progress.step,
+      current: typeof current === 'number' ? current : previousState.progress.current,
+      total: typeof total === 'number' ? total : previousState.progress.total,
     };
+
+    const hasExplicitExtras = extraPayload !== undefined || Object.keys(rest).length > 0;
+    if (hasExplicitExtras) {
+      const combinedExtras: Record<string, unknown> = {
+        ...(isPlainRecord(extraPayload) ? extraPayload : {}),
+        ...rest,
+      };
+      const sanitizedEntries = Object.entries(combinedExtras).filter(([, value]) =>
+        value !== null && value !== undefined &&
+        (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'),
+      ) as [string, string | number | boolean][];
+
+      if (sanitizedEntries.length > 0) {
+        normalizedProgress.extra = sanitizedEntries.reduce<AgentProgressExtra>((acc, [key, value]) => {
+          acc[key] = value;
+          return acc;
+        }, {});
+        normalizedProgress.labels = sanitizedEntries.map(([key, value]) => formatExtraLabel(key, value));
+      } else {
+        normalizedProgress.extra = undefined;
+        normalizedProgress.labels = undefined;
+      }
+    } else if (previousState.progress.extra) {
+      normalizedProgress.extra = { ...previousState.progress.extra };
+      normalizedProgress.labels = previousState.progress.labels ? [...previousState.progress.labels] : undefined;
+    }
+
+    const nextState: AgentState = {
+      status: (backendState.status as AgentStatus) ?? previousState.status,
+      progress: normalizedProgress,
+      details: backendState.details
+        ? (isPlainRecord(backendState.details) ? { ...backendState.details } : previousState.details)
+        : previousState.details,
+    };
+
+    (base as Record<string, AgentState>)[typedName] = nextState;
   });
 
   return base;
@@ -239,7 +338,11 @@ export const useAgentOrchestrator = () => {
         setCurrentJobId(prev => (prev === update.jobId ? prev : update.jobId));
       }
 
-      setAgentStates(normalizeAgentStates(update.agentStates as Record<string, BackendAgentState | undefined>));
+      if (update.agentStates) {
+        setAgentStates(prev =>
+          normalizeAgentStates(update.agentStates as Record<string, BackendAgentState | undefined>, prev),
+        );
+      }
 
       const status = update.status?.toLowerCase();
       if (status === 'completed') {

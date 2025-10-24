@@ -47,6 +47,14 @@
 
 ---
 
+## 📊 Observabilidade Local & Dashboards
+
+* Execute `python -m app.services.audit.report_generator --schedule nightly --output reports/monitoring` para gerar relatórios consolidados das métricas dos agentes, incluindo ajustes aplicados automaticamente pelo EfficiencyGuard.
+* Consulte `docs/guides/observability_dashboards.md` para instruções completas sobre como alimentar dashboards locais e integrar os artefatos gerados aos scripts de revisão.
+* Endpoint opcional para download: `GET /api/monitoring/metrics?format=json` (ou `format=csv&download=1` para exportar planilha pronta para análise offline).
+
+---
+
 ## ⚙️ Configuração
 
 ### Variáveis de Ambiente do Backend

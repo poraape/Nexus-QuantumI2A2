@@ -14,6 +14,7 @@ from ..schemas import DocumentIn
 from ..services.persistence import persist_pipeline_artifacts
 from ..tax import icms_service
 from ..utils import model_dump
+from ..services.orchestrator.budget import TokenBudgetExceeded, TokenBudgetManager
 from .base import build_operations_from_pipeline, serialize_pipeline_result
 from ..orchestrator.state_machine import PipelineRunResult
 
@@ -41,6 +42,9 @@ def _prepare_documents(job_id: uuid.UUID, files: Iterable[Dict[str, object]]) ->
             "origem_uf": file_info.get("origem_uf", "SP"),
             "destino_uf": file_info.get("destino_uf", "SP"),
         }
+        extra_metadata = file_info.get("metadata") if isinstance(file_info, dict) else {}
+        if isinstance(extra_metadata, dict):
+            metadata.update({key: value for key, value in extra_metadata.items() if key not in metadata})
         documents.append(
             DocumentIn(
                 document_id=document_id,
@@ -166,6 +170,9 @@ def run_pipeline(context: Dict[str, object]) -> None:
         return
 
     documents_in = _prepare_documents(job_id, files)
+    budget_context = context.get("token_budget") if isinstance(context, dict) else None
+    budget_manager = TokenBudgetManager.from_context(budget_context)
+    orchestrator = PipelineOrchestrator(budget_manager=budget_manager)
     aggregated_results: List[Dict[str, object]] = []
 
     try:
@@ -193,6 +200,9 @@ def run_pipeline(context: Dict[str, object]) -> None:
             )
 
         _mark_agents_completed(job_id, len(documents_in))
+    except TokenBudgetExceeded as exc:
+        set_job_result(job_id, JobStatus.FAILED, error_message=str(exc))
+        raise
     except Exception as exc:  # pragma: no cover - defensive
         set_job_result(job_id, JobStatus.FAILED, error_message=str(exc))
         raise

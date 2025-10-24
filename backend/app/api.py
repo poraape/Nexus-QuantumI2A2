@@ -5,7 +5,8 @@ import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
-from typing import Annotated, Optional
+from copy import deepcopy
+from typing import Annotated, Dict, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
@@ -115,6 +116,7 @@ async def stream_orchestrator_state(
 ):
     async def event_stream() -> AsyncIterator[str]:
         last_payload: Optional[dict] = None
+        last_agent_states: Dict[str, dict] = {}
         try:
             while True:
                 job = orchestrator.get_job(job_id)
@@ -123,6 +125,25 @@ async def stream_orchestrator_state(
                     return
 
                 payload = _serialize_job(job)
+                agent_states = payload.get("agentStates") if isinstance(payload, dict) else {}
+                if isinstance(agent_states, dict):
+                    for agent, state in agent_states.items():
+                        if not isinstance(state, dict):
+                            continue
+                        previous = last_agent_states.get(agent)
+                        if previous != state:
+                            progress_event = {
+                                "jobId": payload.get("jobId"),
+                                "agent": agent,
+                                "status": state.get("status"),
+                                "progress": state.get("progress", {}),
+                            }
+                            yield f"event: progress\ndata: {json.dumps(progress_event, default=str)}\n\n"
+                    last_agent_states = {
+                        agent: deepcopy(state) if isinstance(state, dict) else {}
+                        for agent, state in agent_states.items()
+                    }
+
                 if payload != last_payload:
                     data = json.dumps(payload, default=str)
                     yield f"event: state\ndata: {data}\n\n"

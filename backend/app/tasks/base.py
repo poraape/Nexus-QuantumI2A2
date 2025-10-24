@@ -8,13 +8,15 @@ from ..models import AgentStatus, JobStatus
 from ..orchestrator.state_machine import PipelineOrchestrator, PipelineRunResult
 from ..progress import set_job_result, update_agent
 from ..schemas import DocumentIn
+from ..services.orchestrator.budget import TokenBudgetManager
 from ..utils import model_dump
 
 
 def execute_pipeline(job_id: uuid.UUID, document_data: Dict[str, Any]) -> PipelineRunResult:
     """Run the synchronous pipeline orchestrator for a given document payload."""
 
-    orchestrator = PipelineOrchestrator()
+    budget_manager = TokenBudgetManager.from_settings()
+    orchestrator = PipelineOrchestrator(budget_manager=budget_manager)
     document = DocumentIn(**document_data)
     return orchestrator.run(document)
 
