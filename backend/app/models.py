@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Optional
 
@@ -54,6 +54,10 @@ class AnalysisJob(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class StoredFile(Base):
     """Metadata for uploaded files saved to disk."""
 
@@ -64,4 +68,26 @@ class StoredFile(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     path: Mapped[str] = mapped_column(String(1000), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class AuditEvent(Base):
+    """Immutable audit trail record for events ingested via the API."""
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent: Mapped[str] = mapped_column(String(150), nullable=False)
+    level: Mapped[str] = mapped_column(String(16), nullable=False)
+    message: Mapped[str] = mapped_column(String(2000), nullable=False)
+    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    correlation_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    scope: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    event_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    signature: Mapped[str] = mapped_column(String(128), nullable=False)
+    public_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    ingest_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    parent_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
