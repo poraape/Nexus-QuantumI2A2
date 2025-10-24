@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Optional
 
 from pydantic import BaseModel
+
+from ..utils import model_dump
 
 LOG_PATH = Path("artifacts/logs/totals_diagnostic.json")
 FIX_REPORT_PATH = Path("artifacts/fix_reports/null_total_correction.json")
@@ -17,7 +20,7 @@ def _serialize_totals(totals: Optional[Any]) -> Optional[dict[str, Any]]:
     if totals is None:
         return None
     if isinstance(totals, BaseModel):
-        return totals.model_dump()
+        return model_dump(totals)
     if isinstance(totals, Mapping):
         return dict(totals)
     if hasattr(totals, "__dict__"):

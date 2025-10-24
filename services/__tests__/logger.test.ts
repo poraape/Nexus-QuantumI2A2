@@ -1,8 +1,23 @@
 import { logger } from '../logger';
 
 describe('LoggerService', () => {
+  const originalFetch = global.fetch;
+
   beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => ({ stored: 1, ingestToken: 'token-123' }),
+    }) as unknown as typeof fetch;
     logger.clear();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch as typeof fetch;
   });
 
   it('records logs and notifies subscribers', () => {
