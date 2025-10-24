@@ -15,7 +15,14 @@ except ModuleNotFoundError:  # pragma: no cover - lightweight fallback
     SQLALCHEMY_AVAILABLE = False
     Session = object  # type: ignore[assignment]
 
-from .models import DEFAULT_AGENT_STATES, AgentStatus, AnalysisJob, JobStatus
+from .models import (
+    DEFAULT_AGENT_STATES,
+    AgentStatus,
+    AnalysisJob,
+    ClassificationCorrection,
+    JobStatus,
+    OperationType,
+)
 
 if SQLALCHEMY_AVAILABLE:
 

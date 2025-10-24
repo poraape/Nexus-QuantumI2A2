@@ -38,6 +38,15 @@ class AgentStatus(str, Enum):
     ERROR = "error"
 
 
+class OperationType(str, Enum):
+    COMPRA = "Compra"
+    VENDA = "Venda"
+    DEVOLUCAO = "Devolução"
+    SERVICO = "Serviço"
+    TRANSFERENCIA = "Transferência"
+    OUTROS = "Outros"
+
+
 DEFAULT_AGENT_STATES: Dict[str, Dict[str, object]] = {
     "ocr": {"status": AgentStatus.PENDING.value, "progress": {"step": "Aguardando arquivos", "current": 0, "total": 0}},
     "auditor": {"status": AgentStatus.PENDING.value, "progress": {}},

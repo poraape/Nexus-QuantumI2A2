@@ -1,5 +1,5 @@
 import { ensureSession } from './authService';
-import type { AuditReport } from '../types';
+import type { AuditReport, ClassificationResult } from '../types';
 import type { AgentStateContract, AnalysisJobContract } from '../src/types/contracts';
 
 export type BackendAgentStatus = AgentStateContract['status'];
@@ -16,6 +16,19 @@ export interface JobStateSubscriptionOptions {
     onUpdate: JobStateUpdateHandler;
     onError?: JobStateErrorHandler;
     signal?: AbortSignal;
+}
+
+export interface ClassificationCorrectionRecord {
+    documentName: string;
+    operationType: ClassificationResult['operationType'];
+    createdBy: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ClassificationCorrectionsResponse {
+    jobId: string;
+    corrections: ClassificationCorrectionRecord[];
 }
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
@@ -73,6 +86,37 @@ export async function fetchProgress(jobId: string): Promise<AnalysisJobResponse>
         error: payload.error,
         result: payload.result ?? null,
     } as AnalysisJobResponse;
+}
+
+export async function fetchClassificationCorrections(jobId: string): Promise<ClassificationCorrectionsResponse> {
+    await ensureSession();
+    const response = await fetch(withBase(`/api/analysis/${jobId}/corrections`), {
+        credentials: 'include',
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Falha ao carregar correções de classificação.');
+    }
+    return (await response.json()) as ClassificationCorrectionsResponse;
+}
+
+export async function persistClassificationCorrection(
+    jobId: string,
+    documentName: string,
+    operationType: ClassificationResult['operationType'],
+): Promise<ClassificationCorrectionsResponse> {
+    await ensureSession();
+    const response = await fetch(withBase(`/api/analysis/${jobId}/corrections`), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentName, operationType }),
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Falha ao salvar a correção de classificação.');
+    }
+    return (await response.json()) as ClassificationCorrectionsResponse;
 }
 
 export function subscribeToJobState(jobId: string, options: JobStateSubscriptionOptions): () => void {

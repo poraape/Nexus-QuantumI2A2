@@ -9,10 +9,13 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from .auth import get_current_user, issue_auth_cookies
 from .config import get_settings
-from .models import AnalysisJob
+from .crud import list_corrections, upsert_correction
+from .database import get_session
+from .models import AnalysisJob, ClassificationCorrection, OperationType
 from .orchestrator import PipelineOrchestrator, orchestrator
 from .services.session import SpaSessionManager, get_session_manager
 
@@ -27,6 +30,24 @@ UploadedFiles = Annotated[list[UploadFile], File(...)]
 OrchestratorDep = Annotated[PipelineOrchestrator, Depends(get_orchestrator)]
 CurrentUserDep = Annotated[str, Depends(get_current_user)]
 SessionManagerDep = Annotated[SpaSessionManager, Depends(get_session_manager)]
+
+
+class CorrectionRequest(BaseModel):
+    documentName: str = Field(..., min_length=1)
+    operationType: OperationType
+
+
+class CorrectionResponse(BaseModel):
+    documentName: str
+    operationType: OperationType
+    createdBy: str
+    createdAt: str
+    updatedAt: str
+
+
+class CorrectionsEnvelope(BaseModel):
+    jobId: str
+    corrections: list[CorrectionResponse]
 
 
 @router.post("/analysis")
@@ -118,6 +139,52 @@ async def stream_orchestrator_state(
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+@router.get("/analysis/{job_id}/corrections", response_model=CorrectionsEnvelope)
+async def get_analysis_corrections(
+    job_id: uuid.UUID,
+    orchestrator: OrchestratorDep,
+    _: CurrentUserDep,
+) -> CorrectionsEnvelope:
+    job = orchestrator.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Análise não encontrada")
+
+    with get_session() as session:
+        corrections = list_corrections(session, job_id)
+
+    return CorrectionsEnvelope(
+        jobId=str(job_id),
+        corrections=[_serialize_correction(correction) for correction in corrections],
+    )
+
+
+@router.post("/analysis/{job_id}/corrections", response_model=CorrectionsEnvelope)
+async def post_analysis_correction(
+    job_id: uuid.UUID,
+    payload: CorrectionRequest,
+    orchestrator: OrchestratorDep,
+    user: CurrentUserDep,
+) -> CorrectionsEnvelope:
+    job = orchestrator.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Análise não encontrada")
+
+    with get_session() as session:
+        correction = upsert_correction(
+            session,
+            job_id,
+            payload.documentName,
+            payload.operationType,
+            user,
+        )
+        corrections = list_corrections(session, job_id)
+
+    return CorrectionsEnvelope(
+        jobId=str(job_id),
+        corrections=[_serialize_correction(item) for item in corrections],
+    )
+
+
 def _serialize_job(job: AnalysisJob) -> dict:
     return {
         "jobId": str(job.id),
@@ -128,3 +195,13 @@ def _serialize_job(job: AnalysisJob) -> dict:
         "createdAt": job.created_at.isoformat() if job.created_at else None,
         "updatedAt": job.updated_at.isoformat() if job.updated_at else None,
     }
+
+
+def _serialize_correction(correction: ClassificationCorrection) -> CorrectionResponse:
+    return CorrectionResponse(
+        documentName=correction.document_name,
+        operationType=correction.operation_type,
+        createdBy=correction.created_by,
+        createdAt=correction.created_at.isoformat(),
+        updatedAt=correction.updated_at.isoformat(),
+    )

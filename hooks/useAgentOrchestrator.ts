@@ -8,8 +8,11 @@ import { telemetry } from '../services/telemetry';
 import {
   startAnalysis,
   subscribeToJobState,
+  fetchClassificationCorrections,
+  persistClassificationCorrection,
   type AnalysisJobResponse,
   type BackendAgentState,
+  type ClassificationCorrectionRecord,
 } from '../services/backendClient';
 
 export type AgentName = 'ocr' | 'auditor' | 'classifier' | 'crossValidator' | 'intelligence' | 'accountant';
@@ -34,8 +37,6 @@ export const initialAgentStates: AgentStates = {
 
 export const cloneInitialAgentStates = (): AgentStates =>
   JSON.parse(JSON.stringify(initialAgentStates)) as AgentStates;
-
-const CORRECTIONS_STORAGE_KEY = 'nexus-classification-corrections';
 
 export const getDetailedErrorMessage = (error: unknown): string => {
   logger.log('ErrorHandler', 'ERROR', 'Analisando erro da aplicação.', { error });
@@ -105,37 +106,92 @@ export const useAgentOrchestrator = () => {
   const [pipelineError, setPipelineError] = useState(false);
   const [isPipelineComplete, setIsPipelineComplete] = useState(false);
   const [isPipelineRunning, setIsPipelineRunning] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [classificationCorrections, setClassificationCorrections] = useState<ClassificationCorrections>({});
+  const [, setCorrectionAuditTrail] = useState<Record<string, ClassificationCorrectionRecord>>({});
 
   const chatRef = useRef<ChatSession | null>(null);
   const chatJobIdRef = useRef<string | null>(null);
   const subscriptionAbortRef = useRef<AbortController | null>(null);
   const subscriptionCleanupRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    const correlationId = telemetry.createCorrelationId('backend');
-    try {
-      const storedCorrections = localStorage.getItem(CORRECTIONS_STORAGE_KEY);
-      if (storedCorrections) {
-        const parsed = JSON.parse(storedCorrections) as ClassificationCorrections;
-        setClassificationCorrections(parsed);
-        logger.log(
-          'Orchestrator',
-          'INFO',
-          `Carregadas ${Object.keys(parsed).length} correções de classificação do localStorage.`,
-          undefined,
-          { correlationId, scope: 'backend' },
-        );
-      }
-    } catch (e) {
-      logger.log('Orchestrator', 'ERROR', 'Falha ao carregar correções do localStorage.', { error: e }, { correlationId, scope: 'backend' });
-    }
-  }, []);
-
   useEffect(() => () => {
     subscriptionAbortRef.current?.abort();
     subscriptionCleanupRef.current?.();
   }, []);
+
+  const applyCorrectionsToReport = useCallback(
+    (report: AuditReport, corrections: ClassificationCorrections): AuditReport => {
+      if (!report || Object.keys(corrections).length === 0) {
+        return report;
+      }
+
+      let changed = false;
+      const documents = report.documents.map(doc => {
+        const correction = corrections[doc.doc.name];
+        if (correction && doc.classification && doc.classification.operationType !== correction) {
+          changed = true;
+          return {
+            ...doc,
+            classification: { ...doc.classification, operationType: correction, confidence: 1.0 },
+          };
+        }
+        return doc;
+      });
+
+      if (!changed) {
+        return report;
+      }
+
+      return { ...report, documents };
+    },
+    [],
+  );
+
+  const syncCorrectionsFromRecords = useCallback(
+    (records: ClassificationCorrectionRecord[]) => {
+      const nextMap: ClassificationCorrections = {};
+      const auditMap: Record<string, ClassificationCorrectionRecord> = {};
+
+      records.forEach(record => {
+        nextMap[record.documentName] = record.operationType;
+        auditMap[record.documentName] = record;
+      });
+
+      setClassificationCorrections(nextMap);
+      setCorrectionAuditTrail(auditMap);
+      setAuditReport(prev => (prev ? applyCorrectionsToReport(prev, nextMap) : prev));
+      return nextMap;
+    },
+    [applyCorrectionsToReport],
+  );
+
+  const loadCorrections = useCallback(
+    async (jobId: string) => {
+      const correlationId = telemetry.createCorrelationId('backend');
+      try {
+        const response = await fetchClassificationCorrections(jobId);
+        const map = syncCorrectionsFromRecords(response.corrections);
+        logger.log(
+          'Orchestrator',
+          'INFO',
+          `Correções persistidas sincronizadas (${Object.keys(map).length}).`,
+          undefined,
+          { correlationId, scope: 'backend' },
+        );
+      } catch (err) {
+        syncCorrectionsFromRecords([]);
+        logger.log(
+          'Orchestrator',
+          'ERROR',
+          'Falha ao carregar correções persistidas.',
+          { error: err },
+          { correlationId, scope: 'backend' },
+        );
+      }
+    },
+    [syncCorrectionsFromRecords],
+  );
 
   const initializeChatFromReport = useCallback(
     async (report: AuditReport, jobId?: string) => {
@@ -179,6 +235,10 @@ export const useAgentOrchestrator = () => {
         return;
       }
 
+      if (update.jobId) {
+        setCurrentJobId(prev => (prev === update.jobId ? prev : update.jobId));
+      }
+
       setAgentStates(normalizeAgentStates(update.agentStates as Record<string, BackendAgentState | undefined>));
 
       const status = update.status?.toLowerCase();
@@ -204,13 +264,17 @@ export const useAgentOrchestrator = () => {
       }
 
       if (Object.prototype.hasOwnProperty.call(update, 'result')) {
-        setAuditReport((update.result ?? null) as AuditReport | null);
-        if (update.result) {
-          void initializeChatFromReport(update.result as AuditReport, update.jobId);
+        const result = update.result as AuditReport | null | undefined;
+        if (result) {
+          const hydratedReport = applyCorrectionsToReport(result, classificationCorrections);
+          setAuditReport(hydratedReport);
+          void initializeChatFromReport(hydratedReport, update.jobId);
+        } else {
+          setAuditReport(null);
         }
       }
     },
-    [initializeChatFromReport],
+    [applyCorrectionsToReport, classificationCorrections, initializeChatFromReport],
   );
 
   const resetSubscription = useCallback(() => {
@@ -245,12 +309,18 @@ export const useAgentOrchestrator = () => {
       setMessages([]);
       setIsPipelineComplete(false);
       setIsPipelineRunning(true);
+      setCurrentJobId(null);
+      syncCorrectionsFromRecords([]);
 
       const abortController = new AbortController();
       subscriptionAbortRef.current = abortController;
 
       try {
         const job = await startAnalysis(files);
+        if (job.jobId) {
+          setCurrentJobId(job.jobId);
+          void loadCorrections(job.jobId);
+        }
         applyBackendUpdate(job);
 
         subscriptionCleanupRef.current = subscribeToJobState(job.jobId, {
@@ -306,7 +376,7 @@ export const useAgentOrchestrator = () => {
   }, []);
 
   const handleClassificationChange = useCallback(
-    (docName: string, newClassification: ClassificationResult['operationType']) => {
+    async (docName: string, newClassification: ClassificationResult['operationType']) => {
       setAuditReport(prevReport => {
         if (!prevReport) return null;
         const updatedDocs = prevReport.documents.map(doc => {
@@ -321,23 +391,33 @@ export const useAgentOrchestrator = () => {
         return { ...prevReport, documents: updatedDocs };
       });
 
-      const newCorrections = { ...classificationCorrections, [docName]: newClassification };
-      setClassificationCorrections(newCorrections);
+      setClassificationCorrections(prev => ({ ...prev, [docName]: newClassification }));
+
+      if (!currentJobId) {
+        logger.log('Orchestrator', 'WARN', `Correção aplicada sem jobId ativo para '${docName}'.`, undefined, {
+          correlationId: telemetry.createCorrelationId('backend'),
+          scope: 'backend',
+        });
+        return;
+      }
+
+      const correlationId = telemetry.createCorrelationId('backend');
       try {
-        localStorage.setItem(CORRECTIONS_STORAGE_KEY, JSON.stringify(newCorrections));
-        logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva.`, undefined, {
-          correlationId: telemetry.createCorrelationId('backend'),
+        const response = await persistClassificationCorrection(currentJobId, docName, newClassification);
+        syncCorrectionsFromRecords(response.corrections);
+        logger.log('Orchestrator', 'INFO', `Correção de classificação para '${docName}' salva no backend.`, undefined, {
+          correlationId,
           scope: 'backend',
         });
-      } catch (e) {
-        logger.log('Orchestrator', 'ERROR', 'Falha ao salvar correção no localStorage.', { error: e }, {
-          correlationId: telemetry.createCorrelationId('backend'),
+      } catch (err) {
+        logger.log('Orchestrator', 'ERROR', 'Falha ao salvar correção no backend.', { error: err }, {
+          correlationId,
           scope: 'backend',
         });
-        setError('Não foi possível salvar a correção de classificação. Ela será perdida ao recarregar a página.');
+        setError('Não foi possível salvar a correção de classificação no servidor.');
       }
     },
-    [classificationCorrections],
+    [currentJobId, setError, syncCorrectionsFromRecords],
   );
 
   const reset = useCallback(() => {
@@ -351,6 +431,9 @@ export const useAgentOrchestrator = () => {
     setMessages([]);
     setIsPipelineComplete(false);
     setIsPipelineRunning(false);
+    setCurrentJobId(null);
+    setClassificationCorrections({});
+    setCorrectionAuditTrail({});
   }, [resetSubscription]);
 
   return {

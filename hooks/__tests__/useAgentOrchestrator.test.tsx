@@ -7,10 +7,14 @@ const mockStartAnalysis = jest.fn();
 const mockSubscribeToJobState = jest.fn();
 const mockStartChat = jest.fn();
 const mockRequestChatMessage = jest.fn();
+const mockFetchCorrections = jest.fn();
+const mockPersistCorrection = jest.fn();
 
 jest.mock('../../services/backendClient', () => ({
   startAnalysis: (...args: any[]) => mockStartAnalysis(...args),
   subscribeToJobState: (...args: any[]) => mockSubscribeToJobState(...args),
+  fetchClassificationCorrections: (...args: any[]) => mockFetchCorrections(...args),
+  persistClassificationCorrection: (...args: any[]) => mockPersistCorrection(...args),
 }));
 
 jest.mock('../../services/chatService', () => ({
@@ -59,6 +63,8 @@ describe('useAgentOrchestrator', () => {
     jest.clearAllMocks();
     localStorage.clear();
     lastSubscription = null;
+    mockFetchCorrections.mockResolvedValue({ jobId: 'job-1', corrections: [] });
+    mockPersistCorrection.mockResolvedValue({ jobId: 'job-1', corrections: [] });
     mockSubscribeToJobState.mockImplementation((_jobId: string, handlers: any) => {
       lastSubscription = handlers;
       return jest.fn();
@@ -118,9 +124,11 @@ describe('useAgentOrchestrator', () => {
 
     await act(async () => {
       await result.current.runPipeline([file]);
+      await Promise.resolve();
     });
 
     expect(mockStartAnalysis).toHaveBeenCalledWith([file]);
+    expect(mockFetchCorrections).toHaveBeenCalledWith('job-1');
     expect(mockSubscribeToJobState).toHaveBeenCalledWith(
       'job-1',
       expect.objectContaining({ onUpdate: expect.any(Function) }),
@@ -158,6 +166,7 @@ describe('useAgentOrchestrator', () => {
 
     await act(async () => {
       await result.current.runPipeline([file]);
+      await Promise.resolve();
     });
 
     await act(async () => {
@@ -170,13 +179,26 @@ describe('useAgentOrchestrator', () => {
       await Promise.resolve();
     });
 
+    mockPersistCorrection.mockResolvedValue({
+      jobId: 'job-1',
+      corrections: [
+        {
+          documentName: 'doc-1.xml',
+          operationType: 'Compra',
+          createdBy: 'tester',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ],
+    });
+
     await act(async () => {
-      result.current.handleClassificationChange('doc-1.xml', 'Compra');
+      await result.current.handleClassificationChange('doc-1.xml', 'Compra');
     });
 
     const updatedDoc = result.current.auditReport?.documents[0] as AuditedDocument;
     expect(updatedDoc.classification?.operationType).toBe('Compra');
-    expect(localStorage.getItem('nexus-classification-corrections')).toContain('Compra');
+    expect(mockPersistCorrection).toHaveBeenCalledWith('job-1', 'doc-1.xml', 'Compra');
   });
 
   it('returns friendly error when chat is not initialized', async () => {
