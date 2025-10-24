@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 from collections import defaultdict
 from threading import Lock
 from typing import DefaultDict, Dict, Iterable, Mapping, MutableMapping, Optional
+
+from pydantic import ValidationError
 
 _OTEL_AVAILABLE = importlib.util.find_spec("opentelemetry") is not None
 
@@ -24,6 +27,8 @@ else:  # pragma: no cover - lightweight environments
     ResourceAttributes = None  # type: ignore[assignment]
 
 from .config import get_settings
+
+logger = logging.getLogger(__name__)
 
 MetricAttributes = MutableMapping[str, object]
 
@@ -63,7 +68,16 @@ class TelemetryService:
             if self._initialized:
                 return
 
-            settings = get_settings()
+            try:
+                settings = get_settings()
+            except ValidationError:
+                self._disabled = True
+                self._initialized = True
+                logger.warning(
+                    "Telemetry disabled: incomplete settings detected during initialization",
+                    exc_info=True,
+                )
+                return
             if not settings.telemetry_enabled or not _OTEL_AVAILABLE:
                 self._disabled = True
                 self._initialized = True
