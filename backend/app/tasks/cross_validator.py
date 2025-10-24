@@ -17,9 +17,17 @@ def run_cross_validator(payload: Dict[str, object]) -> Dict[str, object]:
     job_id = uuid.UUID(payload["job_id"])
     update_agent(job_id, "crossValidator", AgentStatus.RUNNING, step="Executando validação cruzada")
     pipeline_result = ensure_pipeline_result(job_id, payload)
-    operations = build_operations_from_pipeline(pipeline_result)
-    if operations:
-        pipeline_result["operations"] = operations
+    cross_validation = pipeline_result.get("cross_validation")
+    operations = []
+    if isinstance(cross_validation, dict):
+        operations = cross_validation.get("operations", [])  # type: ignore[assignment]
+
+    if not operations:
+        operations = build_operations_from_pipeline(pipeline_result)
+        if operations:
+            cross_validation = cross_validation or {}
+            cross_validation["operations"] = operations
+            pipeline_result["cross_validation"] = cross_validation
     update_agent(
         job_id,
         "crossValidator",

@@ -8,6 +8,7 @@ from typing import Any, Mapping, Optional
 from app.agents.accountant import AccountantAgent
 from app.agents.auditor import AuditorAgent
 from app.agents.classifier import ClassifierAgent
+from app.agents.cross_validator import CrossValidatorAgent
 from app.agents.extractor import ExtractorAgent
 from app.agents.intelligence import IntelligenceAgent
 from app.core.totals import ensure_document_totals, to_float, totals_as_dict
@@ -15,6 +16,7 @@ from app.schemas import (
     AccountingOutput,
     AuditReport,
     ClassificationResult,
+    CrossValidationReport,
     Document,
     DocumentIn,
     InsightReport,
@@ -34,6 +36,7 @@ class PipelineRunResult:
     audit: AuditReport
     classification: ClassificationResult
     accounting: AccountingOutput
+    cross_validation: CrossValidationReport
     insight: InsightReport
 
 
@@ -50,6 +53,7 @@ class PipelineOrchestrator:
         self.auditor = AuditorAgent()
         self.classifier = ClassifierAgent()
         self.accountant = AccountantAgent()
+        self.cross_validator = CrossValidatorAgent()
         self.intelligence = IntelligenceAgent(prompt_optimizer=self.prompt_optimizer)
 
     def _consume_stage(self, agent: str, step: str, metadata: Mapping[str, Any] | None) -> None:
@@ -157,12 +161,15 @@ class PipelineOrchestrator:
         )
 
         self._consume_stage("crossValidator", "consistency", metadata)
+        cross_validation = self.cross_validator.run(document, audit, classification, accounting)
+        self._consume_stage("intelligence", "insight", metadata)
         insights = self.intelligence.run(accounting, budget_manager=self.budget_manager)
         return PipelineRunResult(
             document=document,
             audit=audit,
             classification=classification,
             accounting=accounting,
+            cross_validation=cross_validation,
             insight=insights,
         )
 

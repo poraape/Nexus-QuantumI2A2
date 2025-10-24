@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -93,6 +93,24 @@ class OrchestratorEvent(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class CrossValidationFinding(BaseModel):
+    code: str = Field(..., description="Identificador da regra disparada")
+    message: str = Field(..., description="Mensagem de inconsistência detectada")
+    severity: str = Field(default="warning", description="Nível de severidade")
+    context: Dict[str, Any] = Field(default_factory=dict, description="Contexto adicional")
+
+
+class CrossValidationReport(BaseModel):
+    document_id: str
+    operations: List[Dict[str, Any]] = Field(default_factory=list)
+    findings: List[CrossValidationFinding] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    @property
+    def has_findings(self) -> bool:
+        return bool(self.findings)
+
+
 __all__ = [
     "DocumentIn",
     "Document",
@@ -105,4 +123,6 @@ __all__ = [
     "InsightReport",
     "InsightReference",
     "OrchestratorEvent",
+    "CrossValidationReport",
+    "CrossValidationFinding",
 ]

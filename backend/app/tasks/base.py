@@ -29,6 +29,7 @@ def serialize_pipeline_result(result: PipelineRunResult) -> Dict[str, Any]:
         "audit": model_dump(result.audit),
         "classification": model_dump(result.classification),
         "accounting": model_dump(result.accounting),
+        "cross_validation": model_dump(result.cross_validation),
         "insight": model_dump(result.insight),
     }
 
