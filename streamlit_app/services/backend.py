@@ -45,20 +45,26 @@ class BackendClient:
         raise BackendError(message or f"Request failed with status {response.status_code}")
 
     def _post(self, path: str, **kwargs: Any) -> Response:
-        response = self.session.post(
-            self.config.endpoint(path),
-            timeout=self.config.timeout,
-            **kwargs,
-        )
+        try:
+            response = self.session.post(
+                self.config.endpoint(path),
+                timeout=self.config.timeout,
+                **kwargs,
+            )
+        except requests.RequestException as exc:  # noqa: PERF203 - explicit translation
+            raise BackendError("Falha de rede ao contatar o backend.") from exc
         self._raise_for_status(response)
         return response
 
     def _get(self, path: str, **kwargs: Any) -> Response:
-        response = self.session.get(
-            self.config.endpoint(path),
-            timeout=self.config.timeout,
-            **kwargs,
-        )
+        try:
+            response = self.session.get(
+                self.config.endpoint(path),
+                timeout=self.config.timeout,
+                **kwargs,
+            )
+        except requests.RequestException as exc:  # noqa: PERF203 - explicit translation
+            raise BackendError("Falha de rede ao contatar o backend.") from exc
         self._raise_for_status(response)
         return response
 
@@ -139,24 +145,38 @@ class IntegrationClient:
         retry=retry_if_exception_type(requests.RequestException),
         reraise=True,
     )
+    def _fetch_status_with_retry(self) -> Response:
+        return self.session.get(
+            f"{self.base_url}/api/integrations/status", timeout=self.timeout
+        )
+
     def fetch_status(self) -> Dict[str, Any]:
-        response = self.session.get(f"{self.base_url}/api/integrations/status", timeout=self.timeout)
+        try:
+            response = self._fetch_status_with_retry()
+        except RetryError as exc:
+            raise BackendError("Serviço de integrações indisponível no momento.") from exc
         return self._handle(response)
 
     def enqueue_import(self, erp: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        response = self.session.post(
-            f"{self.base_url}/api/integrations/{erp.lower()}/import",
-            json=payload,
-            timeout=self.timeout,
-        )
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/integrations/{erp.lower()}/import",
+                json=payload,
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:  # noqa: PERF203 - explicit translation
+            raise BackendError("Falha de rede ao enviar job de importação.") from exc
         return self._handle(response)
 
     def enqueue_export(self, erp: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        response = self.session.post(
-            f"{self.base_url}/api/integrations/{erp.lower()}/export",
-            json=payload,
-            timeout=self.timeout,
-        )
+        try:
+            response = self.session.post(
+                f"{self.base_url}/api/integrations/{erp.lower()}/export",
+                json=payload,
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:  # noqa: PERF203 - explicit translation
+            raise BackendError("Falha de rede ao enviar job de exportação.") from exc
         return self._handle(response)
 
 

@@ -9,7 +9,7 @@ import streamlit as st
 
 DEFAULT_BACKEND_URL = "http://localhost:8000"
 DEFAULT_API_PREFIX = "/api"
-DEFAULT_MAS_URL = "http://localhost:3001"
+DEFAULT_MAS_URL = "http://localhost:4000"
 
 
 @dataclass
