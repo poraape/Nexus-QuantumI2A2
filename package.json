@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
-    "test": "jest --coverage",
+    "test": "jest --coverage --config jest.config.cjs",
     "e2e": "start-server-and-test preview http://localhost:4173 cypress run",
     "load": "k6 run --summary-export=reports/performance/k6-summary.json load-tests/pipeline.load.js",
     "report:quality": "node scripts/publishQualityReport.mjs"

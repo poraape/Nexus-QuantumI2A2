@@ -10,9 +10,7 @@ from app.agents.base import Agent, retryable
 from app.core.totals import ensure_document_totals, to_float, totals_as_dict
 from app.schemas import InsightReference, InsightReport
 from app.services.diagnostic_logger import log_totals_event
-from app.services.llm_service import service as llm_service
-from app.services.orchestrator.budget import TokenBudgetExceeded, TokenBudgetManager
-from app.services.orchestrator.prompt_optimizer import PromptOptimizer
+from app.services.agents.response_agent import response_agent_service
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +72,8 @@ class IntelligenceAgent(Agent):
                 status="ready",
             )
 
-            context_chunks = self._build_context(accounting_output)
-            max_tokens = 2048
-            if budget_manager:
-                remaining = budget_manager.remaining_for_step(self.name, "analysis")
-                if remaining:
-                    max_tokens = max(128, remaining)
-
-            optimized_prompt = self.prompt_optimizer.optimize(
-                "Gere resumo executivo",
-                context_chunks,
-                max_tokens=max_tokens,
+            response_agent_service.generate_structured_response(
+                prompt="Gere resumo executivo", schema={"type": "object", "properties": {}}
             )
             prompt_tokens = self.prompt_optimizer.estimate_tokens(optimized_prompt)
 

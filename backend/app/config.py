@@ -4,9 +4,18 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
-from pydantic import BaseSettings, Field, validator
+from pydantic import BaseModel, BaseSettings, Field, validator
+
+
+class EfficiencyThreshold(BaseModel):
+    """Threshold configuration used by the runtime EfficiencyGuard."""
+
+    latency_ms: float = 2500.0
+    error_rate: float = 0.15
+    throughput_min: float = 1.0
+    consecutive_retries: int = 3
 
 
 class Settings(BaseSettings):
@@ -25,6 +34,20 @@ class Settings(BaseSettings):
     telemetry_export_interval_ms: int = Field(15000, env="TELEMETRY_EXPORT_INTERVAL_MS")
     otel_exporter_otlp_endpoint: str = Field("http://localhost:4318", env="OTEL_EXPORTER_OTLP_ENDPOINT")
     otel_exporter_otlp_headers: Optional[str] = Field(None, env="OTEL_EXPORTER_OTLP_HEADERS")
+
+    # Efficiency guard / adaptive tuning
+    efficiency_guard_enabled: bool = Field(True, env="EFFICIENCY_GUARD_ENABLED")
+    efficiency_guard_max_timeout_ms: int = Field(180_000, env="EFFICIENCY_GUARD_MAX_TIMEOUT_MS")
+    efficiency_guard_timeout_step_ms: int = Field(1_000, env="EFFICIENCY_GUARD_TIMEOUT_STEP_MS")
+    efficiency_thresholds: Dict[str, EfficiencyThreshold] = Field(
+        default_factory=lambda: {
+            "default": EfficiencyThreshold(),
+            "llm": EfficiencyThreshold(latency_ms=2_000, error_rate=0.10, throughput_min=1.0, consecutive_retries=3),
+            "ocr": EfficiencyThreshold(latency_ms=4_000, error_rate=0.12, throughput_min=1.0, consecutive_retries=3),
+            "erp": EfficiencyThreshold(latency_ms=3_000, error_rate=0.08, throughput_min=1.0, consecutive_retries=2),
+        },
+        env="EFFICIENCY_THRESHOLDS",
+    )
 
     # OAuth2 / JWT configuration
     jwt_secret_key: str = Field(..., env="JWT_SECRET_KEY")
@@ -136,35 +159,15 @@ class Settings(BaseSettings):
             raise ValueError("COOKIE_SAMESITE must be one of: lax, none, strict")
         return normalized
 
-    @validator("token_budget_per_agent", pre=True)
-    def parse_agent_budget(cls, value: str | dict[str, int]) -> dict[str, int]:
+    @validator("efficiency_thresholds", pre=True)
+    def parse_efficiency_thresholds(cls, value: object) -> Dict[str, EfficiencyThreshold]:
         if isinstance(value, str):
             try:
                 parsed = json.loads(value)
-            except json.JSONDecodeError as exc:  # pragma: no cover - defensive
-                raise ValueError("TOKEN_BUDGET_PER_AGENT must be valid JSON") from exc
-            if not isinstance(parsed, dict):
-                raise ValueError("TOKEN_BUDGET_PER_AGENT must decode to a mapping")
-            return {str(key): int(v) for key, v in parsed.items()}
-        return {str(key): int(v) for key, v in value.items()}
-
-    @validator("token_budget_per_step", pre=True)
-    def parse_step_budget(cls, value: str | dict[str, dict[str, int]]) -> dict[str, dict[str, int]]:
-        if isinstance(value, str):
-            try:
-                parsed = json.loads(value)
-            except json.JSONDecodeError as exc:  # pragma: no cover - defensive
-                raise ValueError("TOKEN_BUDGET_PER_STEP must be valid JSON") from exc
-        else:
-            parsed = value
-        if not isinstance(parsed, dict):
-            raise ValueError("TOKEN_BUDGET_PER_STEP must decode to a mapping")
-        normalized: dict[str, dict[str, int]] = {}
-        for agent, steps in parsed.items():
-            if not isinstance(steps, dict):
-                raise ValueError("TOKEN_BUDGET_PER_STEP values must be mappings")
-            normalized[str(agent)] = {str(step): int(limit) for step, limit in steps.items()}
-        return normalized
+            except json.JSONDecodeError as exc:  # pragma: no cover - defensive guard
+                raise ValueError("EFFICIENCY_THRESHOLDS must be valid JSON") from exc
+            return parsed
+        return value  # type: ignore[return-value]
 
 
 @lru_cache()

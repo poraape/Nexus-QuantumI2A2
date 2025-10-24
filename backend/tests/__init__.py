@@ -48,5 +48,7 @@ if "celery" not in sys.modules:
     celery_stub.shared_task = _shared_task
     sys.modules["celery"] = celery_stub
 
-# Ensure the backend package is imported so ``app`` aliases are registered.
-import backend.app  # noqa: F401
+# Ensure the backend package is imported so ``app`` aliases são registrados,
+# a menos que explicitamente desativado (útil para testes focados).
+if os.environ.get("BACKEND_TEST_SKIP_BOOTSTRAP") != "1":  # pragma: no cover - comportamento padrão
+    import backend.app  # noqa: F401

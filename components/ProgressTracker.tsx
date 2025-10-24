@@ -15,6 +15,24 @@ const ProgressTracker: React.FC<{ agentStates: AgentStates }> = ({ agentStates }
     const runningAgent = (Object.keys(agentStates) as (keyof AgentStates)[]).find(key => agentStates[key].status === 'running');
     const progressDetails = runningAgent ? agentStates[runningAgent].progress : null;
 
+    const fallbackLabels = progressDetails?.labels
+        ? progressDetails.labels
+        : progressDetails?.extra
+          ? Object.entries(progressDetails.extra).map(([key, value]) => {
+                const label = key
+                    .replace(/[_-]+/g, ' ')
+                    .replace(/([a-z])([A-Z])/g, '$1 $2')
+                    .split(' ')
+                    .filter(Boolean)
+                    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+                    .join(' ');
+                if (typeof value === 'boolean') {
+                    return `${label}: ${value ? 'Sim' : 'Não'}`;
+                }
+                return `${label}: ${value}`;
+            })
+          : [];
+
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg animate-fade-in">
             <h2 className="text-xl font-bold mb-4 text-gray-200">Progresso da Análise</h2>
@@ -39,10 +57,25 @@ const ProgressTracker: React.FC<{ agentStates: AgentStates }> = ({ agentStates }
                     );
                 })}
             </div>
-             {progressDetails && (
-                 <div className="text-center text-sm text-gray-400 h-8 flex items-center justify-center">
-                    <p>{progressDetails.step} {progressDetails.total > 0 && `(${progressDetails.current} / ${progressDetails.total})`}</p>
-                 </div>
+            {progressDetails && (
+                <div className="text-center text-sm text-gray-400 min-h-[2.5rem] flex flex-col items-center justify-center gap-1">
+                    <p>
+                        {progressDetails.step}{' '}
+                        {progressDetails.total > 0 && `(${progressDetails.current} / ${progressDetails.total})`}
+                    </p>
+                    {fallbackLabels.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                            {fallbackLabels.map(label => (
+                                <span
+                                    key={label}
+                                    className="px-2 py-0.5 rounded-full bg-gray-700 text-xs text-gray-200"
+                                >
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );
