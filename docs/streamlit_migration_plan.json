@@ -1,0 +1,125 @@
+{
+  "migration": {
+    "objective": "Converter o front-end atual para uma aplicação Streamlit multipágina preservando todas as funcionalidades existentes e garantindo integração completa ao MAS (agentes, APIs e pipelines).",
+    "targets_scope": {
+      "description": "Substituir toda a camada de front-end existente pela stack Streamlit (st.*), mantendo rotas, fluxos, jornadas e casos de uso existentes sem regressões.",
+      "deliverables": [
+        "Mapeamento completo das telas atuais para páginas Streamlit",
+        "Reimplementação das rotas e navegação utilizando o padrão multipágina (pages/**)",
+        "Paridade funcional verificada com os fluxos atuais (cadastros, dashboards, chat, auditoria, etc.)"
+      ]
+    },
+    "component_mapping": {
+      "tables": "Substituir tabelas customizadas por st.dataframe ou st.data_editor com suporte a paginação e ações contextuais.",
+      "forms": "Migrar formulários para st.form com validações client-side e envio integrado às APIs do MAS.",
+      "filters": "Reproduzir filtros avançados utilizando st.selectbox, st.multiselect, st.slider, st.date_input conforme aplicável.",
+      "charts": "Adotar st.plotly_chart (preferencial) com callbacks interativos; suportar Altair/Matplotlib conforme necessidade.",
+      "file_upload": "Implementar upload/download por st.file_uploader e st.download_button com integração ao pipeline de armazenamento atual.",
+      "notifications": "Utilizar st.toast/st.success/st.warning para feedback transacional e alertas.",
+      "chat": "Migrar componentes de chat para st.chat_message e st.chat_input mantendo histórico em session_state."
+    },
+    "pages_architecture": {
+      "structure": "Organizar a aplicação em diretório pages/ com arquivos nomeados por prefixo de ordenação (00_, 01_, etc.) para refletir a navegação existente.",
+      "routing": "Implementar roteamento lógico por session_state['route'] e componentes de navegação (st.sidebar.radio / st.navigation) refletindo breadcrumbs e estados hierárquicos.",
+      "breadcrumbs": "Construir breadcrumbs dinâmicos com base no caminho corrente e histórico armazenado no session_state.",
+      "inter_page_state": "Criar módulo shared/session.py com helpers para persistir objetos (filtros, respostas de API, seleções) entre páginas.",
+      "accessibility": "Garantir que cada página possui títulos, descrições e landmarks semânticos compatíveis com WCAG.",
+      "templates": "Definir layout base em utils/layout.py com funções para header, footer, sidebar e wrappers responsivos."
+    },
+    "state_management": {
+      "session_state": "Utilizar st.session_state para preservar contexto de usuário, preferências, resultados intermediários e estado do chat.",
+      "step_control": "Implementar controle de passos de fluxos (wizard) via session_state['step'] e callbacks para avançar/retroceder.",
+      "cache": {
+        "data": "Aplicar st.cache_data para respostas de APIs idempotentes com invalidação por parâmetros e TTL configurável.",
+        "resources": "Utilizar st.cache_resource para objetos pesados (clientes de API, conexões MAS, modelos carregados)."
+      },
+      "async_queue": "Integrar fila assíncrona/worker existente via wrappers async com polling em session_state e atualizações incrementais de UI."
+    },
+    "integration": {
+      "endpoints": "Mapear todos os endpoints dos agentes/APIs atuais; criar módulo services/clients.py com classes Pydantic para request/response.",
+      "timeouts": "Configurar timeouts padrão (10s leitura / 5s conexão) e ajustes por operação crítica.",
+      "retries": "Aplicar tenacity com política exponencial (3 tentativas, jitter) para operações idempotentes.",
+      "async_queue": "Para pipelines longos, registrar job via API, salvar job_id em session_state e consumir atualizações por websocket/polling com timeout e fallback.",
+      "exception_handling": "Centralizar tratamento em utils/errors.py, exibindo mensagens amigáveis (st.error) e logs estruturados (telemetry).",
+      "logging": "Encaminhar logs e eventos ao MAS/observability via hooks existentes (OpenTelemetry ou equivalente)."
+    },
+    "visualization": {
+      "libraries": ["Plotly", "Altair", "Matplotlib"],
+      "interactivity": "Habilitar zoom, seleção e download em Plotly; sincronizar filtros com session_state para atualizações dinâmicas.",
+      "export": "Adicionar botões de exportação (PNG/SVG/CSV) e captura de gráfico para relatórios.",
+      "accessibility": "Garantir descrições alternativas e cores acessíveis seguindo WCAG AA."
+    },
+    "design_theme": {
+      "theme_file": "Criar .streamlit/config.toml com tema minimalista, tons neutros, tipografia legível (Inter/Roboto).",
+      "light_dark_mode": "Implementar toggle para claro/escuro via session_state['theme'] e classes CSS personalizados em static/styles.css.",
+      "spacing": "Definir escala de espaçamento consistente em helpers de layout.",
+      "icons": "Integrar biblioteca de ícones (Streamlit extras ou emojis) para botões/contexto.",
+      "accessibility": "Contraste mínimo 4.5:1, tamanhos de fonte >= 16px, suporte a navegação por teclado e descrições ARIA em componentes customizados."
+    },
+    "performance": {
+      "lazy_loading": "Carregar dados e componentes pesados somente após interação (expander, tabs).",
+      "pagination": "Aplicar paginação customizada em st.dataframe/st.data_editor para grandes datasets.",
+      "memoization": "Utilizar cache_data/cache_resource para evitar requisições redundantes.",
+      "compression": "Habilitar compressão de respostas na camada de API (se aplicável) e stream de dados via chunked responses.",
+      "streaming": "Empregar st.write_stream para atualizações em tempo real de respostas longas.",
+      "telemetry": "Monitorar métricas de latência e uso via integrações existentes (Prometheus/OpenTelemetry)."
+    },
+    "auth": {
+      "login_placeholder": "Implementar página de login inicial com formulário st.form (usuário/senha) e integração futura com provedor SSO.",
+      "roles": ["admin", "auditor", "dev"],
+      "authorization": "Criar decorator @require_role em utils/auth.py validando papéis antes de renderizar páginas protegidas.",
+      "session_protection": "Armazenar tokens/claims de forma segura no session_state (encriptado se necessário) e invalidar em logout.",
+      "auditing": "Registrar acessos e ações sensíveis no MAS audit log."
+    },
+    "testing_quality": {
+      "ui_smoke": "Criar suíte Playwright (pytest-playwright) validando renderização das páginas principais e navegação.",
+      "api_contracts": "Escrever testes de contrato com Schemathesis/Pydantic para garantir compatibilidade das APIs.",
+      "lint": "Executar ruff e black em módulos Python; ESLint Prettier removidos se front antigo for descontinuado.",
+      "accessibility": "Adicionar verificação de acessibilidade (axe-core via Playwright) nas páginas críticas.",
+      "load_testing": "Adaptar scripts existentes (k6/locust) para endpoints expostos via Streamlit."
+    },
+    "ci_cd": {
+      "pipeline": "Atualizar pipeline CI/CD (GitHub Actions/GitLab) para build da app, execução de testes (lint, unit, UI), auditoria de segurança e deploy automatizado.",
+      "deploy_targets": ["Streamlit Community Cloud", "Contêiner Docker em infra atual"],
+      "artifacts": "Gerar relatórios de testes, cobertura e pacotes de deploy como artefatos.",
+      "gates": "Gatear deploy em produção por aprovação manual após smoke test e verificação de métricas."
+    },
+    "exporting": {
+      "reports": "Gerar relatórios PDF/DOC via módulo reports/generator.py utilizando templates Jinja e weasyprint/pydocx.",
+      "graphs": "Capturar gráficos Plotly em imagem (kaleido) para inclusão nos relatórios.",
+      "chat_logs": "Exportar histórico de chat e logs operacionais em JSON/CSV anexados ao relatório.",
+      "scheduling": "Permitir agendamento automático via agente MAS responsável por relatórios periódicos."
+    },
+    "dependencies": {
+      "requirements_txt": [
+        "streamlit>=1.31",
+        "plotly>=5.18",
+        "altair>=5.1",
+        "requests>=2.31",
+        "pydantic>=2.5",
+        "tenacity>=8.2",
+        "weasyprint>=59",
+        "python-docx>=0.8",
+        "reportlab>=4.0",
+        "pytest-playwright>=0.4",
+        "ruff>=0.1",
+        "black>=23.0"
+      ],
+      "optional": ["kaleido", "watchdog", "streamlit-extras"]
+    },
+    "rollback_plan": {
+      "trigger": "Ativar rollback se houver falhas críticas de funcionalidade, desempenho ou acessibilidade após o deploy.",
+      "mechanism": "Manter branch/tag do front-end anterior; pipeline de rollback que reverte para imagem/container anterior.",
+      "data_strategy": "Garantir que nenhuma migração de dados irreversível seja executada no front-end.",
+      "communication": "Notificar stakeholders e registrar incidente no MAS incident response."
+    },
+    "acceptance_criteria": {
+      "functional_parity": "Todas as jornadas existentes operam sem regressões e com validação dos POs.",
+      "performance": "Tempo de carregamento inicial < 3s com dados médios; interações críticas < 1s.",
+      "accessibility": "Conformidade WCAG 2.1 AA validada por ferramentas automatizadas e revisão manual.",
+      "reliability": "Zero erros críticos nos logs durante smoke test de 24h.",
+      "documentation": "Atualização completa da documentação de uso e operação.",
+      "training": "Treinamento básico para equipes usuárias no novo fluxo Streamlit."
+    }
+  }
+}
