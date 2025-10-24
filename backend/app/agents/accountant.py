@@ -9,6 +9,7 @@ from app.core.tax_rules import adjust_icms_by_uf
 from app.core.tax_simulation import simulate_icms_scenarios
 from app.core.totals import ensure_document_totals, to_float, totals_as_dict
 from app.schemas import AccountingOutput, ClassificationResult, Document
+from app.utils import model_dump
 from app.services import accounting_service
 from app.services.diagnostic_logger import append_fix_report, log_totals_event
 
@@ -160,7 +161,7 @@ class AccountantAgent(Agent):
                 logger.error(
                     "Total invalido para documento %s: %s",
                     classification.document_id,
-                    totals.model_dump() if totals else None,
+                    model_dump(totals) if totals else None,
                 )
                 raise ValueError("Total do documento invalido")
 

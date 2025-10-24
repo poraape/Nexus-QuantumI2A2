@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+import xml.etree.ElementTree as ET
+from typing import Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +28,47 @@ def parse_monetary_value(value_str: str) -> float:
         logger.warning(f"Erro ao converter valor monetário '{value_str}': {e}")
         return 0.0
 
+def _extract_from_xml(text: str) -> List[dict[str, Any]]:
+    if "<" not in text:
+        return []
+
+    cleaned = re.sub(r"xmlns=\"[^\"]+\"", "", text)
+    try:
+        root = ET.fromstring(cleaned)
+    except ET.ParseError:
+        return []
+
+    items: List[dict[str, Any]] = []
+    for det in root.findall(".//det"):
+        prod = det.find("prod")
+        if prod is None:
+            continue
+        sku = (prod.findtext("cProd") or "").strip()
+        description = (prod.findtext("xProd") or "").strip()
+        quantity = parse_monetary_value(prod.findtext("qCom") or "1")
+        unit_price = parse_monetary_value(prod.findtext("vUnCom") or prod.findtext("vProd") or "0")
+        total_value = parse_monetary_value(prod.findtext("vProd") or prod.findtext("vUnCom") or "0")
+        if total_value <= 0:
+            continue
+        items.append(
+            {
+                "sku": sku or None,
+                "description": description,
+                "quantity": quantity if quantity > 0 else 1.0,
+                "unit_price": unit_price if unit_price > 0 else total_value,
+                "total_value": total_value,
+            }
+        )
+    return items
+
+
 def extract_entities(text: str) -> list[dict[str, Any]]:
-    # Padrão mais flexível para diferentes formatos
+    xml_items = _extract_from_xml(text)
+    if xml_items:
+        return xml_items
+
     patterns = [
-        # Formato comum: SKU + descrição + quantidade + valor unitário + valor total
         r"(?P<sku>\w+)\s+(?P<description>.*?)\s+(?P<quantity>\d+(?:[.,]\d+)?)\s+(?P<unit_price>(?:R\$\s*)?\d+(?:[.,]\d+)?)\s+(?P<total>(?:R\$\s*)?\d+(?:[.,]\d+)?)",
-        # Formato alternativo: SKU + descrição + valor total
         r"(?P<sku>\w+)\s+(?P<description>.*?)\s+(?P<total>(?:R\$\s*)?\d+(?:[.,]\d+)?)",
     ]
 
@@ -47,10 +83,9 @@ def extract_entities(text: str) -> list[dict[str, Any]]:
                     "description": match.group("description").strip(),
                     "quantity": float(match.group("quantity")) if "quantity" in match.groupdict() else 1.0,
                     "unit_price": parse_monetary_value(match.group("unit_price")) if "unit_price" in match.groupdict() else total,
-                    "total_value": total
+                    "total_value": total,
                 }
 
-                # Validação básica dos valores
                 if item_data["total_value"] <= 0:
                     logger.warning(f"Valor total inválido para SKU {item_data['sku']}: {total}")
                     continue

@@ -46,7 +46,9 @@ def test_null_total_correction(monkeypatch) -> None:
     monkeypatch.setattr("app.agents.accountant.append_fix_report", lambda **_: None)
     monkeypatch.setattr("app.agents.accountant.log_totals_event", lambda **_: None)
     monkeypatch.setattr("app.orchestrator.state_machine.log_totals_event", lambda **_: None)
-    monkeypatch.setattr("app.orchestrator.state_machine.update_post_validation_benchmark", lambda **_: None)
+    monkeypatch.setattr(
+        "app.orchestrator.state_machine.update_post_validation_benchmark", lambda **_: None
+    )
     monkeypatch.setattr("app.agents.intelligence.log_totals_event", lambda **_: None)
 
     monkeypatch.setattr(

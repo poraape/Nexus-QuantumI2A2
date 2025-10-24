@@ -15,21 +15,26 @@ class MetricStatus:
     name: str
     value: float
     expected: float
-    max_allowed: float
     status: str
     delta_expected: float
     delta_allowed: float
+    max_allowed: float | None = None
+    min_allowed: float | None = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "name": self.name,
             "value": self.value,
             "expected": self.expected,
-            "max_allowed": self.max_allowed,
             "status": self.status,
             "delta_expected": self.delta_expected,
             "delta_allowed": self.delta_allowed,
         }
+        if self.max_allowed is not None:
+            payload["max_allowed"] = self.max_allowed
+        if self.min_allowed is not None:
+            payload["min_allowed"] = self.min_allowed
+        return payload
 
 
 @dataclass(slots=True)
@@ -249,8 +254,29 @@ class PerformanceEvaluator:
             if mean_value is None:
                 continue
             expected = float(targets["expected"])
-            max_allowed = float(targets["max_allowed"])
+            if "min_allowed" in targets:
+                min_allowed = float(targets["min_allowed"])
+                delta_expected = mean_value - expected
+                delta_allowed = mean_value - min_allowed
+                status = "pass"
+                if mean_value < min_allowed:
+                    status = "fail"
+                elif mean_value < expected:
+                    status = "warn"
+                metrics.append(
+                    MetricStatus(
+                        name=name,
+                        value=mean_value,
+                        expected=expected,
+                        status=status,
+                        delta_expected=delta_expected,
+                        delta_allowed=delta_allowed,
+                        min_allowed=min_allowed,
+                    )
+                )
+                continue
 
+            max_allowed = float(targets["max_allowed"])
             delta_expected = mean_value - expected
             delta_allowed = mean_value - max_allowed
             status = "pass"
@@ -264,10 +290,10 @@ class PerformanceEvaluator:
                     name=name,
                     value=mean_value,
                     expected=expected,
-                    max_allowed=max_allowed,
                     status=status,
                     delta_expected=delta_expected,
                     delta_allowed=delta_allowed,
+                    max_allowed=max_allowed,
                 )
             )
         return metrics
@@ -275,13 +301,28 @@ class PerformanceEvaluator:
     def _compute_efficiency(self, metrics: Iterable[MetricStatus]) -> float:
         scores = []
         for metric in metrics:
-            if metric.value <= metric.expected:
-                scores.append(1.0)
-            elif metric.value >= metric.max_allowed:
-                scores.append(0.0)
-            else:
-                span = metric.max_allowed - metric.expected
-                scores.append(max(0.0, 1.0 - (metric.value - metric.expected) / span))
+            if metric.max_allowed is not None:
+                if metric.value <= metric.expected:
+                    scores.append(1.0)
+                elif metric.value >= metric.max_allowed:
+                    scores.append(0.0)
+                else:
+                    span = metric.max_allowed - metric.expected
+                    if span <= 0:
+                        scores.append(0.0)
+                    else:
+                        scores.append(max(0.0, 1.0 - (metric.value - metric.expected) / span))
+            elif metric.min_allowed is not None:
+                if metric.value >= metric.expected:
+                    scores.append(1.0)
+                elif metric.value <= metric.min_allowed:
+                    scores.append(0.0)
+                else:
+                    span = metric.expected - metric.min_allowed
+                    if span <= 0:
+                        scores.append(0.0)
+                    else:
+                        scores.append(max(0.0, (metric.value - metric.min_allowed) / span))
         return round(100.0 * mean(scores), 2) if scores else 0.0
 
     def _write_runtime_trace(

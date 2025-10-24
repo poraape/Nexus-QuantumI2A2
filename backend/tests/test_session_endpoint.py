@@ -3,11 +3,12 @@ from __future__ import annotations
 import base64
 import os
 import sys
+import time
 import types
 from pathlib import Path
 from typing import Annotated, Dict
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.testclient import TestClient
 
 import backend.app as backend_app_package
@@ -15,6 +16,7 @@ from backend.app.auth import UserManager, issue_auth_cookies
 from backend.app.config import get_settings
 from backend.app.services.crypto import EncryptedJsonStore, KMSClient
 from backend.app.services.session import (
+    SessionState,
     SpaSessionManager,
     get_session_manager,
     reset_session_manager,
@@ -88,6 +90,23 @@ def _prepare_app(
     user_manager.create_user(settings.spa_username, user_password)
 
     app = FastAPI()
+
+    manager = get_session_manager()
+    expected_password = user_password
+
+    def _fake_login(self: SpaSessionManager) -> SessionState:
+        if settings.spa_password != expected_password:
+            raise HTTPException(status_code=401, detail="Credenciais inválidas.")
+        state = SessionState(
+            access_token="test-access",
+            refresh_token="test-refresh",
+            expires_at=time.time() + settings.jwt_expires_minutes * 60,
+        )
+        self._persist_state(state)
+        return state
+
+    manager._perform_login = types.MethodType(_fake_login, manager)  # type: ignore[attr-defined]
+    app.dependency_overrides[get_session_manager] = lambda: manager
 
     @app.post("/api/session")
     async def create_session(

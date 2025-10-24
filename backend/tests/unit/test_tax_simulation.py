@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.core.tax_simulation import simulate_icms_scenarios
 from app.schemas import Document, DocumentIn, DocumentItem, DocumentTotals
+from app.utils import model_dump
 
 
 def build_document() -> Document:
@@ -13,7 +14,7 @@ def build_document() -> Document:
         metadata={"origem_uf": "SP", "destino_uf": "RJ"},
     )
     document = Document(
-        **base.model_dump(),
+        **model_dump(base),
         items=[
             DocumentItem(
                 sku="ABC",

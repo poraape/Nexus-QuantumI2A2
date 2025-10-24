@@ -8,18 +8,19 @@ from celery import shared_task
 
 from ..models import AgentStatus
 from ..progress import update_agent
-from .base import _simulate_work
+from .base import ensure_pipeline_result
 
 
 @shared_task(name="agents.classifier")
-def run_classifier(context: Dict[str, object]) -> Dict[str, object]:
-    job_id = uuid.UUID(context["job_id"])
-    update_agent(job_id, "classifier", AgentStatus.RUNNING, step="Classificando operações")
-    _simulate_work()
-    classification = {
-        "categories": {},
-        "summary": {},
-    }
-    update_agent(job_id, "classifier", AgentStatus.COMPLETED, extra={"categories": len(classification["categories"])})
-    context["classification"] = classification
-    return context
+def run_classifier(payload: Dict[str, object]) -> Dict[str, object]:
+    job_id = uuid.UUID(payload["job_id"])
+    update_agent(job_id, "classifier", AgentStatus.RUNNING, step="Classificando documento")
+    pipeline_result = ensure_pipeline_result(job_id, payload)
+    classification = pipeline_result.get("classification", {})
+    update_agent(
+        job_id,
+        "classifier",
+        AgentStatus.COMPLETED,
+        extra={"confidence": classification.get("confidence")},
+    )
+    return pipeline_result.get("insight", {})
