@@ -11,7 +11,7 @@ from typing import Dict, Optional
 
 from fastapi import HTTPException, status
 
-from ..auth import AuthService, AuthorizationCodeStore, RefreshTokenStore, UserManager
+from ..auth import AuthorizationCodeStore, AuthService, RefreshTokenStore, UserManager
 from ..config import get_settings
 from ..services.audit import AuditLogger
 from ..services.crypto import EncryptedJsonStore, KMSClient
@@ -28,9 +28,9 @@ class SessionState:
 
     def as_dict(self) -> Dict[str, float | str]:
         return {
-            'access_token': self.access_token,
-            'refresh_token': self.refresh_token,
-            'expires_at': self.expires_at,
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+            "expires_at": self.expires_at,
         }
 
 
@@ -60,9 +60,9 @@ class SpaSessionManager:
             return None
         try:
             return SessionState(
-                access_token=payload['access_token'],
-                refresh_token=payload['refresh_token'],
-                expires_at=float(payload['expires_at']),
+                access_token=payload["access_token"],
+                refresh_token=payload["refresh_token"],
+                expires_at=float(payload["expires_at"]),
             )
         except KeyError:
             return None
@@ -76,8 +76,8 @@ class SpaSessionManager:
         return (state.expires_at - 30.0) > time.time()
 
     def _code_challenge(self, verifier: str) -> str:
-        digest = hashlib.sha256(verifier.encode('utf-8')).digest()
-        return base64.urlsafe_b64encode(digest).rstrip(b'=').decode('utf-8')
+        digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+        return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("utf-8")
 
     def _perform_login(self) -> SessionState:
         code_verifier = secrets.token_urlsafe(64)
@@ -91,8 +91,8 @@ class SpaSessionManager:
         tokens = self._auth_service.exchange_token(code, code_verifier, self._client_id)
         expires_at = time.time() + self._token_ttl_seconds
         state = SessionState(
-            access_token=tokens['access_token'],
-            refresh_token=tokens['refresh_token'],
+            access_token=tokens["access_token"],
+            refresh_token=tokens["refresh_token"],
             expires_at=expires_at,
         )
         self._persist_state(state)
@@ -107,8 +107,8 @@ class SpaSessionManager:
             raise
         expires_at = time.time() + self._token_ttl_seconds
         new_state = SessionState(
-            access_token=tokens['access_token'],
-            refresh_token=tokens['refresh_token'],
+            access_token=tokens["access_token"],
+            refresh_token=tokens["refresh_token"],
             expires_at=expires_at,
         )
         self._persist_state(new_state)
@@ -137,7 +137,7 @@ def _build_auth_service() -> AuthService:
         EncryptedJsonStore(
             settings.data_dir / settings.refresh_token_store,
             kms,
-            'refresh-tokens',
+            "refresh-tokens",
         ),
         ttl_hours=settings.refresh_token_ttl_hours,
     )
@@ -152,9 +152,9 @@ def _build_auth_service() -> AuthService:
     audit_logger = AuditLogger(
         log_path=settings.data_dir / settings.audit_log_name,
         bucket=bucket,
-        private_key_path=settings.data_dir / 'signing_key.pem',
+        private_key_path=settings.data_dir / "signing_key.pem",
     )
-    user_manager = UserManager(settings.data_dir / 'users.json')
+    user_manager = UserManager(settings.data_dir / "users.json")
     if settings.default_username and settings.default_password:
         user_manager.create_user(settings.default_username, settings.default_password)
     return AuthService(user_manager, code_store, refresh_store, audit_logger)
@@ -170,7 +170,7 @@ def _build_session_manager() -> SpaSessionManager:
     store = EncryptedJsonStore(
         settings.data_dir / settings.spa_session_store,
         kms,
-        'spa-session',
+        "spa-session",
     )
     return SpaSessionManager(
         auth_service=auth_service,

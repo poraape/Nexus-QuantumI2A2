@@ -5,15 +5,15 @@ import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
+from .auth import get_current_user, issue_auth_cookies
+from .config import get_settings
 from .models import AnalysisJob
 from .orchestrator import PipelineOrchestrator, orchestrator
-from .auth import issue_auth_cookies
-from .config import get_settings
 from .services.session import SpaSessionManager, get_session_manager
 
 router = APIRouter(prefix="/api", tags=["analysis"])
@@ -23,12 +23,18 @@ def get_orchestrator() -> PipelineOrchestrator:
     return orchestrator
 
 
+UploadedFiles = Annotated[list[UploadFile], File(...)]
+OrchestratorDep = Annotated[PipelineOrchestrator, Depends(get_orchestrator)]
+CurrentUserDep = Annotated[str, Depends(get_current_user)]
+SessionManagerDep = Annotated[SpaSessionManager, Depends(get_session_manager)]
+
+
 @router.post("/analysis")
 async def create_analysis(
-    files: list[UploadFile] = File(...),
+    orchestrator: OrchestratorDep,
+    _: CurrentUserDep,
+    files: UploadedFiles,
     webhook_url: Optional[str] = None,
-    orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
-    _: str = Depends(get_current_user),
 ):
     if not files:
         raise HTTPException(status_code=400, detail="Nenhum arquivo enviado.")
@@ -40,13 +46,13 @@ async def create_analysis(
 @router.post("/session", tags=["auth"])
 async def create_session(
     response: Response,
-    session_manager: SpaSessionManager = Depends(get_session_manager),
+    session_manager: SessionManagerDep,
 ) -> dict[str, int]:
     state = session_manager.get_session()
     issue_auth_cookies(response, state.access_token, state.refresh_token)
     settings = get_settings()
-    response.headers['X-Session-Expires'] = str(int(state.expires_at))
-    response.headers['X-Session-Cookie'] = settings.access_token_cookie_name
+    response.headers["X-Session-Expires"] = str(int(state.expires_at))
+    response.headers["X-Session-Cookie"] = settings.access_token_cookie_name
     return {
         "expiresAt": int(state.expires_at * 1000),
     }
@@ -55,8 +61,8 @@ async def create_session(
 @router.get("/analysis/{job_id}")
 async def get_analysis(
     job_id: uuid.UUID,
-    orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
-    _: str = Depends(get_current_user),
+    orchestrator: OrchestratorDep,
+    _: CurrentUserDep,
 ):
     job = orchestrator.get_job(job_id)
     if not job:
@@ -67,8 +73,8 @@ async def get_analysis(
 @router.get("/analysis/{job_id}/progress")
 async def get_progress(
     job_id: uuid.UUID,
-    orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
-    _: str = Depends(get_current_user),
+    orchestrator: OrchestratorDep,
+    _: CurrentUserDep,
 ):
     job = orchestrator.get_job(job_id)
     if not job:
@@ -84,7 +90,7 @@ async def get_progress(
 @router.get("/orchestrator/state/{job_id}")
 async def stream_orchestrator_state(
     job_id: uuid.UUID,
-    orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+    orchestrator: OrchestratorDep,
 ):
     async def event_stream() -> AsyncIterator[str]:
         last_payload: Optional[dict] = None
@@ -92,7 +98,7 @@ async def stream_orchestrator_state(
             while True:
                 job = orchestrator.get_job(job_id)
                 if not job:
-                    yield "event: error\ndata: {\"detail\": \"Análise não encontrada\"}\n\n"
+                    yield 'event: error\ndata: {"detail": "Análise não encontrada"}\n\n'
                     return
 
                 payload = _serialize_job(job)

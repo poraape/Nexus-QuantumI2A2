@@ -5,7 +5,7 @@ import re
 from decimal import Decimal
 from typing import Any, Iterable, Mapping, MutableMapping, Union
 
-from app.schemas import Document, DocumentItem, DocumentTotals
+from app.schemas import Document, DocumentTotals
 
 logger = logging.getLogger(__name__)
 

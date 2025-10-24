@@ -1,0 +1,42 @@
+{
+  "results": [
+    {
+      "bundleName": "dist/assets/jszip-l0sNRNKZ.js",
+      "totalBytes": 44,
+      "mappedBytes": 0,
+      "unmappedBytes": 0,
+      "eolBytes": 2,
+      "sourceMapCommentBytes": 42,
+      "files": {
+        "[sourceMappingURL]": {
+          "size": 42
+        },
+        "[unmapped]": {
+          "size": 0
+        },
+        "[EOLs]": {
+          "size": 2
+        }
+      }
+    },
+    {
+      "bundleName": "dist/assets/pdf-l0sNRNKZ.js",
+      "totalBytes": 42,
+      "mappedBytes": 0,
+      "unmappedBytes": 0,
+      "eolBytes": 2,
+      "sourceMapCommentBytes": 40,
+      "files": {
+        "[sourceMappingURL]": {
+          "size": 40
+        },
+        "[unmapped]": {
+          "size": 0
+        },
+        "[EOLs]": {
+          "size": 2
+        }
+      }
+    }
+  ]
+}

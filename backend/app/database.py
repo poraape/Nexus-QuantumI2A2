@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from .config import get_settings
 
-
 settings = get_settings()
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, MutableMapping, Optional, Union
 
-from app.core.tax_rules import adjust_icms_by_uf, get_icms_rate
+from app.core.tax_rules import get_icms_rate
 from app.core.totals import to_float
 from app.schemas import Document, DocumentItem
 

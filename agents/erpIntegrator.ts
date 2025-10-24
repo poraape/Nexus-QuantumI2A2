@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import cron from 'node-cron';
 import dayjs from 'dayjs';
-import type { IntegrationConfig, IntegrationJobPayload, IntegrationWebhookPayload, IntegrationChannel } from '../types';
+import type { IntegrationConfig, IntegrationJobPayload, IntegrationWebhookPayload, IntegrationChannel, IntegrationExportJobPayload } from '../types';
 import { integrationStateStore } from '../services/integrationStateStore';
 import { enqueueExportJob, enqueueImportJob } from '../services/queues';
 import { runNfePublicImport } from '../services/importers/nfePublicImporter';
@@ -180,13 +180,20 @@ export class ErpIntegrator extends EventEmitter {
     }
 
     async enqueueExport(payload: IntegrationJobPayload) {
+        if (!payload.documents || payload.documents.length === 0) {
+            throw new Error('Export job requires at least one document.');
+        }
         await integrationStateStore.recordRun({
             erp: payload.erp,
             action: 'export',
             status: 'queued',
             payload,
         });
-        await enqueueExportJob({ ...payload, requestedBy: payload.requestedBy ?? 'scheduler' });
+        await enqueueExportJob({
+            ...payload,
+            requestedBy: payload.requestedBy ?? 'scheduler',
+            documents: payload.documents,
+        });
         this.emit('jobQueued', payload);
     }
 
@@ -202,7 +209,10 @@ export class ErpIntegrator extends EventEmitter {
         if (data.kind === 'import') {
             await this.enqueueImport(payload);
         } else {
-            await this.enqueueExport(payload);
+            if (!data.documents || data.documents.length === 0) {
+                throw new Error('Webhook export payload missing documents.');
+            }
+            await this.enqueueExport({ ...payload, documents: data.documents });
         }
     }
 
@@ -227,11 +237,15 @@ export class ErpIntegrator extends EventEmitter {
         return { documents, nfeDocuments: nfeResult.documents };
     }
 
-    async processExportJob(job: IntegrationJobPayload & { documents: Record<string, unknown>[] }) {
+    async processExportJob(job: IntegrationExportJobPayload) {
         const provider = this.channelToProvider(job.erp);
         if (!provider) throw new Error(`ERP provider not configured for channel ${job.erp}`);
         const connector = this.connectors.get(provider);
         if (!connector) throw new Error(`Connector not found for provider ${provider}`);
+
+        if (!job.documents || job.documents.length === 0) {
+            throw new Error('Export job missing documents payload.');
+        }
 
         await runSpedExport(job, { layout: this.options.config[provider].spedLayout }, job.documents);
         await connector.pushDocuments({

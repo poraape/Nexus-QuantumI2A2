@@ -5,10 +5,10 @@ import logging
 from typing import Any
 
 from app.agents.base import Agent, retryable
+from app.core.totals import ensure_document_totals, to_float
 from app.schemas import Document, DocumentIn, DocumentItem, DocumentTotals
 from app.services import nlp_service, ocr_service
 from app.services.diagnostic_logger import log_totals_event
-from app.core.totals import ensure_document_totals, to_float
 
 logger = logging.getLogger(__name__)
 

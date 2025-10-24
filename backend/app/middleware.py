@@ -25,12 +25,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._lock = asyncio.Lock()
 
     def _identifier(self, request: Request) -> str:
-        forwarded_for = request.headers.get('X-Forwarded-For')
+        forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            return forwarded_for.split(',')[0].strip()
+            return forwarded_for.split(",")[0].strip()
         if request.client and request.client.host:
             return request.client.host
-        return 'anonymous'
+        return "anonymous"
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
         identifier = self._identifier(request)
@@ -42,9 +42,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if len(bucket) >= self._limit:
                 return Response(
                     status_code=HTTP_429_TOO_MANY_REQUESTS,
-                    media_type='application/json',
+                    media_type="application/json",
                     content='{"detail": "Too many requests."}',
-                    headers={'Retry-After': str(self._window)},
+                    headers={"Retry-After": str(self._window)},
                 )
             bucket.append(now)
 
@@ -60,10 +60,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
         self._logger = audit_logger
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        if request.url.path == '/health':
+        if request.url.path == "/health":
             return await call_next(request)
 
-        correlation_id = request.headers.get('X-Correlation-ID') or str(uuid.uuid4())
+        correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
         request.state.correlation_id = correlation_id
         start_time = time.perf_counter()
 
@@ -72,31 +72,31 @@ class AuditMiddleware(BaseHTTPMiddleware):
         except Exception:
             duration_ms = (time.perf_counter() - start_time) * 1000
             self._logger.log(
-                'http',
-                'request.failed',
+                "http",
+                "request.failed",
                 {
-                    'path': request.url.path,
-                    'method': request.method,
-                    'status': 500,
-                    'duration_ms': round(duration_ms, 2),
-                    'correlation_id': correlation_id,
-                    'client': getattr(request.client, 'host', None),
+                    "path": request.url.path,
+                    "method": request.method,
+                    "status": 500,
+                    "duration_ms": round(duration_ms, 2),
+                    "correlation_id": correlation_id,
+                    "client": getattr(request.client, "host", None),
                 },
             )
             raise
 
         duration_ms = (time.perf_counter() - start_time) * 1000
-        response.headers['X-Correlation-ID'] = correlation_id
+        response.headers["X-Correlation-ID"] = correlation_id
         self._logger.log(
-            'http',
-            'request.completed',
+            "http",
+            "request.completed",
             {
-                'path': request.url.path,
-                'method': request.method,
-                'status': response.status_code,
-                'duration_ms': round(duration_ms, 2),
-                'correlation_id': correlation_id,
-                'client': getattr(request.client, 'host', None),
+                "path": request.url.path,
+                "method": request.method,
+                "status": response.status_code,
+                "duration_ms": round(duration_ms, 2),
+                "correlation_id": correlation_id,
+                "client": getattr(request.client, "host", None),
             },
         )
         return response

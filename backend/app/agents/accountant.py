@@ -5,9 +5,9 @@ import logging
 from typing import Any, Dict, Union
 
 from app.agents.base import Agent, retryable
-from app.core.totals import ensure_document_totals, to_float, totals_as_dict
 from app.core.tax_rules import adjust_icms_by_uf
 from app.core.tax_simulation import simulate_icms_scenarios
+from app.core.totals import ensure_document_totals, to_float, totals_as_dict
 from app.schemas import AccountingOutput, ClassificationResult, Document
 from app.services import accounting_service
 from app.services.diagnostic_logger import append_fix_report, log_totals_event

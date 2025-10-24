@@ -116,7 +116,7 @@ export interface IntegrationHistoryEntry {
     action: 'import' | 'export';
     status: 'queued' | 'running' | 'success' | 'error';
     message?: string | null;
-    payload?: Record<string, unknown> | null;
+    payload?: (Record<string, unknown> | IntegrationJobPayload | IntegrationExportJobPayload) | null;
     pendingJobs?: number;
     timestamp: string;
 }
@@ -127,6 +127,7 @@ export interface IntegrationJobPayload {
     since?: string;
     metadata?: Record<string, unknown>;
     requestedBy?: string;
+    documents?: Record<string, unknown>[];
 }
 
 export interface IntegrationExportJobPayload extends IntegrationJobPayload {
@@ -139,6 +140,7 @@ export interface IntegrationWebhookPayload {
     kind: 'import' | 'export';
     since?: string;
     metadata?: Record<string, unknown>;
+    documents?: Record<string, unknown>[];
 }
 
 export interface IntegrationConfig {

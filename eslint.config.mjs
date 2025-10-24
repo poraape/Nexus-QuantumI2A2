@@ -70,7 +70,7 @@ const reactHooksRecommended = reactHooksPlugin.configs['recommended'];
 
 export default [
   {
-    ignores: ['dist', 'coverage', 'reports', 'node_modules', 'cypress/videos', 'cypress/screenshots'],
+    ignores: ['dist', 'coverage', 'reports', 'node_modules', '.venv', 'cypress/videos', 'cypress/screenshots'],
   },
   js.configs.recommended,
   {

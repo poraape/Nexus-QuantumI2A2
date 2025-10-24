@@ -1,8 +1,8 @@
+import importlib
 import sys
 import types
 import uuid
 from enum import Enum
-
 
 if "celery" not in sys.modules:
     celery_stub = types.ModuleType("celery")
@@ -52,16 +52,13 @@ if "backend.app.progress" not in sys.modules:
 else:
     progress_stub = sys.modules["backend.app.progress"]
 
-import importlib
-
 backend_app_pkg = importlib.import_module("backend.app")
-setattr(backend_app_pkg, "models", models_stub)
-setattr(backend_app_pkg, "progress", progress_stub)
-
-from ..ocr import AgentStatus, run_ocr
-
+backend_app_pkg.models = models_stub
+backend_app_pkg.progress = progress_stub
 
 def test_run_ocr_updates_progress(monkeypatch):
+    from ..ocr import AgentStatus, run_ocr
+
     calls = []
 
     def fake_update_agent(job_id, agent, status, *, step=None, current=None, total=None, extra=None):

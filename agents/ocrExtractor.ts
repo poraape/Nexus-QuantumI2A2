@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { logger } from '../services/logger';
 import { telemetry } from '../services/telemetry';
 import { executeWithResilience } from '../services/resilience';
@@ -17,7 +18,8 @@ export async function runOCRFromImage(buffer: ArrayBuffer, lang = "por", correla
             maxAttempts: 3,
         });
         const worker = await createWorker(lang);
-        const { data } = await executeWithResilience('ocr', 'ocr.recognize', async () => worker.recognize(buffer), {
+        const imageSource = Buffer.from(buffer);
+        const { data } = await executeWithResilience('ocr', 'ocr.recognize', async () => worker.recognize(imageSource), {
             correlationId: runCorrelationId,
             attributes: { lang },
             maxAttempts: 3,

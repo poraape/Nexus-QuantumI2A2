@@ -8,7 +8,7 @@ from typing import Dict, Optional
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from .models import AgentStatus, AnalysisJob, DEFAULT_AGENT_STATES, JobStatus
+from .models import DEFAULT_AGENT_STATES, AgentStatus, AnalysisJob, JobStatus
 
 
 def create_job(session: Session, webhook_url: Optional[str] = None) -> AnalysisJob:

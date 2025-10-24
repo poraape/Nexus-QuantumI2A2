@@ -4,13 +4,13 @@ import {
   DiagLogLevel,
   metrics,
   trace,
-  logs,
   Span,
   SpanStatusCode,
   Histogram,
   Counter,
   UpDownCounter,
 } from '@opentelemetry/api';
+import { logs } from '@opentelemetry/api-logs';
 import { Resource } from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { WebTracerProvider } from '@opentelemetry/sdk-trace-web';

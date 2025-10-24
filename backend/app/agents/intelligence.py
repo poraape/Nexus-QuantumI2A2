@@ -4,8 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.agents.base import Agent, retryable
 from app.agents.accountant import AccountantAgent
+from app.agents.base import Agent, retryable
 from app.core.totals import ensure_document_totals, to_float, totals_as_dict
 from app.schemas import InsightReference, InsightReport
 from app.services.diagnostic_logger import log_totals_event

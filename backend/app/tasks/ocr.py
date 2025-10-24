@@ -6,8 +6,8 @@ from typing import Dict, List
 
 from celery import shared_task
 
-from ..progress import update_agent
 from ..models import AgentStatus
+from ..progress import update_agent
 from .base import _simulate_work
 
 

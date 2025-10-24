@@ -11,7 +11,6 @@ from .crud import get_job, set_job_status, upsert_agent_state
 from .database import get_session
 from .models import AgentStatus, JobStatus
 
-
 settings = get_settings()
 
 

@@ -24,12 +24,12 @@ class SecureBucketClient:
 
         session = boto3.session.Session()
         self._client = session.client(
-            's3',
+            "s3",
             endpoint_url=endpoint_url,
             region_name=region,
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
-            config=Config(signature_version='s3v4'),
+            config=Config(signature_version="s3v4"),
         )
 
     def upload_file(self, file_path: Path) -> None:

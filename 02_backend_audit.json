@@ -34,12 +34,12 @@
   "checks": [
     {
       "id": "py_style",
-      "run": "ruff --fix . || true",
-      "expect": "sem erros críticos"
+      "run": "ruff check . --fix || true",
+      "expect": "sem erros criticos"
     },
     {
       "id": "py_types",
-      "run": "mypy --install-types --non-interactive || true",
+      "run": "mypy backend --install-types --non-interactive || true",
       "expect": "tipagem ok"
     },
     {
@@ -54,23 +54,23 @@
     },
     {
       "id": "ts_eslint",
-      "run": "eslint . --ext .ts,.tsx,.js --fix || true",
+      "run": "npx eslint . --ext .ts,.tsx,.js --fix || true",
       "expect": "eslint ok"
     },
     {
       "id": "ts_types",
-      "run": "tsc -p tsconfig.json --noEmit || true",
+      "run": "npx tsc -p tsconfig.json --noEmit || true",
       "expect": "ts ok"
     },
     {
       "id": "api_fiscal_contracts",
-      "run": "pytest -q tests/fiscal_contracts || true",
+      "run": "set PYTHONPATH=backend && pytest -q backend/tests || true",
       "expect": "contratos fiscais conformes"
     },
     {
       "id": "audit_trail",
       "run": "codex.audit.ensure_append_only_logs",
-      "expect": "trilha imutável habilitada"
+      "expect": "trilha imutavel habilitada"
     }
   ],
   "autofixes": [
@@ -83,7 +83,7 @@
       "replacement": "prefetch/select_related ou bulk ops"
     },
     {
-      "pattern": "float em cálculos monetários",
+      "pattern": "float em calculos monetarios",
       "replacement": "Decimal + contexto BRL"
     },
     {
@@ -91,7 +91,7 @@
       "replacement": "padronizar via http client wrapper com jitter"
     },
     {
-      "pattern": "timezone não definido",
+      "pattern": "timezone nao definido",
       "replacement": "America/Sao_Paulo"
     }
   ],

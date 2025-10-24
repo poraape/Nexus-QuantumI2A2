@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from enum import Enum
-from copy import deepcopy
 from typing import Dict, Optional
 
-from sqlalchemy import JSON, DateTime, Enum as SqlEnum, String
+from sqlalchemy import JSON, DateTime, String
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 

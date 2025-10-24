@@ -15,6 +15,6 @@ def validate_cfop(cfop: str) -> Iterable[AuditIssue]:
 
 def validate_document(document) -> list[AuditIssue]:  # type: ignore[override]
     issues: list[AuditIssue] = []
-    for item in document.items:
+    for _item in document.items:
         issues.extend(validate_cfop(document.metadata.get("cfop", "0000")))
     return issues

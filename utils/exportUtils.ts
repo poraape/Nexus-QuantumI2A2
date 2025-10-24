@@ -65,24 +65,23 @@ export const exportToXlsx = async (report: AuditReport, filename: string) => {
     utils.book_append_sheet(wb, wsSummary, 'Resumo Executivo');
 
     // Document Details Sheet
-    const docDetailsData = report.documents.flatMap(d => {
+    const docDetailsData: Record<string, unknown>[] = report.documents.flatMap((d) => {
         if (!d.doc.data || d.doc.data.length === 0) {
-            // FIX: Added 'Classificação' to ensure a consistent object shape, resolving the type error.
-            return [{ 
-                Documento: d.doc.name, 
-                Status: d.status, 
-                Classificação: d.classification?.operationType || 'N/A',
-                "Nome Produto": "N/A - Sem itens" 
+            return [{
+                Documento: d.doc.name,
+                Status: d.status,
+                Classificação: d.classification?.operationType ?? 'Outros',
+                'Nome Produto': 'N/A - Sem itens',
             }];
         }
-        return d.doc.data.map(item => ({
+        return d.doc.data.map((item) => ({
             Documento: d.doc.name,
             Status: d.status,
-            Classificação: d.classification?.operationType,
-            ...item
+            Classificação: d.classification?.operationType ?? 'Outros',
+            ...item,
         }));
     });
-    if(docDetailsData.length > 0) {
+    if (docDetailsData.length > 0) {
         const wsDocs = utils.json_to_sheet(docDetailsData);
         utils.book_append_sheet(wb, wsDocs, 'Detalhes dos Itens');
     }

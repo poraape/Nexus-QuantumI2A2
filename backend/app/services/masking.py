@@ -30,10 +30,10 @@ class IdentifierMasker:
         for record in records:
             new_record: Dict[str, object] = {}
             for key, value in record.items():
-                if isinstance(value, str) and ('cnpj' in key.lower() or 'cpf' in key.lower()):
+                if isinstance(value, str) and ("cnpj" in key.lower() or "cpf" in key.lower()):
                     new_record[key] = self.mask_value(value)
                 else:
                     new_record[key] = value
             sanitized.append(new_record)
-        self.audit_logger.log('masking_service', 'identifiers.sanitized', {'count': len(sanitized)})
+        self.audit_logger.log("masking_service", "identifiers.sanitized", {"count": len(sanitized)})
         return sanitized

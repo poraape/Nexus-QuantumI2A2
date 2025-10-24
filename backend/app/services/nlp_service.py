@@ -11,17 +11,17 @@ def parse_monetary_value(value_str: str) -> float:
     """Converte string de valor monetário para float."""
     try:
         # Remove caracteres não numéricos exceto ponto e vírgula
-        clean_value = re.sub(r'[^\d.,]', '', value_str)
+        clean_value = re.sub(r"[^\d.,]", "", value_str)
         # Se tiver mais de um separador decimal, considera o último
-        if clean_value.count(',') + clean_value.count('.') > 1:
-            *_, last_part = re.split(r'[.,]', clean_value)
-            main_part = ''.join(re.split(r'[.,]', clean_value)[:-1])
+        if clean_value.count(",") + clean_value.count(".") > 1:
+            *_, last_part = re.split(r"[.,]", clean_value)
+            main_part = "".join(re.split(r"[.,]", clean_value)[:-1])
             clean_value = f"{main_part}.{last_part}"
         # Normaliza para usar ponto como separador decimal
-        if ',' in clean_value and '.' not in clean_value:
-            clean_value = clean_value.replace(',', '.')
-        elif ',' in clean_value:
-            clean_value = clean_value.replace(',', '')
+        if "," in clean_value and "." not in clean_value:
+            clean_value = clean_value.replace(",", ".")
+        elif "," in clean_value:
+            clean_value = clean_value.replace(",", "")
         return float(clean_value)
     except (ValueError, IndexError) as e:
         logger.warning(f"Erro ao converter valor monetário '{value_str}': {e}")
@@ -49,12 +49,12 @@ def extract_entities(text: str) -> list[dict[str, Any]]:
                     "unit_price": parse_monetary_value(match.group("unit_price")) if "unit_price" in match.groupdict() else total,
                     "total_value": total
                 }
-                
+
                 # Validação básica dos valores
                 if item_data["total_value"] <= 0:
                     logger.warning(f"Valor total inválido para SKU {item_data['sku']}: {total}")
                     continue
-                    
+
                 items.append(item_data)
             except Exception as e:
                 logger.error(f"Erro ao processar item: {e}")
@@ -62,5 +62,5 @@ def extract_entities(text: str) -> list[dict[str, Any]]:
 
     if not items:
         logger.warning("Nenhum item foi extraído do texto")
-        
+
     return items

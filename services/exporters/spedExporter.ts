@@ -2,7 +2,7 @@ import { createWriteStream } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import dayjs from 'dayjs';
-import type { IntegrationJobPayload, IntegrationHistoryEntry } from '../../types';
+import type { IntegrationJobPayload } from '../../types';
 import { integrationStateStore } from '../integrationStateStore';
 
 export interface SpedExporterConfig {
@@ -16,12 +16,6 @@ export const runSpedExport = async (
 ): Promise<{ filePath: string }> => {
     const filePath = join(tmpdir(), `sped-${payload.erp.toLowerCase()}-${dayjs().format('YYYYMMDD-HHmmss')}.txt`);
 
-    const meta: Partial<IntegrationHistoryEntry> = {
-        erp: payload.erp,
-        action: 'export',
-        payload: { ...payload, layout: config.layout },
-    };
-
     try {
         const stream = createWriteStream(filePath);
         stream.write(`|0000|LECD|${config.layout}|${dayjs().format('YYYYMMDD')}|\n`);
@@ -31,17 +25,19 @@ export const runSpedExport = async (
         stream.end();
 
         await integrationStateStore.recordRun({
-            ...meta,
+            erp: payload.erp,
+            action: 'export',
             status: 'success',
             message: `Arquivo SPED gerado com ${documents.length} lançamentos`,
-            payload: { ...meta.payload, count: documents.length, filePath },
+            payload: { ...payload, layout: config.layout, count: documents.length, filePath },
         });
 
         return { filePath };
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Falha desconhecida ao gerar SPED';
         await integrationStateStore.recordRun({
-            ...meta,
+            erp: payload.erp,
+            action: 'export',
             status: 'error',
             message,
         });

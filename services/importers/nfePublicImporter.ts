@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { XMLParser } from 'fast-xml-parser';
 import { integrationStateStore } from '../integrationStateStore';
-import type { IntegrationJobPayload, IntegrationHistoryEntry } from '../../types';
+import type { IntegrationJobPayload } from '../../types';
 
 export interface NfePublicImporterConfig {
     endpoint: string;
@@ -14,15 +14,13 @@ export const runNfePublicImport = async (
     payload: IntegrationJobPayload,
     config: NfePublicImporterConfig,
 ): Promise<{ documents: Record<string, unknown>[] }> => {
-    const meta: Partial<IntegrationHistoryEntry> = {
-        erp: payload.erp,
-        action: 'import',
-        status: 'running',
-        payload: { ...payload },
-    };
-
     try {
-        await integrationStateStore.recordRun({ ...meta, status: 'running' });
+        await integrationStateStore.recordRun({
+            erp: payload.erp,
+            action: 'import',
+            status: 'running',
+            payload: { ...payload },
+        });
 
         const url = new URL(config.endpoint);
         url.searchParams.set('since', payload.since ?? dayjs().subtract(1, 'day').toISOString());
@@ -41,7 +39,8 @@ export const runNfePublicImport = async (
         const documents = rawDocuments.map((xml: string) => parser.parse(xml));
 
         await integrationStateStore.recordRun({
-            ...meta,
+            erp: payload.erp,
+            action: 'import',
             status: 'success',
             timestamp: new Date(),
             message: `Importadas ${documents.length} NFes públicas`,
@@ -52,7 +51,8 @@ export const runNfePublicImport = async (
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Falha desconhecida ao importar NFes';
         await integrationStateStore.recordRun({
-            ...meta,
+            erp: payload.erp,
+            action: 'import',
             status: 'error',
             message,
         });

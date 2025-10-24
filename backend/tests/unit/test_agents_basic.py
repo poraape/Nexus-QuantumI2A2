@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.agents.extractor import ExtractorAgent
-from app.schemas import DocumentIn, DocumentTotals
+from app.schemas import DocumentIn
 
 
 def test_extractor_returns_document(monkeypatch) -> None:

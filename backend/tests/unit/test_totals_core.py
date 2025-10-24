@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from app.core.totals import ensure_document_totals, recompute_document_totals, to_float, totals_as_dict
+from app.core.totals import (
+    ensure_document_totals,
+    recompute_document_totals,
+    to_float,
+    totals_as_dict,
+)
 
 
 def test_to_float_converts_brl_strings() -> None:

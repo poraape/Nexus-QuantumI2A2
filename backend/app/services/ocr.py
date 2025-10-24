@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
 
 import pytesseract
 from PIL import Image
@@ -20,5 +19,5 @@ class OCRService:
         loop = asyncio.get_running_loop()
         language = self.settings.ocr_language
         text = await loop.run_in_executor(None, lambda: pytesseract.image_to_string(Image.open(image_path), lang=language))
-        self.audit_logger.log('ocr_service', 'ocr.extract', {'language': language})
+        self.audit_logger.log("ocr_service", "ocr.extract", {"language": language})
         return text

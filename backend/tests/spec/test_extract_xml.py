@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.schemas import Document, DocumentIn, DocumentTotals
+from app.schemas import Document, DocumentTotals
 
 
 def test_extract_xml_requirement() -> None:

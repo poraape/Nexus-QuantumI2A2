@@ -2,25 +2,25 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from .checks import (
     BaseCheck,
+    CheckResult,
     DNSResolutionCheck,
     HTTPEndpointCheck,
     PolicyComplianceCheck,
-    TCPConnectivityCheck,
-    TLSCertificateCheck,
-    CheckResult,
     Severity,
     Status,
+    TCPConnectivityCheck,
+    TLSCertificateCheck,
     extract_host_from_url,
     extract_port_from_url,
 )
-from .manifest_loader import ConnectivityManifest, load_manifest
+from .manifest_loader import load_manifest
 
 
 @dataclass(slots=True)
@@ -165,7 +165,7 @@ class ConnectivityValidator:
                     timeout=self._connect_timeout(),
                 )
 
-        for name, endpoint in self.manifest.endpoints.items():
+        for _name, endpoint in self.manifest.endpoints.items():
             base = endpoint.get("base_url")
             if not base:
                 continue

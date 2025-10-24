@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
 
 AgentStatusLiteral = Literal["pending", "running", "completed", "error"]
 JobStatusLiteral = Literal["queued", "running", "completed", "failed"]
@@ -49,7 +48,7 @@ class ChartDataContract(BaseModel):
 
 class ChatMessageContract(BaseModel):
     id: str
-    sender: Union["user", "ai"]
+    sender: Literal["user", "ai"]
     text: str
     chartData: Optional[ChartDataContract] = None
 

@@ -8,7 +8,6 @@ from typing import Any, Mapping, MutableMapping, Optional
 
 from pydantic import BaseModel
 
-
 LOG_PATH = Path("artifacts/logs/totals_diagnostic.json")
 FIX_REPORT_PATH = Path("artifacts/fix_reports/null_total_correction.json")
 BENCHMARK_PATH = Path("artifacts/fix_reports/post_validation_benchmark.json")

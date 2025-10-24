@@ -5,7 +5,6 @@ from celery import Celery
 
 from .config import get_settings
 
-
 settings = get_settings()
 
 

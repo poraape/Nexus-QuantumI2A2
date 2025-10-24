@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
-    Ed25519PublicKey,
 )
 
 from .storage import SecureBucketClient
@@ -42,7 +41,7 @@ class AuditLogger:
                 encryption_algorithm=serialization.NoEncryption(),
             )
             # Write atomically to avoid partial keys
-            tmp_path = self.private_key_path.with_suffix('.tmp')
+            tmp_path = self.private_key_path.with_suffix(".tmp")
             tmp_path.write_bytes(pem)
             os.replace(tmp_path, self.private_key_path)
         return self._private_key
@@ -53,23 +52,23 @@ class AuditLogger:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
-        return pem.decode('utf-8')
+        return pem.decode("utf-8")
 
     def log(self, actor: str, action: str, metadata: Dict[str, Any] | None = None) -> None:
         entry: Dict[str, Any] = {
-            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
-            'actor': actor,
-            'action': action,
-            'metadata': metadata or {},
-            'public_key': self._public_key_b64(),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "actor": actor,
+            "action": action,
+            "metadata": metadata or {},
+            "public_key": self._public_key_b64(),
         }
-        serialized_entry = json.dumps(entry, sort_keys=True).encode('utf-8')
+        serialized_entry = json.dumps(entry, sort_keys=True).encode("utf-8")
         signature = self._load_private_key().sign(serialized_entry)
         record = {
-            'entry': entry,
-            'signature': signature.hex(),
+            "entry": entry,
+            "signature": signature.hex(),
         }
         line = json.dumps(record, sort_keys=True)
-        with self.log_path.open('a', encoding='utf-8') as fh:
-            fh.write(line + '\n')
+        with self.log_path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
         self.bucket.upload_file(self.log_path)

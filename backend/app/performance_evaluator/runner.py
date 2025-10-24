@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from statistics import mean, pstdev
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -398,7 +398,6 @@ class PerformanceEvaluator:
         adjustments = []
         baseline_score = efficiency_score
         for iteration in range(1, iterations + 1):
-            delta = max(0.0, (config.get("stop_condition", "").count("efficiency_score") * 0.5) - iteration * 0.5)
             adjustments.append(
                 {
                     "iteration": iteration,
