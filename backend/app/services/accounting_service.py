@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from app.schemas import AccountingOutput
+from ..schemas import AccountingOutput
 
 
 def generate_sped_stub(audited_docs: list[dict[str, Any]]) -> AccountingOutput:

@@ -1,6 +1,7 @@
 """OCR agent task backed by the synchronous orchestrator."""
 from __future__ import annotations
 
+import time
 import uuid
 from typing import Dict
 

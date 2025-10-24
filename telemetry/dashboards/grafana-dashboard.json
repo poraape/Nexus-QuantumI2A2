@@ -48,6 +48,39 @@
             "legendFormat": "Throughput"
           }
         ]
+      },
+      {
+        "type": "graph",
+        "title": "Latência p95 por agente",
+        "datasource": "OTLP-Metrics",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(agent_latency_ms_bucket[5m])) by (le, agent))",
+            "legendFormat": "{{agent}}"
+          }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "Taxa de sucesso dos agentes (SLO 99%)",
+        "datasource": "OTLP-Metrics",
+        "targets": [
+          {
+            "expr": "sum(rate(agent_success_total[5m])) by (agent) / (sum(rate(agent_success_total[5m])) by (agent) + sum(rate(agent_error_total[5m])) by (agent))",
+            "legendFormat": "{{agent}}"
+          }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "Inconsistências detectadas por agente (últimos 5m)",
+        "datasource": "OTLP-Metrics",
+        "targets": [
+          {
+            "expr": "sum(rate(agent_inconsistencies_total[5m])) by (agent)",
+            "legendFormat": "{{agent}}"
+          }
+        ]
       }
     ],
     "templating": {

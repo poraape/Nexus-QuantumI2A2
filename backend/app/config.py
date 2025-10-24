@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     storage_path: Path = Field(Path("backend_storage"), env="STORAGE_PATH")
     webhook_timeout_seconds: int = Field(10, env="WEBHOOK_TIMEOUT_SECONDS")
 
+    # Observability / telemetry
+    telemetry_service_name: str = Field("nexus-backend", env="TELEMETRY_SERVICE_NAME")
+    telemetry_environment: str = Field("development", env="TELEMETRY_ENVIRONMENT")
+    telemetry_enabled: bool = Field(True, env="TELEMETRY_ENABLED")
+    telemetry_export_interval_ms: int = Field(15000, env="TELEMETRY_EXPORT_INTERVAL_MS")
+    otel_exporter_otlp_endpoint: str = Field("http://localhost:4318", env="OTEL_EXPORTER_OTLP_ENDPOINT")
+    otel_exporter_otlp_headers: Optional[str] = Field(None, env="OTEL_EXPORTER_OTLP_HEADERS")
+
     # OAuth2 / JWT configuration
     jwt_secret_key: str = Field(..., env="JWT_SECRET_KEY")
     jwt_algorithm: str = Field("HS256", env="JWT_ALGORITHM")

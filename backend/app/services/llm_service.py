@@ -1,11 +1,28 @@
 """Cliente LLM com fallback."""
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 from typing import Any
 
-from tenacity import retry, stop_after_attempt, wait_exponential_jitter
+_TENACITY_AVAILABLE = importlib.util.find_spec("tenacity") is not None
+
+if _TENACITY_AVAILABLE:  # pragma: no cover - exercised em ambientes completos
+    from tenacity import retry, stop_after_attempt, wait_exponential_jitter
+else:  # pragma: no cover - fallback para testes offline
+
+    def retry(*args, **kwargs):  # type: ignore[no-untyped-def]
+        def decorator(func):
+            return func
+
+        return decorator
+
+    def stop_after_attempt(*args, **kwargs):  # type: ignore[no-untyped-def]
+        return None
+
+    def wait_exponential_jitter(*args, **kwargs):  # type: ignore[no-untyped-def]
+        return None
 
 logger = logging.getLogger(__name__)
 
