@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any, Iterable, Mapping, MutableMapping, Union
 
 from app.schemas import Document, DocumentTotals
+from app.utils import model_dump
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ def _item_taxes(item: Any) -> float:
 
 def totals_as_dict(totals: Any) -> MutableMapping[str, float]:
     if isinstance(totals, DocumentTotals):
-        return totals.model_dump()
+        return model_dump(totals)
     if isinstance(totals, Mapping):
         return {
             "items_total": to_float(totals.get("items_total") or totals.get("products")),
@@ -129,6 +130,6 @@ def ensure_document_totals(document: DocumentLike) -> DocumentLike:
     if isinstance(document, Document):
         document.totals = totals_object
     else:
-        document["totals"] = totals_object.model_dump()
+        document["totals"] = model_dump(totals_object)
 
     return document
