@@ -94,6 +94,31 @@ class Settings(BaseSettings):
     llm_model: str = Field("gemini-2.0-flash", env="LLM_MODEL")
     llm_endpoint: Optional[str] = Field(None, env="LLM_ENDPOINT")
 
+    # Token budgeting
+    token_budget_total: int = Field(120_000, env="TOKEN_BUDGET_TOTAL")
+    token_budget_per_agent: dict[str, int] = Field(
+        default_factory=lambda: {
+            "ocr": 40_000,
+            "auditor": 25_000,
+            "classifier": 20_000,
+            "accountant": 15_000,
+            "crossValidator": 12_000,
+            "intelligence": 30_000,
+        },
+        env="TOKEN_BUDGET_PER_AGENT",
+    )
+    token_budget_per_step: dict[str, dict[str, int]] = Field(
+        default_factory=lambda: {
+            "ocr": {"ingest": 40_000},
+            "auditor": {"analysis": 20_000},
+            "classifier": {"classification": 18_000},
+            "accountant": {"reconciliation": 15_000},
+            "crossValidator": {"consistency": 10_000},
+            "intelligence": {"analysis": 25_000},
+        },
+        env="TOKEN_BUDGET_PER_STEP",
+    )
+
     # OCR configuration
     ocr_language: str = Field("por", env="OCR_LANGUAGE")
 

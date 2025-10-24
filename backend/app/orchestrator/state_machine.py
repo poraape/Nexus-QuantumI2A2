@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping, Optional
 
 from app.agents.accountant import AccountantAgent
 from app.agents.auditor import AuditorAgent
@@ -20,6 +20,8 @@ from app.schemas import (
     InsightReport,
 )
 from app.services.diagnostic_logger import log_totals_event, update_post_validation_benchmark
+from app.services.orchestrator.budget import TokenBudgetManager
+from app.services.orchestrator.prompt_optimizer import PromptOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +38,24 @@ class PipelineRunResult:
 
 
 class PipelineOrchestrator:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        budget_manager: Optional[TokenBudgetManager] = None,
+        prompt_optimizer: Optional[PromptOptimizer] = None,
+    ) -> None:
+        self.budget_manager = budget_manager
+        self.prompt_optimizer = prompt_optimizer or PromptOptimizer()
         self.extractor = ExtractorAgent()
         self.auditor = AuditorAgent()
         self.classifier = ClassifierAgent()
         self.accountant = AccountantAgent()
-        self.intelligence = IntelligenceAgent()
+        self.intelligence = IntelligenceAgent(prompt_optimizer=self.prompt_optimizer)
+
+    def _consume_stage(self, agent: str, step: str, metadata: Mapping[str, Any] | None) -> None:
+        if not self.budget_manager:
+            return
+        self.budget_manager.consume_for_stage(agent, step, metadata)
 
     def _load_corrections(self, metadata: Mapping[str, Any] | None) -> dict[str, str]:
         if not isinstance(metadata, Mapping):
@@ -78,6 +92,8 @@ class PipelineOrchestrator:
         return any(to_float(value) == 0.0 for value in totals_dict.values())
 
     def run(self, document_in: DocumentIn) -> PipelineRunResult:
+        metadata = document_in.metadata if hasattr(document_in, "metadata") else None
+        self._consume_stage("ocr", "ingest", metadata)
         document = self.extractor.run(document_in)
         document = ensure_document_totals(document)  # type: ignore[assignment]
         logger.info(
@@ -90,9 +106,12 @@ class PipelineOrchestrator:
             }
         )
 
+        self._consume_stage("auditor", "analysis", metadata)
         audit = self.auditor.run(document)
         corrections = self._load_corrections(document_in.metadata if hasattr(document_in, "metadata") else None)
+        self._consume_stage("classifier", "classification", metadata)
         classification = self.classifier.run(audit, corrections=corrections)
+        self._consume_stage("accountant", "reconciliation", metadata)
         accounting = self.accountant.run(classification)
         logger.info(
             {
@@ -137,7 +156,8 @@ class PipelineOrchestrator:
             }
         )
 
-        insights = self.intelligence.run(accounting)
+        self._consume_stage("crossValidator", "consistency", metadata)
+        insights = self.intelligence.run(accounting, budget_manager=self.budget_manager)
         return PipelineRunResult(
             document=document,
             audit=audit,
