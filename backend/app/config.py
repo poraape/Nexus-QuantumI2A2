@@ -1,6 +1,7 @@
 """Application configuration using environment variables."""
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -70,6 +71,31 @@ class Settings(BaseSettings):
     llm_model: str = Field("gemini-2.0-flash", env="LLM_MODEL")
     llm_endpoint: Optional[str] = Field(None, env="LLM_ENDPOINT")
 
+    # Token budgeting
+    token_budget_total: int = Field(120_000, env="TOKEN_BUDGET_TOTAL")
+    token_budget_per_agent: dict[str, int] = Field(
+        default_factory=lambda: {
+            "ocr": 40_000,
+            "auditor": 25_000,
+            "classifier": 20_000,
+            "accountant": 15_000,
+            "crossValidator": 12_000,
+            "intelligence": 30_000,
+        },
+        env="TOKEN_BUDGET_PER_AGENT",
+    )
+    token_budget_per_step: dict[str, dict[str, int]] = Field(
+        default_factory=lambda: {
+            "ocr": {"ingest": 40_000},
+            "auditor": {"analysis": 20_000},
+            "classifier": {"classification": 18_000},
+            "accountant": {"reconciliation": 15_000},
+            "crossValidator": {"consistency": 10_000},
+            "intelligence": {"analysis": 25_000},
+        },
+        env="TOKEN_BUDGET_PER_STEP",
+    )
+
     # OCR configuration
     ocr_language: str = Field("por", env="OCR_LANGUAGE")
 
@@ -108,6 +134,36 @@ class Settings(BaseSettings):
         allowed = {"lax", "none", "strict"}
         if normalized not in allowed:
             raise ValueError("COOKIE_SAMESITE must be one of: lax, none, strict")
+        return normalized
+
+    @validator("token_budget_per_agent", pre=True)
+    def parse_agent_budget(cls, value: str | dict[str, int]) -> dict[str, int]:
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:  # pragma: no cover - defensive
+                raise ValueError("TOKEN_BUDGET_PER_AGENT must be valid JSON") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError("TOKEN_BUDGET_PER_AGENT must decode to a mapping")
+            return {str(key): int(v) for key, v in parsed.items()}
+        return {str(key): int(v) for key, v in value.items()}
+
+    @validator("token_budget_per_step", pre=True)
+    def parse_step_budget(cls, value: str | dict[str, dict[str, int]]) -> dict[str, dict[str, int]]:
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:  # pragma: no cover - defensive
+                raise ValueError("TOKEN_BUDGET_PER_STEP must be valid JSON") from exc
+        else:
+            parsed = value
+        if not isinstance(parsed, dict):
+            raise ValueError("TOKEN_BUDGET_PER_STEP must decode to a mapping")
+        normalized: dict[str, dict[str, int]] = {}
+        for agent, steps in parsed.items():
+            if not isinstance(steps, dict):
+                raise ValueError("TOKEN_BUDGET_PER_STEP values must be mappings")
+            normalized[str(agent)] = {str(step): int(limit) for step, limit in steps.items()}
         return normalized
 
 
