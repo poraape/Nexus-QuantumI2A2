@@ -15,6 +15,36 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from .storage import SecureBucketClient
 
 
+def load_or_create_private_key(path: Path) -> Ed25519PrivateKey:
+    """Load an Ed25519 private key from disk, generating it when absent."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        key_data = path.read_bytes()
+        return serialization.load_pem_private_key(key_data, password=None)
+
+    private_key = Ed25519PrivateKey.generate()
+    pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_bytes(pem)
+    os.replace(tmp_path, path)
+    return private_key
+
+
+def public_key_pem(private_key: Ed25519PrivateKey) -> str:
+    """Return the PEM encoded public key for the provided private key."""
+
+    pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return pem.decode("utf-8")
+
+
 @dataclass
 class AuditLogger:
     log_path: Path
@@ -27,32 +57,12 @@ class AuditLogger:
         self.private_key_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _load_private_key(self) -> Ed25519PrivateKey:
-        if self._private_key is not None:
-            return self._private_key
-
-        if self.private_key_path.exists():
-            key_data = self.private_key_path.read_bytes()
-            self._private_key = serialization.load_pem_private_key(key_data, password=None)
-        else:
-            self._private_key = Ed25519PrivateKey.generate()
-            pem = self._private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption(),
-            )
-            # Write atomically to avoid partial keys
-            tmp_path = self.private_key_path.with_suffix(".tmp")
-            tmp_path.write_bytes(pem)
-            os.replace(tmp_path, self.private_key_path)
+        if self._private_key is None:
+            self._private_key = load_or_create_private_key(self.private_key_path)
         return self._private_key
 
     def _public_key_b64(self) -> str:
-        public_key = self._load_private_key().public_key()
-        pem = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-        return pem.decode("utf-8")
+        return public_key_pem(self._load_private_key())
 
     def log(self, actor: str, action: str, metadata: Dict[str, Any] | None = None) -> None:
         entry: Dict[str, Any] = {
